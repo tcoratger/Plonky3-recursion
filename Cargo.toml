@@ -1,7 +1,5 @@
-[package]
-description = "Plonky3 native support for uni-stark recursion."
-name = "p3-recursion"
-authors = ["The Plonky3 developers"]
+[workspace.package]
+description = "Plonky3 native support for recursive proof composition"
 version = "0.1.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"
@@ -10,4 +8,16 @@ homepage = "https://github.com/Plonky3/Plonky3-recursion"
 keywords = ["cryptography", "SNARK", "PLONK", "FRI", "plonky3"]
 categories = ["cryptography::cryptocurrencies"]
 
-[dependencies]
+[workspace]
+members = [
+    "recursion",
+]
+
+[workspace.dependencies]
+
+# Local dependencies
+p3-recursion = { path = "recursion", version = "0.1.0" }
+
+[profile.profiling]
+inherits = "release"
+debug = true
