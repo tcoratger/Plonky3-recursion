@@ -1,12 +1,3 @@
-[workspace.package]
-description = "Plonky3 native support for recursive proof composition"
-version = "0.1.0"
-edition = "2024"
-license = "MIT OR Apache-2.0"
-repository = "https://github.com/Plonky3/Plonky3-recursion"
-homepage = "https://github.com/Plonky3/Plonky3-recursion"
-keywords = ["cryptography", "SNARK", "PLONK", "FRI", "plonky3"]
-categories = ["cryptography::cryptocurrencies"]
 
 [workspace]
 members = [
@@ -18,6 +9,16 @@ members = [
     "recursion",
     "symmetric-air",
 ]
+
+[workspace.package]
+description = "Plonky3 native support for recursive proof composition"
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/Plonky3/Plonky3-recursion"
+homepage = "https://github.com/Plonky3/Plonky3-recursion"
+keywords = ["cryptography", "SNARK", "PLONK", "FRI", "plonky3"]
+categories = ["cryptography::cryptocurrencies"]
 
 [workspace.dependencies]
 
