@@ -1,3 +1,7 @@
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
+use alloc::{format, vec};
+
 use p3_field::Field;
 
 use crate::circuit::Circuit;
@@ -139,17 +143,17 @@ pub struct CircuitRunner<F> {
 impl<
     F: Clone
         + Default
-        + std::ops::Add<Output = F>
-        + std::ops::Sub<Output = F>
-        + std::ops::Mul<Output = F>
+        + core::ops::Add<Output = F>
+        + core::ops::Sub<Output = F>
+        + core::ops::Mul<Output = F>
         + PartialEq
-        + std::fmt::Debug
+        + core::fmt::Debug
         + Field,
 > CircuitRunner<F>
 {
     /// Create a new prover instance
     pub fn new(circuit: Circuit<F>) -> Self {
-        let witness = vec![None; circuit.slot_count as usize];
+        let witness = vec![None; circuit.witness_count as usize];
         let complex_op_private_data = vec![None; circuit.non_primitive_ops.len()];
         Self {
             circuit,
@@ -173,7 +177,7 @@ impl<
 
         for (i, value) in public_values.iter().enumerate() {
             let widx = self.circuit.public_rows[i];
-            self.witness[widx.0 as usize] = Some(*value);
+            self.set_witness(widx, *value)?;
         }
 
         Ok(())
@@ -532,11 +536,11 @@ impl<
 impl<
     F: Clone
         + Default
-        + std::ops::Add<Output = F>
-        + std::ops::Sub<Output = F>
-        + std::ops::Mul<Output = F>
+        + core::ops::Add<Output = F>
+        + core::ops::Sub<Output = F>
+        + core::ops::Mul<Output = F>
         + PartialEq
-        + std::fmt::Debug
+        + core::fmt::Debug
         + Field,
 > Circuit<F>
 {
@@ -548,6 +552,9 @@ impl<
 
 #[cfg(test)]
 mod tests {
+    extern crate std;
+    use std::println;
+
     use p3_baby_bear::BabyBear;
     use p3_field::extension::BinomialExtensionField;
     use p3_field::{BasedVectorSpace, PrimeCharacteristicRing};
@@ -591,7 +598,6 @@ mod tests {
     fn test_toy_example_37_times_x_minus_111() {
         let mut builder = CircuitBuilder::<BabyBear>::new();
 
-        // DESIGN.txt example: 37 * x - 111 = 0
         let x = builder.add_public_input();
         let c37 = builder.add_const(BabyBear::from_u64(37));
         let c111 = builder.add_const(BabyBear::from_u64(111));
@@ -611,7 +617,7 @@ mod tests {
             println!("{i}: {prim:?}");
         }
 
-        let slot_count = circuit.slot_count;
+        let witness_count = circuit.witness_count;
         let mut runner = circuit.runner();
 
         // Set public input: x = 3 (should satisfy 37 * 3 - 111 = 0)
@@ -666,6 +672,20 @@ mod tests {
             );
         }
 
+        println!("\n=== ADD TRACE ===");
+        for i in 0..traces.add_trace.lhs_values.len() {
+            println!(
+                "Row {}: WitnessId({}) + WitnessId({}) -> WitnessId({}) | {:?} + {:?} -> {:?}",
+                i,
+                traces.add_trace.lhs_index[i],
+                traces.add_trace.rhs_index[i],
+                traces.add_trace.result_index[i],
+                traces.add_trace.lhs_values[i],
+                traces.add_trace.rhs_values[i],
+                traces.add_trace.result_values[i]
+            );
+        }
+
         println!("\n=== SUB TRACE ===");
         for i in 0..traces.sub_trace.lhs_values.len() {
             println!(
@@ -681,7 +701,7 @@ mod tests {
         }
 
         // Verify trace structure
-        assert_eq!(traces.witness_trace.index.len(), slot_count as usize);
+        assert_eq!(traces.witness_trace.index.len(), witness_count as usize);
 
         // Should have constants: 37, 111, 1 and 0 (for assert_zero)
         assert!(traces.const_trace.values.len() >= 4);
@@ -693,8 +713,8 @@ mod tests {
         // Should have two mul operations (explicit Mul and Div lowering to Mul with inverse)
         assert_eq!(traces.mul_trace.lhs_values.len(), 2);
 
-        // Should have four sub operations (2 explicit Sub and 2 assert_zero lowering to Sub with zero)
-        assert_eq!(traces.sub_trace.lhs_values.len(), 4);
+        // Should have two sub operations
+        assert_eq!(traces.sub_trace.lhs_values.len(), 2);
     }
 
     #[test]
