@@ -245,10 +245,7 @@ where
         context: &str,
     ) -> WitnessId {
         *expr_to_widx.get(&expr_id).unwrap_or_else(|| {
-            panic!(
-                "Expression {:?} not found in witness mapping: {}",
-                expr_id, context
-            )
+            panic!("Expression {expr_id:?} not found in witness mapping: {context}",)
         })
     }
 
