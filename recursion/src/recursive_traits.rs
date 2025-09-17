@@ -1,4 +1,6 @@
-use std::marker::PhantomData;
+use alloc::vec;
+use alloc::vec::Vec;
+use core::marker::PhantomData;
 
 use p3_circuit::{CircuitBuilder, ExprId};
 use p3_commit::{Mmcs, Pcs};
