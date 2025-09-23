@@ -38,12 +38,15 @@ pub enum CircuitError {
     /// Division by zero encountered.
     DivisionByZero,
     /// Invalid bit value in SampleBits bit decomposition (must be 0 or 1).
-    InvalidBitValue { input_witness_id: u32, bit_value: String },
+    InvalidBitValue {
+        input_witness_id: u32,
+        bit_value: String,
+    },
     /// Bit decomposition doesn't reconstruct to the input value.
     BitDecompositionMismatch {
         input_witness_id: u32,
         expected: String,
-        reconstructed: String
+        reconstructed: String,
     },
 }
 
@@ -102,11 +105,24 @@ impl core::fmt::Display for CircuitError {
             CircuitError::DivisionByZero => {
                 write!(f, "Division by zero encountered")
             }
-            CircuitError::InvalidBitValue { input_witness_id, bit_value } => {
-                write!(f, "Invalid bit value in SampleBits bit decomposition for WitnessId({input_witness_id}): {bit_value} (must be 0 or 1)")
+            CircuitError::InvalidBitValue {
+                input_witness_id,
+                bit_value,
+            } => {
+                write!(
+                    f,
+                    "Invalid bit value in SampleBits bit decomposition for WitnessId({input_witness_id}): {bit_value} (must be 0 or 1)"
+                )
             }
-            CircuitError::BitDecompositionMismatch { input_witness_id, expected, reconstructed } => {
-                write!(f, "Bit decomposition for WitnessId({input_witness_id}) doesn't match input: expected {expected}, reconstructed {reconstructed}")
+            CircuitError::BitDecompositionMismatch {
+                input_witness_id,
+                expected,
+                reconstructed,
+            } => {
+                write!(
+                    f,
+                    "Bit decomposition for WitnessId({input_witness_id}) doesn't match input: expected {expected}, reconstructed {reconstructed}"
+                )
             }
         }
     }
@@ -653,7 +669,8 @@ impl<
                 };
 
                 // Compute output value by extracting the lowest num_bits bits
-                let output_value = self.compute_sample_bits(input_value, &private_data, input, output)?;
+                let output_value =
+                    self.compute_sample_bits(input_value, &private_data, input, output)?;
 
                 // Store the computed output in the witness table
                 self.set_witness(output, output_value)?;

@@ -252,11 +252,7 @@ where
     /// The private data must include:
     /// - `num_bits`: Number of bits to extract (1 ≤ num_bits ≤ 63)
     /// - `bit_decomposition`: Binary representation of input for range checking
-    pub fn add_sample_bits(
-        &mut self,
-        input_expr: ExprId,
-        output_expr: ExprId,
-    ) -> NonPrimitiveOpId {
+    pub fn add_sample_bits(&mut self, input_expr: ExprId, output_expr: ExprId) -> NonPrimitiveOpId {
         let op_id = NonPrimitiveOpId(self.non_primitive_ops.len() as u32);
         let witness_exprs = vec![input_expr, output_expr];
         self.non_primitive_ops
@@ -531,16 +527,10 @@ where
                             got: witness_exprs.len(),
                         });
                     }
-                    let input_widx = Self::get_witness_id(
-                        expr_to_widx,
-                        witness_exprs[0],
-                        "SampleBits input",
-                    )?;
-                    let output_widx = Self::get_witness_id(
-                        expr_to_widx,
-                        witness_exprs[1],
-                        "SampleBits output",
-                    )?;
+                    let input_widx =
+                        Self::get_witness_id(expr_to_widx, witness_exprs[0], "SampleBits input")?;
+                    let output_widx =
+                        Self::get_witness_id(expr_to_widx, witness_exprs[1], "SampleBits output")?;
 
                     lowered_ops.push(NonPrimitiveOp::SampleBits {
                         input: input_widx,
