@@ -6,7 +6,7 @@ use crate::types::WitnessId;
 ///
 /// These operations form the core computational primitives after expression lowering.
 /// All primitive operations:
-/// - Operate on witness table slots (WitnessId)  
+/// - Operate on witness table slots (WitnessId)
 /// - Can be heavily optimized (constant folding, CSE, etc.)
 /// - Are executed in topological order during circuit evaluation
 /// - Form a directed acyclic graph (DAG) of dependencies
@@ -48,6 +48,7 @@ pub enum Prim<F> {
 #[derive(Debug, Clone, PartialEq)]
 pub enum NonPrimitiveOpType {
     FakeMerkleVerify,
+    SampleBits,
     // Future: FriVerify, HashAbsorb, etc.
 }
 
@@ -81,6 +82,22 @@ pub enum NonPrimitiveOp {
     /// - Merkle path siblings and direction bits
     /// - See `FakeMerklePrivateData` for complete specification
     FakeMerkleVerify { leaf: WitnessId, root: WitnessId },
+
+    /// Circuit version of challenger.sample_bits(n) for FRI verification
+    ///
+    /// Extracts the lowest `bits` bits from a sampled field element, equivalent to
+    /// the operation `rand_usize & ((1 << bits) - 1)` from the challenger.
+    /// This is used in FRI to generate random indices for query verification.
+    ///
+    /// Public interface (on witness bus):
+    /// - `input`: Field element from challenger sampling (WitnessId)
+    /// - `output`: Extracted bits as field element, range [0, 2^bits - 1] (WitnessId)
+    ///
+    /// Private data (set via NonPrimitiveOpId):
+    /// - Number of bits to extract (1 ≤ bits ≤ 63)
+    /// - Bit decomposition witness for range checking
+    /// - See `SampleBitsPrivateData` for complete specification
+    SampleBits { input: WitnessId, output: WitnessId },
 }
 
 /// Private auxiliary data for non-primitive operations
@@ -98,6 +115,12 @@ pub enum NonPrimitiveOpPrivateData<F> {
     /// to generate a valid proof. This data is not part of the public
     /// circuit specification.
     FakeMerkleVerify(FakeMerklePrivateData<F>),
+
+    /// Private data for sample_bits operation
+    ///
+    /// Contains the number of bits to extract and the bit decomposition
+    /// witness needed for range checking constraints.
+    SampleBits(SampleBitsPrivateData<F>),
 }
 
 /// Private Merkle path data for fake Merkle verification (simplified)
@@ -125,4 +148,30 @@ pub struct FakeMerklePrivateData<F> {
     /// `true` = current node is right child. Used to determine
     /// hash input ordering: `hash(current, sibling)` vs `hash(sibling, current)`.
     pub path_directions: Vec<bool>,
+}
+
+/// Private data for sample_bits operation
+///
+/// Contains the parameters and witness data needed to constrain the bitwise
+/// extraction operation. The prover provides a bit decomposition of the input
+/// field element, and the constraint system verifies that the output correctly
+/// extracts the lowest `num_bits` bits.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SampleBitsPrivateData<F> {
+    /// Number of bits to extract from the input field element
+    ///
+    /// Must satisfy: 1 ≤ num_bits ≤ 63 (to fit in usize and avoid overflow)
+    /// TODO: Maybe in the future, we can support extracting more than 63 bits.
+    ///
+    /// The output will be in the range [0, 2^num_bits - 1]
+    pub num_bits: usize,
+
+    /// Bit decomposition of the input field element
+    ///
+    /// A vector of field elements, each representing a bit (0 or 1).
+    /// The length equals the field element's bit width (typically 64 bits).
+    /// Used by the constraint system to verify the bitwise extraction.
+    ///
+    /// Constraint: input = sum(bit_decomposition[i] * 2^i for i in 0..len)
+    pub bit_decomposition: Vec<F>,
 }
