@@ -130,8 +130,8 @@ mod tests {
 
     #[test]
     fn test_witness_air_extension_field() {
-        use p3_field::extension::BinomialExtensionField;
         use p3_field::BasedVectorSpace;
+        use p3_field::extension::BinomialExtensionField;
 
         type Ext4 = BinomialExtensionField<Val, 4>;
 
@@ -140,19 +140,24 @@ mod tests {
             Val::from_u64(2),
             Val::from_u64(3),
             Val::from_u64(4),
-        ]).unwrap();
+        ])
+        .unwrap();
 
         let b = Ext4::from_basis_coefficients_slice(&[
             Val::from_u64(5),
             Val::from_u64(6),
             Val::from_u64(7),
             Val::from_u64(8),
-        ]).unwrap();
+        ])
+        .unwrap();
 
         let values = vec![a, b];
         let indices = vec![0, 1];
 
-        let trace = WitnessTrace { values, index: indices };
+        let trace = WitnessTrace {
+            values,
+            index: indices,
+        };
         let matrix = WitnessAir::<Val, 4>::trace_to_matrix(&trace);
 
         // Verify dimensions: D + 1 = 4 + 1 = 5 columns
@@ -180,7 +185,10 @@ mod tests {
         let values = vec![Val::from_u64(42)];
         let indices = vec![0];
 
-        let trace = WitnessTrace { values, index: indices };
+        let trace = WitnessTrace {
+            values,
+            index: indices,
+        };
         let matrix = WitnessAir::<Val, 1>::trace_to_matrix(&trace);
 
         // Should be padded to power of two
@@ -191,7 +199,7 @@ mod tests {
         {
             let row0 = matrix.row_slice(0).unwrap();
             assert_eq!(row0[0], Val::from_u64(42)); // value
-            assert_eq!(row0[1], Val::from_u64(0));  // index = 0
+            assert_eq!(row0[1], Val::from_u64(0)); // index = 0
         }
 
         let config = build_test_config();
@@ -208,7 +216,10 @@ mod tests {
         let values: Vec<Val> = (1..=n as u64).map(Val::from_u64).collect();
         let indices: Vec<u32> = (0..n as u32).collect();
 
-        let trace = WitnessTrace { values, index: indices };
+        let trace = WitnessTrace {
+            values,
+            index: indices,
+        };
         let matrix = WitnessAir::<Val, 1>::trace_to_matrix(&trace);
 
         // Should be padded to next power of two (4)
