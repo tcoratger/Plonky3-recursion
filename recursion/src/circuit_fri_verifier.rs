@@ -96,7 +96,6 @@ pub fn verify_query<F: Field>(
     builder.connect(folded_eval, final_value);
 }
 
-
 /// Compute x₀ for phase `i` from the query index bits and a caller-provided power ladder.
 ///
 /// For phase with folded height `k` (log_folded_height), caller must pass:

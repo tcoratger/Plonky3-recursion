@@ -375,8 +375,8 @@ mod tests {
 
         // Verify the bits are correctly decomposed - 6 = [0,1,1] in little-endian
         assert_eq!(traces.public_trace.values[0], BabyBear::ZERO); // bit 0
-        assert_eq!(traces.public_trace.values[1], BabyBear::ONE);  // bit 1
-        assert_eq!(traces.public_trace.values[2], BabyBear::ONE);  // bit 2
+        assert_eq!(traces.public_trace.values[1], BabyBear::ONE); // bit 1
+        assert_eq!(traces.public_trace.values[2], BabyBear::ONE); // bit 2
 
         // Also verify that the returned bits have the expected length
         assert_eq!(bits.len(), 3);
