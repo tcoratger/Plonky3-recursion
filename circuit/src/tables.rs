@@ -327,18 +327,6 @@ impl<
             ) => {
                 // Type match - good!
             }
-            (
-                crate::op::NonPrimitiveOp::SampleBits { .. },
-                NonPrimitiveOpPrivateData::SampleBits(_),
-            ) => {
-                // Type match - good!
-            }
-            _ => {
-                return Err(CircuitError::NonPrimitiveOpIdOutOfRange {
-                    op_id: op_id.0,
-                    max_ops: self.circuit.non_primitive_ops.len(),
-                });
-            }
         }
 
         self.non_primitive_op_private_data[op_id.0 as usize] = Some(private_data);
@@ -568,7 +556,6 @@ impl<
             // Copy out leaf/root to end immutable borrow immediately
             let (leaf, root) = match &self.circuit.non_primitive_ops[op_idx] {
                 crate::op::NonPrimitiveOp::FakeMerkleVerify { leaf, root } => (*leaf, *root),
-                _ => continue, // Skip non-FakeMerkleVerify operations
             };
 
             // Clone private data option to avoid holding a borrow on self
@@ -636,120 +623,18 @@ impl<
         })
     }
 
+    /// Generate trace for SampleBits operations
     fn generate_sample_bits_trace(&mut self) -> Result<SampleBitsTrace<F>, CircuitError> {
-        let mut input_values = Vec::new();
-        let mut input_index = Vec::new();
-        let mut output_values = Vec::new();
-        let mut output_index = Vec::new();
-        let mut num_bits = Vec::new();
-        let mut bit_decompositions = Vec::new();
-        let mut bit_decomposition_lengths = Vec::new();
-
-        // Process each SampleBits operation
-        for op_idx in 0..self.circuit.non_primitive_ops.len() {
-            // Extract input and output indices
-            let (input, output) = match &self.circuit.non_primitive_ops[op_idx] {
-                crate::op::NonPrimitiveOp::SampleBits { input, output } => (*input, *output),
-                _ => continue, // Skip non-SampleBits operations
-            };
-
-            // Get private data for this operation
-            if let Some(Some(crate::op::NonPrimitiveOpPrivateData::SampleBits(private_data))) =
-                self.non_primitive_op_private_data.get(op_idx).cloned()
-            {
-                // Get input value from witness
-                let input_value = if let Some(val) =
-                    self.witness.get(input.0 as usize).and_then(|x| x.as_ref())
-                {
-                    *val
-                } else {
-                    return Err(CircuitError::NonPrimitiveOpWitnessNotSet {
-                        operation_index: op_idx,
-                    });
-                };
-
-                // Compute output value by extracting the lowest num_bits bits
-                let output_value =
-                    self.compute_sample_bits(input_value, &private_data, input, output)?;
-
-                // Store the computed output in the witness table
-                self.set_witness(output, output_value)?;
-
-                // Add to trace
-                input_values.push(input_value);
-                input_index.push(input.0);
-                output_values.push(output_value);
-                output_index.push(output.0);
-                num_bits.push(private_data.num_bits as u32);
-
-                // Add bit decomposition to flattened vector
-                bit_decomposition_lengths.push(private_data.bit_decomposition.len() as u32);
-                bit_decompositions.extend_from_slice(&private_data.bit_decomposition);
-            } else {
-                return Err(CircuitError::NonPrimitiveOpMissingPrivateData {
-                    operation_index: op_idx,
-                });
-            }
-        }
-
+        // TODO: fill in with actual trace generation
         Ok(SampleBitsTrace {
-            input_values,
-            input_index,
-            output_values,
-            output_index,
-            num_bits,
-            bit_decompositions,
-            bit_decomposition_lengths,
+            input_values: Vec::new(),
+            input_index: Vec::new(),
+            output_values: Vec::new(),
+            output_index: Vec::new(),
+            num_bits: Vec::new(),
+            bit_decompositions: Vec::new(),
+            bit_decomposition_lengths: Vec::new(),
         })
-    }
-
-    /// Compute the sample_bits operation: extract the lowest `num_bits` bits from input
-    fn compute_sample_bits(
-        &self,
-        input: F,
-        private_data: &crate::op::SampleBitsPrivateData<F>,
-        input_witness_id: WitnessId,
-        _output_witness_id: WitnessId,
-    ) -> Result<F, CircuitError> {
-        // Verify bit decomposition is correct
-        let mut reconstructed = F::ZERO;
-        let mut power_of_two = F::ONE;
-
-        for &bit in &private_data.bit_decomposition {
-            // Verify each bit is 0 or 1
-            if bit != F::ZERO && bit != F::ONE {
-                return Err(CircuitError::InvalidBitValue {
-                    input_witness_id: input_witness_id.0,
-                    bit_value: format!("{:?}", bit),
-                });
-            }
-
-            reconstructed += bit * power_of_two;
-            power_of_two += power_of_two;
-        }
-
-        // Verify bit decomposition matches input
-        if reconstructed != input {
-            return Err(CircuitError::BitDecompositionMismatch {
-                input_witness_id: input_witness_id.0,
-                expected: format!("{:?}", input),
-                reconstructed: format!("{:?}", reconstructed),
-            });
-        }
-
-        // Extract the lowest num_bits bits
-        let mut result = F::ZERO;
-        let mut power_of_two = F::ONE;
-
-        for i in 0..private_data
-            .num_bits
-            .min(private_data.bit_decomposition.len())
-        {
-            result += private_data.bit_decomposition[i] * power_of_two;
-            power_of_two += power_of_two;
-        }
-
-        Ok(result)
     }
 }
 

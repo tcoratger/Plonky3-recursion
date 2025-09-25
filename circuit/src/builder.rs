@@ -55,7 +55,7 @@ fn build_connect_dsu(connects: &[(ExprId, ExprId)]) -> HashMap<usize, usize> {
 ///
 /// This struct provides methods to build up a computation graph by adding:
 /// - Public inputs
-/// - Constants  
+/// - Constants
 /// - Arithmetic operations (add, multiply, subtract)
 /// - Assertions (values that must equal zero)
 /// - Complex operations (like Merkle tree verification)
@@ -234,29 +234,6 @@ where
         self.non_primitive_ops
             .push((op_id, NonPrimitiveOpType::FakeMerkleVerify, witness_exprs));
 
-        op_id
-    }
-
-    /// Add a sample_bits operation to the circuit.
-    ///
-    /// This performs the circuit version of challenger.sample_bits(n), extracting
-    /// the lowest `bits` bits from the input field element.
-    ///
-    /// # Arguments
-    /// * `input_expr` - Expression representing the input field element
-    /// * `output_expr` - Expression where the extracted bits result will be stored
-    ///
-    /// # Returns
-    /// Operation ID for setting private data (number of bits and bit decomposition)
-    ///
-    /// The private data must include:
-    /// - `num_bits`: Number of bits to extract (1 ≤ num_bits ≤ 63)
-    /// - `bit_decomposition`: Binary representation of input for range checking
-    pub fn add_sample_bits(&mut self, input_expr: ExprId, output_expr: ExprId) -> NonPrimitiveOpId {
-        let op_id = NonPrimitiveOpId(self.non_primitive_ops.len() as u32);
-        let witness_exprs = vec![input_expr, output_expr];
-        self.non_primitive_ops
-            .push((op_id, NonPrimitiveOpType::SampleBits, witness_exprs));
         op_id
     }
 }
@@ -519,24 +496,6 @@ where
                         root: root_widx,
                     });
                 }
-                NonPrimitiveOpType::SampleBits => {
-                    if witness_exprs.len() != 2 {
-                        return Err(CircuitBuilderError::NonPrimitiveOpArity {
-                            op: "SampleBits",
-                            expected: 2,
-                            got: witness_exprs.len(),
-                        });
-                    }
-                    let input_widx =
-                        Self::get_witness_id(expr_to_widx, witness_exprs[0], "SampleBits input")?;
-                    let output_widx =
-                        Self::get_witness_id(expr_to_widx, witness_exprs[1], "SampleBits output")?;
-
-                    lowered_ops.push(NonPrimitiveOp::SampleBits {
-                        input: input_widx,
-                        output: output_widx,
-                    });
-                } // Add more variants here as needed
             }
         }
 
