@@ -97,8 +97,6 @@ pub struct Traces<F> {
     pub mul_trace: MulTrace<F>,
     /// Fake Merkle verification table
     pub fake_merkle_trace: FakeMerkleTrace<F>,
-    /// Sample bits operation table
-    pub sample_bits_trace: SampleBitsTrace<F>,
 }
 
 /// Central witness table with preprocessed index column
@@ -179,25 +177,6 @@ pub struct FakeMerkleTrace<F> {
     pub result_index: Vec<u32>,
     /// Path direction bits (0 = left, 1 = right) - private
     pub path_directions: Vec<u32>,
-}
-
-/// Sample bits operation table for FRI challenger integration
-#[derive(Debug, Clone)]
-pub struct SampleBitsTrace<F> {
-    /// Input field element values (from challenger sampling)
-    pub input_values: Vec<F>,
-    /// Input indices (pointing to witness bus)
-    pub input_index: Vec<u32>,
-    /// Output values (extracted bits as field elements)
-    pub output_values: Vec<F>,
-    /// Output indices (pointing to witness bus)
-    pub output_index: Vec<u32>,
-    /// Number of bits extracted for each operation (private)
-    pub num_bits: Vec<u32>,
-    /// Bit decomposition witness for each input (private, flattened)
-    pub bit_decompositions: Vec<F>,
-    /// Lengths of each bit decomposition (private, for parsing bit_decompositions)
-    pub bit_decomposition_lengths: Vec<u32>,
 }
 
 /// Circuit runner that executes circuits and generates execution traces
@@ -299,7 +278,6 @@ impl<
         let add_trace = self.generate_add_trace()?;
         let mul_trace = self.generate_mul_trace()?;
         let fake_merkle_trace = self.generate_fake_merkle_trace()?;
-        let sample_bits_trace = self.generate_sample_bits_trace()?;
 
         Ok(Traces {
             witness_trace,
@@ -308,7 +286,6 @@ impl<
             add_trace,
             mul_trace,
             fake_merkle_trace,
-            sample_bits_trace,
         })
     }
 
@@ -574,20 +551,6 @@ impl<
             result_values,
             result_index,
             path_directions,
-        })
-    }
-
-    /// Generate trace for SampleBits operations
-    fn generate_sample_bits_trace(&mut self) -> Result<SampleBitsTrace<F>, CircuitError> {
-        // TODO: fill in with actual trace generation
-        Ok(SampleBitsTrace {
-            input_values: Vec::new(),
-            input_index: Vec::new(),
-            output_values: Vec::new(),
-            output_index: Vec::new(),
-            num_bits: Vec::new(),
-            bit_decompositions: Vec::new(),
-            bit_decomposition_lengths: Vec::new(),
         })
     }
 }
