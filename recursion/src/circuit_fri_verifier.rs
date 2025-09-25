@@ -113,6 +113,31 @@ pub fn reconstruct_index_from_bits<F: Field>(
     acc
 }
 
+/// Decompose a field element into its little-endian bits.
+///
+/// For a given target `x`, this function creates `N_BITS` new boolean targets `b_i`
+/// and adds constraints to enforce that:
+///     x = Σ b_i · 2^i
+pub fn decompose_to_bits<F: Field, const N_BITS: usize>(
+    builder: &mut CircuitBuilder<F>,
+    x: Target,
+) -> Vec<Target> {
+    let mut bits = Vec::with_capacity(N_BITS);
+
+    // Create bit witness variables
+    for _ in 0..N_BITS {
+        let bit = builder.add_public_input(); // TODO: Should be witness
+        builder.assert_bool(bit);
+        bits.push(bit);
+    }
+
+    // Constrain that the bits reconstruct to the original element
+    let reconstructed = reconstruct_index_from_bits(builder, &bits);
+    builder.connect(x, reconstructed);
+
+    bits
+}
+
 /// Compute x₀ for phase `i` from the query index bits and a caller-provided power ladder.
 ///
 /// For phase with folded height `k` (log_folded_height), caller must pass:
