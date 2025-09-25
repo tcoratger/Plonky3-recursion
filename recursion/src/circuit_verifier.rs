@@ -3,34 +3,37 @@ use alloc::vec::Vec;
 
 use itertools::{Itertools, zip_eq};
 use p3_circuit::utils::ColumnsTargets;
-use p3_circuit::{CircuitBuilder, ExprId};
+use p3_circuit::{CircuitBuilder, CircuitBuilderError, CircuitError};
 use p3_commit::Pcs;
 use p3_field::{BasedVectorSpace, Field, PrimeCharacteristicRing};
 use p3_uni_stark::StarkGenericConfig;
+use thiserror::Error;
 
+use crate::Target;
+use crate::recursive_generation::GenerationError;
 use crate::recursive_traits::{
     CommitmentTargets, OpenedValuesTargets, ProofTargets, Recursive, RecursiveAir, RecursivePcs,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum VerificationError {
+    #[error("Invalid proof shape")]
     InvalidProofShape,
+
+    #[error("Missing random opened values for existing random commitment")]
     RandomizationError,
+
+    #[error("Circuit error: {0}")]
+    Circuit(#[from] CircuitError),
+
+    #[error("Circuit builder error: {0}")]
+    CircuitBuilder(#[from] CircuitBuilderError),
+
+    #[error("Generation error: {0}")]
+    Generation(#[from] GenerationError),
 }
 
-impl core::fmt::Display for VerificationError {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self {
-            VerificationError::InvalidProofShape => write!(f, "Invalid proof shape"),
-            VerificationError::RandomizationError => write!(
-                f,
-                "Missing random opened values for existing random commitment"
-            ),
-        }
-    }
-}
-
-// Method to get all the challenge wires.
+// Method to get all the challenge targets.
 fn get_circuit_challenges<
     SC: StarkGenericConfig,
     Comm: Recursive<SC::Challenge, Input = <SC::Pcs as Pcs<SC::Challenge, SC::Challenger>>::Commitment>,
@@ -39,7 +42,7 @@ fn get_circuit_challenges<
 >(
     proof_targets: &ProofTargets<SC, Comm, OpeningProof>,
     circuit: &mut CircuitBuilder<SC::Challenge>,
-) -> Vec<ExprId>
+) -> Vec<Target>
 where
     SC::Pcs: RecursivePcs<
             SC,
@@ -51,7 +54,7 @@ where
 {
     let mut challenges = vec![];
     // TODO: Observe degree bits and degree_bits - is_zk.
-    // TODO: Observe local wires.
+    // TODO: Observe local targets.
     // TODO: Observe public values.
     // First Fiat-Shamir challenge `alpha`.
     challenges.push(circuit.add_public_input());
@@ -81,14 +84,14 @@ pub fn verify_circuit<
             SC::Challenge,
             Input = <SC::Pcs as Pcs<SC::Challenge, SC::Challenger>>::Commitment,
         > + Clone,
-    InputProof: Recursive<SC::Challenge> + Clone,
+    InputProof: Recursive<SC::Challenge>,
     OpeningProof: Recursive<SC::Challenge>,
 >(
     config: &SC,
     air: &A,
     circuit: &mut CircuitBuilder<SC::Challenge>,
     proof_targets: &ProofTargets<SC, Comm, OpeningProof>,
-    public_values: &[ExprId],
+    public_values: &[Target],
 ) -> Result<(), VerificationError>
 where
     A: RecursiveAir<SC::Challenge>,
@@ -240,9 +243,9 @@ where
                 let zp = zps[i];
 
                 let inner_result = chunk.iter().enumerate().fold(zero, |cur_s, (e_i, c)| {
-                    let e_i_wire =
+                    let e_i_target =
                         circuit.add_const(SC::Challenge::ith_basis_element(e_i).unwrap());
-                    let inner_mul = circuit.mul(e_i_wire, *c);
+                    let inner_mul = circuit.mul(e_i_target, *c);
                     circuit.add(cur_s, inner_mul)
                 });
                 let mul = circuit.mul(inner_result, zp);
@@ -278,32 +281,19 @@ fn vanishing_poly_at_point_circuit<
 >(
     config: &SC,
     domain: Domain,
-    zeta: ExprId,
+    zeta: Target,
     circuit: &mut CircuitBuilder<SC::Challenge>,
-) -> ExprId
+) -> Target
 where
     <SC as StarkGenericConfig>::Pcs: RecursivePcs<SC, InputProof, OpeningProof, Comm, Domain>,
 {
     let pcs = config.pcs();
     let inv = circuit.add_const(pcs.first_point(&domain).inverse());
     let mul = circuit.mul(zeta, inv);
-    let exp = exp_power_of_2(circuit, mul, pcs.log_size(&domain));
+    let exp = circuit.exp_power_of_2(mul, pcs.log_size(&domain));
     let one = circuit.add_const(SC::Challenge::ONE);
 
     circuit.sub(exp, one)
-}
-
-fn exp_power_of_2<F: Field>(
-    circuit: &mut CircuitBuilder<F>,
-    base: ExprId,
-    power_log: usize,
-) -> ExprId {
-    let mut res = base;
-    for _ in 0..power_log {
-        let square = circuit.mul(res, res);
-        res = square;
-    }
-    res
 }
 
 #[cfg(test)]
@@ -317,8 +307,8 @@ mod tests {
     use p3_air::{Air, AirBuilder, BaseAir};
     use p3_baby_bear::{BabyBear, Poseidon2BabyBear};
     use p3_challenger::{CanObserve, DuplexChallenger, FieldChallenger};
+    use p3_circuit::CircuitBuilder;
     use p3_circuit::utils::RowSelectorsTargets;
-    use p3_circuit::{CircuitBuilder, ExprId};
     use p3_commit::testing::TrivialPcs;
     use p3_commit::{Pcs, PolynomialSpace};
     use p3_dft::{Radix2DitParallel, TwoAdicSubgroupDft};
@@ -333,9 +323,10 @@ mod tests {
     use rand::rngs::SmallRng;
     use rand::{Rng, SeedableRng};
 
-    use crate::circuit_verifier::{exp_power_of_2, verify_circuit};
+    use crate::Target;
+    use crate::circuit_verifier::verify_circuit;
     use crate::recursive_traits::{
-        ComsWithOpenings, ProofTargets, Recursive, RecursiveLagrangeSelectors, RecursivePcs,
+        ComsWithOpeningsTargets, ProofTargets, Recursive, RecursiveLagrangeSelectors, RecursivePcs,
     };
 
     type DummyCom<F> = Vec<Vec<F>>;
@@ -401,15 +392,15 @@ mod tests {
         fn get_challenges_circuit(
             _circuit: &mut CircuitBuilder<<SC as StarkGenericConfig>::Challenge>,
             _proof_targets: &crate::recursive_traits::ProofTargets<SC, Comm, EmptyTarget>,
-        ) -> vec::Vec<p3_circuit::ExprId> {
+        ) -> vec::Vec<Target> {
             vec![]
         }
 
         fn verify_circuit(
             &self,
             _circuit: &mut CircuitBuilder<<SC as StarkGenericConfig>::Challenge>,
-            _challenges: &[ExprId],
-            _commitments_with_opening_points: &ComsWithOpenings<
+            _challenges: &[Target],
+            _commitments_with_opening_points: &ComsWithOpeningsTargets<
                 Comm,
                 TwoAdicMultiplicativeCoset<Val<SC>>,
             >,
@@ -421,7 +412,7 @@ mod tests {
             &self,
             circuit: &mut CircuitBuilder<SC::Challenge>,
             domain: &TwoAdicMultiplicativeCoset<Val<SC>>,
-            point: &ExprId,
+            point: &Target,
         ) -> RecursiveLagrangeSelectors {
             // Constants that we will need.
             let shift_inv = circuit.add_const(SC::Challenge::from(domain.shift_inverse()));
@@ -431,7 +422,7 @@ mod tests {
 
             // Unshifted and z_h
             let unshifted_point = circuit.mul(shift_inv, *point);
-            let us_exp = exp_power_of_2(circuit, unshifted_point, domain.log_size());
+            let us_exp = circuit.exp_power_of_2(unshifted_point, domain.log_size());
             let z_h = circuit.sub(us_exp, one);
 
             // Denominators
@@ -672,15 +663,15 @@ mod tests {
             .collect::<Vec<_>>();
 
         verify_circuit(&config, &air, &mut circuit_builder, &proof_targets, &[])
-            .map_err(|e| format!("{:?}", e))?;
+            .map_err(|e| format!("{e:?}"))?;
 
         let circuit = circuit_builder.build().unwrap();
         let mut runner = circuit.runner();
         runner
             .set_public_inputs(&pvs)
-            .map_err(|e| format!("{:?}", e))?;
+            .map_err(|e| format!("{e:?}"))?;
 
-        let _traces = runner.run().map_err(|e| format!("{:?}", e))?;
+        let _traces = runner.run().map_err(|e| format!("{e:?}"))?;
 
         Ok(())
     }

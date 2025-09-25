@@ -3,99 +3,83 @@ use alloc::vec::Vec;
 use alloc::{format, vec};
 
 use p3_field::Field;
+use thiserror::Error;
 
 use crate::circuit::Circuit;
 use crate::op::{NonPrimitiveOpPrivateData, Prim};
 use crate::types::{NonPrimitiveOpId, WitnessId};
 
 /// Errors that can occur during circuit execution and trace generation.
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum CircuitError {
     /// Public input length mismatch.
+    #[error("Public input length mismatch: expected {expected}, got {got}")]
     PublicInputLengthMismatch { expected: usize, got: usize },
+
     /// Circuit missing public_rows mapping.
+    #[error("Circuit missing public_rows mapping")]
     MissingPublicRowsMapping,
+
     /// NonPrimitiveOpId out of range.
+    #[error("NonPrimitiveOpId {op_id} out of range (circuit has {max_ops} complex ops)")]
     NonPrimitiveOpIdOutOfRange { op_id: u32, max_ops: usize },
+
     /// Public input not set for a WitnessId.
+    #[error("Public input not set for WitnessId({witness_id})")]
     PublicInputNotSet { witness_id: u32 },
+
     /// Witness not set for a WitnessId.
+    #[error("Witness not set for WitnessId({witness_id})")]
     WitnessNotSet { witness_id: u32 },
+
     /// WitnessId out of bounds.
+    #[error("WitnessId({witness_id}) out of bounds")]
     WitnessIdOutOfBounds { witness_id: u32 },
+
     /// Witness conflict: trying to reassign to a different value.
+    #[error(
+        "Witness conflict: WitnessId({witness_id}) already set to {existing}, cannot reassign to {new}"
+    )]
     WitnessConflict {
         witness_id: u32,
         existing: String,
         new: String,
     },
-    /// Witness not set for an index during trace generation.
-    WitnessNotSetForIndex { index: usize },
-    /// Non-primitive op attempted to read a witness value that was not set.
-    NonPrimitiveOpWitnessNotSet { operation_index: usize },
-    /// Missing private data for a non-primitive operation.
-    NonPrimitiveOpMissingPrivateData { operation_index: usize },
-    /// Division by zero encountered.
-    DivisionByZero,
-}
 
-impl core::fmt::Display for CircuitError {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self {
-            CircuitError::PublicInputLengthMismatch { expected, got } => {
-                write!(
-                    f,
-                    "Public input length mismatch: expected {expected}, got {got}"
-                )
-            }
-            CircuitError::MissingPublicRowsMapping => {
-                write!(f, "Circuit missing public_rows mapping")
-            }
-            CircuitError::NonPrimitiveOpIdOutOfRange { op_id, max_ops } => {
-                write!(
-                    f,
-                    "NonPrimitiveOpId {op_id} out of range (circuit has {max_ops} complex ops)"
-                )
-            }
-            CircuitError::PublicInputNotSet { witness_id } => {
-                write!(f, "Public input not set for WitnessId({witness_id})")
-            }
-            CircuitError::WitnessNotSet { witness_id } => {
-                write!(f, "Witness not set for WitnessId({witness_id})")
-            }
-            CircuitError::WitnessIdOutOfBounds { witness_id } => {
-                write!(f, "WitnessId({witness_id}) out of bounds")
-            }
-            CircuitError::WitnessConflict {
-                witness_id,
-                existing,
-                new,
-            } => {
-                write!(
-                    f,
-                    "Witness conflict: WitnessId({witness_id}) already set to {existing}, cannot reassign to {new}"
-                )
-            }
-            CircuitError::WitnessNotSetForIndex { index } => {
-                write!(f, "Witness not set for index {index}")
-            }
-            CircuitError::NonPrimitiveOpWitnessNotSet { operation_index } => {
-                write!(
-                    f,
-                    "Witness value not set for non-primitive operation {operation_index}"
-                )
-            }
-            CircuitError::NonPrimitiveOpMissingPrivateData { operation_index } => {
-                write!(
-                    f,
-                    "Missing private data for non-primitive operation {operation_index}"
-                )
-            }
-            CircuitError::DivisionByZero => {
-                write!(f, "Division by zero encountered")
-            }
-        }
-    }
+    /// Witness not set for an index during trace generation.
+    #[error("Witness not set for index {index}")]
+    WitnessNotSetForIndex { index: usize },
+
+    /// Non-primitive op attempted to read a witness value that was not set.
+    #[error("Witness value not set for non-primitive operation {operation_index}")]
+    NonPrimitiveOpWitnessNotSet { operation_index: usize },
+
+    /// Missing private data for a non-primitive operation.
+    #[error("Missing private data for non-primitive operation {operation_index}")]
+    NonPrimitiveOpMissingPrivateData { operation_index: usize },
+
+    /// Division by zero encountered.
+    #[error("Division by zero encountered")]
+    DivisionByZero,
+
+    /// Invalid bit value in SampleBits bit decomposition (must be 0 or 1).
+    #[error(
+        "Invalid bit value in SampleBits bit decomposition for WitnessId({input_witness_id}): {bit_value} (must be 0 or 1)"
+    )]
+    InvalidBitValue {
+        input_witness_id: u32,
+        bit_value: String,
+    },
+
+    /// Bit decomposition doesn't reconstruct to the input value.
+    #[error(
+        "Bit decomposition for WitnessId({input_witness_id}) doesn't match input: expected {expected}, reconstructed {reconstructed}"
+    )]
+    BitDecompositionMismatch {
+        input_witness_id: u32,
+        expected: String,
+        reconstructed: String,
+    },
 }
 
 /// Execution traces for all tables
@@ -117,10 +101,10 @@ pub struct Traces<F> {
     pub sample_bits_trace: SampleBitsTrace<F>,
 }
 
-/// Central witness table with transparent index column
+/// Central witness table with preprocessed index column
 #[derive(Debug, Clone)]
 pub struct WitnessTrace<F> {
-    /// Transparent index column (0, 1, 2, ...)
+    /// Preprocessed index column (0, 1, 2, ...)
     pub index: Vec<u32>,
     /// Witness values
     pub values: Vec<F>,
@@ -129,7 +113,7 @@ pub struct WitnessTrace<F> {
 /// Constant table
 #[derive(Debug, Clone)]
 pub struct ConstTrace<F> {
-    /// Transparent index column (equals the WitnessId this row binds)
+    /// Preprocessed index column (equals the WitnessId this row binds)
     pub index: Vec<u32>,
     /// Constant values
     pub values: Vec<F>,
@@ -138,7 +122,7 @@ pub struct ConstTrace<F> {
 /// Public input table
 #[derive(Debug, Clone)]
 pub struct PublicTrace<F> {
-    /// Transparent index column (equals the WitnessId of that public)
+    /// Preprocessed index column (equals the WitnessId of that public)
     pub index: Vec<u32>,
     /// Public input values
     pub values: Vec<F>,
