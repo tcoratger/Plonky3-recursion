@@ -1,86 +1,10 @@
-use alloc::string::String;
 use alloc::vec::Vec;
 use alloc::{format, vec};
-
-use p3_field::Field;
-use thiserror::Error;
 
 use crate::circuit::Circuit;
 use crate::op::{NonPrimitiveOpPrivateData, Prim};
 use crate::types::{NonPrimitiveOpId, WitnessId};
-
-/// Errors that can occur during circuit execution and trace generation.
-#[derive(Debug, Error)]
-pub enum CircuitError {
-    /// Public input length mismatch.
-    #[error("Public input length mismatch: expected {expected}, got {got}")]
-    PublicInputLengthMismatch { expected: usize, got: usize },
-
-    /// Circuit missing public_rows mapping.
-    #[error("Circuit missing public_rows mapping")]
-    MissingPublicRowsMapping,
-
-    /// NonPrimitiveOpId out of range.
-    #[error("NonPrimitiveOpId {op_id} out of range (circuit has {max_ops} complex ops)")]
-    NonPrimitiveOpIdOutOfRange { op_id: u32, max_ops: usize },
-
-    /// Public input not set for a WitnessId.
-    #[error("Public input not set for WitnessId({witness_id})")]
-    PublicInputNotSet { witness_id: WitnessId },
-
-    /// Witness not set for a WitnessId.
-    #[error("Witness not set for WitnessId({witness_id})")]
-    WitnessNotSet { witness_id: WitnessId },
-
-    /// WitnessId out of bounds.
-    #[error("WitnessId({witness_id}) out of bounds")]
-    WitnessIdOutOfBounds { witness_id: WitnessId },
-
-    /// Witness conflict: trying to reassign to a different value.
-    #[error(
-        "Witness conflict: WitnessId({witness_id}) already set to {existing}, cannot reassign to {new}"
-    )]
-    WitnessConflict {
-        witness_id: WitnessId,
-        existing: String,
-        new: String,
-    },
-
-    /// Witness not set for an index during trace generation.
-    #[error("Witness not set for index {index}")]
-    WitnessNotSetForIndex { index: usize },
-
-    /// Non-primitive op attempted to read a witness value that was not set.
-    #[error("Witness value not set for non-primitive operation {operation_index}")]
-    NonPrimitiveOpWitnessNotSet { operation_index: usize },
-
-    /// Missing private data for a non-primitive operation.
-    #[error("Missing private data for non-primitive operation {operation_index}")]
-    NonPrimitiveOpMissingPrivateData { operation_index: usize },
-
-    /// Division by zero encountered.
-    #[error("Division by zero encountered")]
-    DivisionByZero,
-
-    /// Invalid bit value in SampleBits bit decomposition (must be 0 or 1).
-    #[error(
-        "Invalid bit value in SampleBits bit decomposition for WitnessId({input_witness_id}): {bit_value} (must be 0 or 1)"
-    )]
-    InvalidBitValue {
-        input_witness_id: WitnessId,
-        bit_value: String,
-    },
-
-    /// Bit decomposition doesn't reconstruct to the input value.
-    #[error(
-        "Bit decomposition for WitnessId({input_witness_id}) doesn't match input: expected {expected}, reconstructed {reconstructed}"
-    )]
-    BitDecompositionMismatch {
-        input_witness_id: WitnessId,
-        expected: String,
-        reconstructed: String,
-    },
-}
+use crate::{CircuitError, CircuitField};
 
 /// Execution traces for all tables
 #[derive(Debug, Clone)]
@@ -195,17 +119,7 @@ pub struct CircuitRunner<F> {
     non_primitive_op_private_data: Vec<Option<NonPrimitiveOpPrivateData<F>>>,
 }
 
-impl<
-    F: Clone
-        + Default
-        + core::ops::Add<Output = F>
-        + core::ops::Sub<Output = F>
-        + core::ops::Mul<Output = F>
-        + PartialEq
-        + core::fmt::Debug
-        + Field,
-> CircuitRunner<F>
-{
+impl<F: CircuitField> CircuitRunner<F> {
     /// Create a new prover instance
     pub fn new(circuit: Circuit<F>) -> Self {
         let witness = vec![None; circuit.witness_count as usize];
@@ -517,13 +431,8 @@ impl<
                     right_index.push(0); // Not on witness bus - private data
 
                     // Compute parent hash (simple mock hash: left + right + direction)
-                    let parent_hash = current_hash
-                        + *sibling_value
-                        + if direction {
-                            F::from_u64(1)
-                        } else {
-                            F::from_u64(0)
-                        };
+                    let parent_hash =
+                        current_hash + *sibling_value + if direction { F::ONE } else { F::ZERO };
 
                     result_values.push(parent_hash);
                     result_index.push(root); // Points to witness bus
@@ -552,23 +461,6 @@ impl<
             result_index,
             path_directions,
         })
-    }
-}
-
-impl<
-    F: Clone
-        + Default
-        + core::ops::Add<Output = F>
-        + core::ops::Sub<Output = F>
-        + core::ops::Mul<Output = F>
-        + PartialEq
-        + core::fmt::Debug
-        + Field,
-> Circuit<F>
-{
-    /// Create a circuit runner for execution and trace generation
-    pub fn runner(self) -> CircuitRunner<F> {
-        CircuitRunner::new(self)
     }
 }
 
