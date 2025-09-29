@@ -727,7 +727,10 @@ mod tests {
         assert_eq!(traces.add_trace.lhs_values.len(), 2);
         assert_eq!(traces.add_trace.lhs_index, vec![WitnessId(2), WitnessId(3)]);
         assert_eq!(traces.add_trace.rhs_index, vec![WitnessId(0), WitnessId(0)]);
-        assert_eq!(traces.add_trace.result_index, vec![WitnessId(5), WitnessId(6)]);
+        assert_eq!(
+            traces.add_trace.result_index,
+            vec![WitnessId(5), WitnessId(6)]
+        );
     }
 
     #[test]
