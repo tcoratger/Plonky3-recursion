@@ -2,6 +2,8 @@ use alloc::string::String;
 
 use thiserror::Error;
 
+use crate::WitnessId;
+
 /// Errors that can occur during circuit execution and trace generation.
 #[derive(Debug, Error)]
 pub enum CircuitError {
@@ -19,22 +21,22 @@ pub enum CircuitError {
 
     /// Public input not set for a WitnessId.
     #[error("Public input not set for WitnessId({witness_id})")]
-    PublicInputNotSet { witness_id: u32 },
+    PublicInputNotSet { witness_id: WitnessId },
 
     /// Witness not set for a WitnessId.
     #[error("Witness not set for WitnessId({witness_id})")]
-    WitnessNotSet { witness_id: u32 },
+    WitnessNotSet { witness_id: WitnessId },
 
     /// WitnessId out of bounds.
     #[error("WitnessId({witness_id}) out of bounds")]
-    WitnessIdOutOfBounds { witness_id: u32 },
+    WitnessIdOutOfBounds { witness_id: WitnessId },
 
     /// Witness conflict: trying to reassign to a different value.
     #[error(
         "Witness conflict: WitnessId({witness_id}) already set to {existing}, cannot reassign to {new}"
     )]
     WitnessConflict {
-        witness_id: u32,
+        witness_id: WitnessId,
         existing: String,
         new: String,
     },
@@ -60,7 +62,7 @@ pub enum CircuitError {
         "Invalid bit value in SampleBits bit decomposition for WitnessId({input_witness_id}): {bit_value} (must be 0 or 1)"
     )]
     InvalidBitValue {
-        input_witness_id: u32,
+        input_witness_id: WitnessId,
         bit_value: String,
     },
 
@@ -69,7 +71,7 @@ pub enum CircuitError {
         "Bit decomposition for WitnessId({input_witness_id}) doesn't match input: expected {expected}, reconstructed {reconstructed}"
     )]
     BitDecompositionMismatch {
-        input_witness_id: u32,
+        input_witness_id: WitnessId,
         expected: String,
         reconstructed: String,
     },
