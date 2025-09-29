@@ -70,7 +70,7 @@ impl<F: Field + PrimeCharacteristicRing, const D: usize> AddAir<F, D> {
                         "Extension field degree mismatch for lhs",
                     );
                     values.extend_from_slice(lhs_coeffs);
-                    values.push(F::from_u64(trace.lhs_index[op_idx] as u64));
+                    values.push(F::from_u64(trace.lhs_index[op_idx].0 as u64));
 
                     // RHS limbs + index
                     let rhs_coeffs = trace.rhs_values[op_idx].as_basis_coefficients_slice();
@@ -80,7 +80,7 @@ impl<F: Field + PrimeCharacteristicRing, const D: usize> AddAir<F, D> {
                         "Extension field degree mismatch for rhs",
                     );
                     values.extend_from_slice(rhs_coeffs);
-                    values.push(F::from_u64(trace.rhs_index[op_idx] as u64));
+                    values.push(F::from_u64(trace.rhs_index[op_idx].0 as u64));
 
                     // Result limbs + index
                     let result_coeffs = trace.result_values[op_idx].as_basis_coefficients_slice();
@@ -90,7 +90,7 @@ impl<F: Field + PrimeCharacteristicRing, const D: usize> AddAir<F, D> {
                         "Extension field degree mismatch for result",
                     );
                     values.extend_from_slice(result_coeffs);
-                    values.push(F::from_u64(trace.result_index[op_idx] as u64));
+                    values.push(F::from_u64(trace.result_index[op_idx].0 as u64));
                 } else {
                     // Filler lane: append zeros for unused slot to keep the row width uniform.
                     values.resize(values.len() + lane_width, F::ZERO);

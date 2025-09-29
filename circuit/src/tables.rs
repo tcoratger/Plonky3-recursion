@@ -26,22 +26,22 @@ pub enum CircuitError {
 
     /// Public input not set for a WitnessId.
     #[error("Public input not set for WitnessId({witness_id})")]
-    PublicInputNotSet { witness_id: u32 },
+    PublicInputNotSet { witness_id: WitnessId },
 
     /// Witness not set for a WitnessId.
     #[error("Witness not set for WitnessId({witness_id})")]
-    WitnessNotSet { witness_id: u32 },
+    WitnessNotSet { witness_id: WitnessId },
 
     /// WitnessId out of bounds.
     #[error("WitnessId({witness_id}) out of bounds")]
-    WitnessIdOutOfBounds { witness_id: u32 },
+    WitnessIdOutOfBounds { witness_id: WitnessId },
 
     /// Witness conflict: trying to reassign to a different value.
     #[error(
         "Witness conflict: WitnessId({witness_id}) already set to {existing}, cannot reassign to {new}"
     )]
     WitnessConflict {
-        witness_id: u32,
+        witness_id: WitnessId,
         existing: String,
         new: String,
     },
@@ -67,7 +67,7 @@ pub enum CircuitError {
         "Invalid bit value in SampleBits bit decomposition for WitnessId({input_witness_id}): {bit_value} (must be 0 or 1)"
     )]
     InvalidBitValue {
-        input_witness_id: u32,
+        input_witness_id: WitnessId,
         bit_value: String,
     },
 
@@ -76,7 +76,7 @@ pub enum CircuitError {
         "Bit decomposition for WitnessId({input_witness_id}) doesn't match input: expected {expected}, reconstructed {reconstructed}"
     )]
     BitDecompositionMismatch {
-        input_witness_id: u32,
+        input_witness_id: WitnessId,
         expected: String,
         reconstructed: String,
     },
@@ -102,8 +102,8 @@ pub struct Traces<F> {
 /// Central witness table with preprocessed index column
 #[derive(Debug, Clone)]
 pub struct WitnessTrace<F> {
-    /// Preprocessed index column (0, 1, 2, ...)
-    pub index: Vec<u32>,
+    /// Preprocessed index column (WitnessId(0), WitnessId(1), WitnessId(2), ...)
+    pub index: Vec<WitnessId>,
     /// Witness values
     pub values: Vec<F>,
 }
@@ -112,7 +112,7 @@ pub struct WitnessTrace<F> {
 #[derive(Debug, Clone)]
 pub struct ConstTrace<F> {
     /// Preprocessed index column (equals the WitnessId this row binds)
-    pub index: Vec<u32>,
+    pub index: Vec<WitnessId>,
     /// Constant values
     pub values: Vec<F>,
 }
@@ -121,7 +121,7 @@ pub struct ConstTrace<F> {
 #[derive(Debug, Clone)]
 pub struct PublicTrace<F> {
     /// Preprocessed index column (equals the WitnessId of that public)
-    pub index: Vec<u32>,
+    pub index: Vec<WitnessId>,
     /// Public input values
     pub values: Vec<F>,
 }
@@ -131,16 +131,16 @@ pub struct PublicTrace<F> {
 pub struct AddTrace<F> {
     /// Left operand values
     pub lhs_values: Vec<F>,
-    /// Left operand indices
-    pub lhs_index: Vec<u32>,
+    /// Left operand indices (references witness bus)
+    pub lhs_index: Vec<WitnessId>,
     /// Right operand values
     pub rhs_values: Vec<F>,
-    /// Right operand indices
-    pub rhs_index: Vec<u32>,
+    /// Right operand indices (references witness bus)
+    pub rhs_index: Vec<WitnessId>,
     /// Result values
     pub result_values: Vec<F>,
-    /// Result indices
-    pub result_index: Vec<u32>,
+    /// Result indices (references witness bus)
+    pub result_index: Vec<WitnessId>,
 }
 
 /// Mul operation table
@@ -148,16 +148,16 @@ pub struct AddTrace<F> {
 pub struct MulTrace<F> {
     /// Left operand values
     pub lhs_values: Vec<F>,
-    /// Left operand indices
-    pub lhs_index: Vec<u32>,
+    /// Left operand indices (references witness bus)
+    pub lhs_index: Vec<WitnessId>,
     /// Right operand values
     pub rhs_values: Vec<F>,
-    /// Right operand indices
-    pub rhs_index: Vec<u32>,
+    /// Right operand indices (references witness bus)
+    pub rhs_index: Vec<WitnessId>,
     /// Result values
     pub result_values: Vec<F>,
-    /// Result indices
-    pub result_index: Vec<u32>,
+    /// Result indices (references witness bus)
+    pub result_index: Vec<WitnessId>,
 }
 
 /// Fake Merkle verification table (simplified: single field elements)
@@ -165,17 +165,17 @@ pub struct MulTrace<F> {
 pub struct FakeMerkleTrace<F> {
     /// Left operand values (current hash)
     pub left_values: Vec<F>,
-    /// Left operand indices
-    pub left_index: Vec<u32>,
+    /// Left operand indices (references witness bus)
+    pub left_index: Vec<WitnessId>,
     /// Right operand values (sibling hash)
     pub right_values: Vec<F>,
-    /// Right operand indices (not on witness bus - private)
+    /// Right operand indices (not on witness bus - private data, so stays u32)
     pub right_index: Vec<u32>,
     /// Result values (computed parent hash)
     pub result_values: Vec<F>,
-    /// Result indices
-    pub result_index: Vec<u32>,
-    /// Path direction bits (0 = left, 1 = right) - private
+    /// Result indices (references witness bus)
+    pub result_index: Vec<WitnessId>,
+    /// Path direction bits (0 = left, 1 = right) - private data
     pub path_directions: Vec<u32>,
 }
 
@@ -302,7 +302,7 @@ impl<
                 Prim::Public { out, public_pos: _ } => {
                     // Public inputs should already be set
                     if self.witness[out.0 as usize].is_none() {
-                        return Err(CircuitError::PublicInputNotSet { witness_id: out.0 });
+                        return Err(CircuitError::PublicInputNotSet { witness_id: out });
                     }
                 }
                 Prim::Add { a, b, out } => {
@@ -341,19 +341,19 @@ impl<
             .get(widx.0 as usize)
             .and_then(|opt| opt.as_ref())
             .cloned()
-            .ok_or(CircuitError::WitnessNotSet { witness_id: widx.0 })
+            .ok_or(CircuitError::WitnessNotSet { witness_id: widx })
     }
 
     fn set_witness(&mut self, widx: WitnessId, value: F) -> Result<(), CircuitError> {
         if widx.0 as usize >= self.witness.len() {
-            return Err(CircuitError::WitnessIdOutOfBounds { witness_id: widx.0 });
+            return Err(CircuitError::WitnessIdOutOfBounds { witness_id: widx });
         }
 
         // Check for conflicting reassignment
         if let Some(existing_value) = self.witness[widx.0 as usize] {
             if existing_value != value {
                 return Err(CircuitError::WitnessConflict {
-                    witness_id: widx.0,
+                    witness_id: widx,
                     existing: format!("{existing_value:?}"),
                     new: format!("{value:?}"),
                 });
@@ -372,7 +372,7 @@ impl<
         for (i, witness_opt) in self.witness.iter().enumerate() {
             match witness_opt {
                 Some(value) => {
-                    index.push(i as u32);
+                    index.push(WitnessId(i as u32));
                     values.push(*value);
                 }
                 None => {
@@ -391,7 +391,7 @@ impl<
         // Collect all constants from primitive operations
         for prim in &self.circuit.primitive_ops {
             if let Prim::Const { out, val } = prim {
-                index.push(out.0);
+                index.push(*out);
                 values.push(*val);
             }
         }
@@ -406,7 +406,7 @@ impl<
         // Collect all public inputs from primitive operations
         for prim in &self.circuit.primitive_ops {
             if let Prim::Public { out, public_pos: _ } = prim {
-                index.push(out.0);
+                index.push(*out);
                 let value = self.get_witness(*out)?;
                 values.push(value);
             }
@@ -426,11 +426,11 @@ impl<
         for prim in &self.circuit.primitive_ops {
             if let Prim::Add { a, b, out } = prim {
                 lhs_values.push(self.get_witness(*a)?);
-                lhs_index.push(a.0);
+                lhs_index.push(*a);
                 rhs_values.push(self.get_witness(*b)?);
-                rhs_index.push(b.0);
+                rhs_index.push(*b);
                 result_values.push(self.get_witness(*out)?);
-                result_index.push(out.0);
+                result_index.push(*out);
             }
         }
 
@@ -455,11 +455,11 @@ impl<
         for prim in &self.circuit.primitive_ops {
             if let Prim::Mul { a, b, out } = prim {
                 lhs_values.push(self.get_witness(*a)?);
-                lhs_index.push(a.0);
+                lhs_index.push(*a);
                 rhs_values.push(self.get_witness(*b)?);
-                rhs_index.push(b.0);
+                rhs_index.push(*b);
                 result_values.push(self.get_witness(*out)?);
-                result_index.push(out.0);
+                result_index.push(*out);
             }
         }
 
@@ -510,7 +510,7 @@ impl<
                 {
                     // Current hash becomes left operand
                     left_values.push(current_hash);
-                    left_index.push(leaf.0); // Points to witness bus
+                    left_index.push(leaf); // Points to witness bus
 
                     // Sibling becomes right operand (private data - not on witness bus)
                     right_values.push(*sibling_value);
@@ -526,7 +526,7 @@ impl<
                         };
 
                     result_values.push(parent_hash);
-                    result_index.push(root.0); // Points to witness bus
+                    result_index.push(root); // Points to witness bus
 
                     path_directions.push(if direction { 1 } else { 0 });
 
@@ -583,6 +583,7 @@ mod tests {
     use p3_field::{BasedVectorSpace, PrimeCharacteristicRing};
 
     use crate::builder::CircuitBuilder;
+    use crate::types::WitnessId;
 
     #[test]
     fn test_table_generation_basic() {
@@ -724,9 +725,9 @@ mod tests {
 
         // Encoded subtractions land in the add table (result + rhs = lhs).
         assert_eq!(traces.add_trace.lhs_values.len(), 2);
-        assert_eq!(traces.add_trace.lhs_index, vec![2, 3]);
-        assert_eq!(traces.add_trace.rhs_index, vec![0, 0]);
-        assert_eq!(traces.add_trace.result_index, vec![5, 6]);
+        assert_eq!(traces.add_trace.lhs_index, vec![WitnessId(2), WitnessId(3)]);
+        assert_eq!(traces.add_trace.rhs_index, vec![WitnessId(0), WitnessId(0)]);
+        assert_eq!(traces.add_trace.result_index, vec![WitnessId(5), WitnessId(6)]);
     }
 
     #[test]

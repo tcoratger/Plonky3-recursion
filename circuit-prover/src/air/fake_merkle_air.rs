@@ -42,7 +42,7 @@ impl<F: Field + PrimeCharacteristicRing> FakeMerkleVerifyAir<F> {
                 "FakeMerkleVerifyAir only supports base field elements (D=1)"
             );
             values.push(left_coeffs[0]);
-            values.push(F::from_u64(trace.left_index[i] as u64));
+            values.push(F::from_u64(trace.left_index[i].0 as u64));
 
             // RIGHT
             let right_coeffs = trace.right_values[i].as_basis_coefficients_slice();
@@ -62,7 +62,7 @@ impl<F: Field + PrimeCharacteristicRing> FakeMerkleVerifyAir<F> {
                 "FakeMerkleVerifyAir only supports base field elements (D=1)"
             );
             values.push(result_coeffs[0]);
-            values.push(F::from_u64(trace.result_index[i] as u64));
+            values.push(F::from_u64(trace.result_index[i].0 as u64));
 
             // DIRECTION
             values.push(F::from_u64(trace.path_directions[i] as u64));

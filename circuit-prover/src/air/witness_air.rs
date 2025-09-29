@@ -50,7 +50,7 @@ impl<F: Field, const D: usize> WitnessAir<F, D> {
                 "Extension field degree mismatch for witness value"
             );
             values.extend_from_slice(coeffs);
-            values.push(F::from_u64(trace.index[i] as u64));
+            values.push(F::from_u64(trace.index[i].0 as u64));
         }
 
         // Pad to power of two with monotonic index continuation
