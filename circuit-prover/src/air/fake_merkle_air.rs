@@ -118,6 +118,7 @@ mod tests {
     use alloc::vec;
 
     use p3_baby_bear::BabyBear as Val;
+    use p3_circuit::WitnessId;
     use p3_circuit::tables::FakeMerkleTrace;
     use p3_matrix::dense::RowMajorMatrix;
     use p3_uni_stark::{prove, verify};
@@ -131,9 +132,9 @@ mod tests {
         let left_values = vec![Val::from_u64(42); n];
         let right_values = vec![Val::from_u64(50); n];
         let result_values = vec![Val::from_u64(92); n]; // 42 + 50 + 0
-        let left_index = vec![1u32; n];
-        let right_index = vec![2u32; n];
-        let result_index = vec![3u32; n];
+        let left_index = vec![WitnessId(1); n];
+        let right_index = vec![2u32; n]; // Note: right_index stays u32 (private data)
+        let result_index = vec![WitnessId(3); n];
         let path_directions = vec![0u32; n]; // left direction
 
         let trace = FakeMerkleTrace {

@@ -195,6 +195,7 @@ mod tests {
     use alloc::vec;
 
     use p3_baby_bear::BabyBear as Val;
+    use p3_circuit::WitnessId;
     use p3_circuit::tables::MulTrace;
     use p3_field::extension::BinomialExtensionField;
     use p3_field::{BasedVectorSpace, Field};
@@ -210,9 +211,9 @@ mod tests {
         let lhs_values = vec![Val::from_u64(3); n];
         let rhs_values = vec![Val::from_u64(7); n];
         let result_values = vec![Val::from_u64(21); n];
-        let lhs_index = vec![1u32; n];
-        let rhs_index = vec![2u32; n];
-        let result_index = vec![3u32; n];
+        let lhs_index = vec![WitnessId(1); n];
+        let rhs_index = vec![WitnessId(2); n];
+        let result_index = vec![WitnessId(3); n];
 
         let trace = MulTrace {
             lhs_values,
@@ -276,9 +277,9 @@ mod tests {
         let lhs_values = vec![lhs; n];
         let rhs_values = vec![rhs; n];
         let result_values = vec![result; n];
-        let lhs_index = vec![1u32; n];
-        let rhs_index = vec![2u32; n];
-        let result_index = vec![3u32; n];
+        let lhs_index = vec![WitnessId(1); n];
+        let rhs_index = vec![WitnessId(2); n];
+        let result_index = vec![WitnessId(3); n];
 
         let trace = MulTrace {
             lhs_values,
@@ -308,9 +309,9 @@ mod tests {
         let lhs_values = vec![Val::from_u64(1); n];
         let rhs_values = vec![Val::from_u64(2); n];
         let result_values = vec![Val::from_u64(2); n];
-        let lhs_index = vec![10u32; n];
-        let rhs_index = vec![20u32; n];
-        let result_index = vec![30u32; n];
+        let lhs_index = vec![WitnessId(10); n];
+        let rhs_index = vec![WitnessId(20); n];
+        let result_index = vec![WitnessId(30); n];
 
         let trace = MulTrace {
             lhs_values,
