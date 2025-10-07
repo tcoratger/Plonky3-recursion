@@ -4,9 +4,8 @@ use std::env;
 /// Public input: expected_result (F(n))
 use p3_baby_bear::BabyBear;
 use p3_circuit::builder::CircuitBuilder;
-use p3_circuit_prover::config;
 use p3_circuit_prover::prover::ProverError;
-use p3_circuit_prover::{MultiTableProver, TablePacking};
+use p3_circuit_prover::{MultiTableProver, TablePacking, config};
 use p3_field::PrimeCharacteristicRing;
 use tracing_forest::ForestLayer;
 use tracing_forest::util::LevelFilter;

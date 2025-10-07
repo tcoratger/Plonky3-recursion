@@ -6,9 +6,8 @@ use std::env;
 use p3_baby_bear::BabyBear;
 use p3_circuit::builder::CircuitBuilder;
 use p3_circuit::{FakeMerklePrivateData, MerkleOps, NonPrimitiveOpPrivateData};
-use p3_circuit_prover::MultiTableProver;
-use p3_circuit_prover::config;
 use p3_circuit_prover::prover::ProverError;
+use p3_circuit_prover::{MultiTableProver, config};
 use p3_field::PrimeCharacteristicRing;
 
 type F = BabyBear;
