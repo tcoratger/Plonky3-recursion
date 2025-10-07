@@ -242,10 +242,8 @@ where
         let mul_proof = prove(&self.config, &mul_air, mul_matrix, pis);
 
         // FakeMerkle (always uses base field regardless of traces D)
-        let fake_merkle_matrix =
-            FakeMerkleVerifyAir::<Val<SC>>::trace_to_matrix(&traces.fake_merkle_trace);
-        let fake_merkle_air =
-            FakeMerkleVerifyAir::<Val<SC>>::new(traces.fake_merkle_trace.left_values.len());
+        let fake_merkle_matrix = FakeMerkleVerifyAir::trace_to_matrix(&traces.fake_merkle_trace);
+        let fake_merkle_air = FakeMerkleVerifyAir::new(traces.fake_merkle_trace.left_values.len());
         let fake_merkle_proof = prove(&self.config, &fake_merkle_air, fake_merkle_matrix, pis);
 
         Ok(MultiTableProof {
@@ -311,16 +309,16 @@ where
 
         // Mul
         let mul_air: MulAir<Val<SC>, D> = if D == 1 {
-            MulAir::<Val<SC>, D>::new(proof.mul.rows, mul_lanes)
+            MulAir::new(proof.mul.rows, mul_lanes)
         } else {
             let w = w_binomial.ok_or(ProverError::MissingWForExtension)?;
-            MulAir::<Val<SC>, D>::new_binomial(proof.mul.rows, mul_lanes, w)
+            MulAir::new_binomial(proof.mul.rows, mul_lanes, w)
         };
         verify(&self.config, &mul_air, &proof.mul.proof, pis)
             .map_err(|_| ProverError::VerificationFailed { phase: "mul" })?;
 
         // FakeMerkle
-        let fake_merkle_air = FakeMerkleVerifyAir::<Val<SC>>::new(proof.fake_merkle.rows);
+        let fake_merkle_air = FakeMerkleVerifyAir::new(proof.fake_merkle.rows);
         verify(
             &self.config,
             &fake_merkle_air,
