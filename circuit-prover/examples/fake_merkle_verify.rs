@@ -7,7 +7,7 @@ use p3_baby_bear::BabyBear;
 use p3_circuit::builder::CircuitBuilder;
 use p3_circuit::{FakeMerklePrivateData, MerkleOps, NonPrimitiveOpPrivateData};
 use p3_circuit_prover::MultiTableProver;
-use p3_circuit_prover::config::babybear_config::build_standard_config_babybear;
+use p3_circuit_prover::config;
 use p3_circuit_prover::prover::ProverError;
 use p3_field::PrimeCharacteristicRing;
 
@@ -43,7 +43,7 @@ fn main() -> Result<(), ProverError> {
     )?;
 
     let traces = runner.run()?;
-    let config = build_standard_config_babybear();
+    let config = config::baby_bear().build();
     let multi_prover = MultiTableProver::new(config);
     let proof = multi_prover.prove_all_tables(&traces)?;
     multi_prover.verify_all_tables(&proof)
