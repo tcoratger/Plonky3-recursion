@@ -16,7 +16,7 @@ use alloc::vec::Vec;
 use p3_circuit::tables::Traces;
 use p3_circuit::{CircuitBuilderError, CircuitError};
 use p3_field::{BasedVectorSpace, Field};
-use p3_uni_stark::{StarkGenericConfig, prove, verify};
+use p3_uni_stark::{StarkGenericConfig, Val, prove, verify};
 use thiserror::Error;
 use tracing::instrument;
 
@@ -91,7 +91,7 @@ where
     /// Extension field degree: 1 for base field; otherwise the extension degree used.
     pub ext_degree: usize,
     /// Binomial parameter W for extension fields (e.g., x^D = W); None for base fields
-    pub w_binomial: Option<p3_uni_stark::Val<SC>>,
+    pub w_binomial: Option<Val<SC>>,
 }
 
 /// Multi-table STARK prover for circuit execution traces.
@@ -132,7 +132,7 @@ pub enum ProverError {
 impl<SC> MultiTableProver<SC>
 where
     SC: StarkGenericConfig,
-    p3_uni_stark::Val<SC>: StarkField,
+    Val<SC>: StarkField,
 {
     pub fn new(config: SC) -> Self {
         Self {
@@ -165,9 +165,7 @@ where
         traces: &Traces<EF>,
     ) -> Result<MultiTableProof<SC>, ProverError>
     where
-        EF: Field
-            + BasedVectorSpace<p3_uni_stark::Val<SC>>
-            + ExtractBinomialW<p3_uni_stark::Val<SC>>,
+        EF: Field + BasedVectorSpace<Val<SC>> + ExtractBinomialW<Val<SC>>,
     {
         let pis = vec![];
         let w_opt = EF::extract_w();
@@ -203,65 +201,51 @@ where
     fn prove_for_degree<EF, const D: usize>(
         &self,
         traces: &Traces<EF>,
-        pis: &Vec<p3_uni_stark::Val<SC>>,
-        w_binomial: Option<p3_uni_stark::Val<SC>>,
+        pis: &Vec<Val<SC>>,
+        w_binomial: Option<Val<SC>>,
     ) -> Result<MultiTableProof<SC>, ProverError>
     where
-        EF: Field + BasedVectorSpace<p3_uni_stark::Val<SC>>,
+        EF: Field + BasedVectorSpace<Val<SC>>,
     {
         debug_assert_eq!(D, EF::DIMENSION, "D parameter must match EF::DIMENSION");
         let table_packing = self.table_packing;
         let add_lanes = table_packing.add_lanes();
         let mul_lanes = table_packing.mul_lanes();
         // Witness
-        let witness_matrix =
-            WitnessAir::<p3_uni_stark::Val<SC>, D>::trace_to_matrix(&traces.witness_trace);
-        let witness_air =
-            WitnessAir::<p3_uni_stark::Val<SC>, D>::new(traces.witness_trace.values.len());
+        let witness_matrix = WitnessAir::<Val<SC>, D>::trace_to_matrix(&traces.witness_trace);
+        let witness_air = WitnessAir::<Val<SC>, D>::new(traces.witness_trace.values.len());
         let witness_proof = prove(&self.config, &witness_air, witness_matrix, pis);
 
         // Const
-        let const_matrix =
-            ConstAir::<p3_uni_stark::Val<SC>, D>::trace_to_matrix(&traces.const_trace);
-        let const_air = ConstAir::<p3_uni_stark::Val<SC>, D>::new(traces.const_trace.values.len());
+        let const_matrix = ConstAir::<Val<SC>, D>::trace_to_matrix(&traces.const_trace);
+        let const_air = ConstAir::<Val<SC>, D>::new(traces.const_trace.values.len());
         let const_proof = prove(&self.config, &const_air, const_matrix, pis);
 
         // Public
-        let public_matrix =
-            PublicAir::<p3_uni_stark::Val<SC>, D>::trace_to_matrix(&traces.public_trace);
-        let public_air =
-            PublicAir::<p3_uni_stark::Val<SC>, D>::new(traces.public_trace.values.len());
+        let public_matrix = PublicAir::<Val<SC>, D>::trace_to_matrix(&traces.public_trace);
+        let public_air = PublicAir::<Val<SC>, D>::new(traces.public_trace.values.len());
         let public_proof = prove(&self.config, &public_air, public_matrix, pis);
 
         // Add
-        let add_matrix =
-            AddAir::<p3_uni_stark::Val<SC>, D>::trace_to_matrix(&traces.add_trace, add_lanes);
-        let add_air =
-            AddAir::<p3_uni_stark::Val<SC>, D>::new(traces.add_trace.lhs_values.len(), add_lanes);
+        let add_matrix = AddAir::<Val<SC>, D>::trace_to_matrix(&traces.add_trace, add_lanes);
+        let add_air = AddAir::<Val<SC>, D>::new(traces.add_trace.lhs_values.len(), add_lanes);
         let add_proof = prove(&self.config, &add_air, add_matrix, pis);
 
         // Multiplication (uses binomial arithmetic for extension fields)
-        let mul_matrix =
-            MulAir::<p3_uni_stark::Val<SC>, D>::trace_to_matrix(&traces.mul_trace, mul_lanes);
-        let mul_air: MulAir<p3_uni_stark::Val<SC>, D> = if D == 1 {
-            MulAir::<p3_uni_stark::Val<SC>, D>::new(traces.mul_trace.lhs_values.len(), mul_lanes)
+        let mul_matrix = MulAir::<Val<SC>, D>::trace_to_matrix(&traces.mul_trace, mul_lanes);
+        let mul_air: MulAir<Val<SC>, D> = if D == 1 {
+            MulAir::<Val<SC>, D>::new(traces.mul_trace.lhs_values.len(), mul_lanes)
         } else {
             let w = w_binomial.ok_or(ProverError::MissingWForExtension)?;
-            MulAir::<p3_uni_stark::Val<SC>, D>::new_binomial(
-                traces.mul_trace.lhs_values.len(),
-                mul_lanes,
-                w,
-            )
+            MulAir::<Val<SC>, D>::new_binomial(traces.mul_trace.lhs_values.len(), mul_lanes, w)
         };
         let mul_proof = prove(&self.config, &mul_air, mul_matrix, pis);
 
         // FakeMerkle (always uses base field regardless of traces D)
-        let fake_merkle_matrix = FakeMerkleVerifyAir::<p3_uni_stark::Val<SC>>::trace_to_matrix(
-            &traces.fake_merkle_trace,
-        );
-        let fake_merkle_air = FakeMerkleVerifyAir::<p3_uni_stark::Val<SC>>::new(
-            traces.fake_merkle_trace.left_values.len(),
-        );
+        let fake_merkle_matrix =
+            FakeMerkleVerifyAir::<Val<SC>>::trace_to_matrix(&traces.fake_merkle_trace);
+        let fake_merkle_air =
+            FakeMerkleVerifyAir::<Val<SC>>::new(traces.fake_merkle_trace.left_values.len());
         let fake_merkle_proof = prove(&self.config, &fake_merkle_air, fake_merkle_matrix, pis);
 
         Ok(MultiTableProof {
@@ -299,45 +283,44 @@ where
     fn verify_for_degree<const D: usize>(
         &self,
         proof: &MultiTableProof<SC>,
-        pis: &Vec<p3_uni_stark::Val<SC>>,
-        w_binomial: Option<p3_uni_stark::Val<SC>>,
+        pis: &Vec<Val<SC>>,
+        w_binomial: Option<Val<SC>>,
     ) -> Result<(), ProverError> {
         let table_packing = proof.table_packing;
         let add_lanes = table_packing.add_lanes();
         let mul_lanes = table_packing.mul_lanes();
         // Witness
-        let witness_air = WitnessAir::<p3_uni_stark::Val<SC>, D>::new(proof.witness.rows);
+        let witness_air = WitnessAir::<Val<SC>, D>::new(proof.witness.rows);
         verify(&self.config, &witness_air, &proof.witness.proof, pis)
             .map_err(|_| ProverError::VerificationFailed { phase: "witness" })?;
 
         // Const
-        let const_air = ConstAir::<p3_uni_stark::Val<SC>, D>::new(proof.constants.rows);
+        let const_air = ConstAir::<Val<SC>, D>::new(proof.constants.rows);
         verify(&self.config, &const_air, &proof.constants.proof, pis)
             .map_err(|_| ProverError::VerificationFailed { phase: "const" })?;
 
         // Public
-        let public_air = PublicAir::<p3_uni_stark::Val<SC>, D>::new(proof.public.rows);
+        let public_air = PublicAir::<Val<SC>, D>::new(proof.public.rows);
         verify(&self.config, &public_air, &proof.public.proof, pis)
             .map_err(|_| ProverError::VerificationFailed { phase: "public" })?;
 
         // Add
-        let add_air = AddAir::<p3_uni_stark::Val<SC>, D>::new(proof.add.rows, add_lanes);
+        let add_air = AddAir::<Val<SC>, D>::new(proof.add.rows, add_lanes);
         verify(&self.config, &add_air, &proof.add.proof, pis)
             .map_err(|_| ProverError::VerificationFailed { phase: "add" })?;
 
         // Mul
-        let mul_air: MulAir<p3_uni_stark::Val<SC>, D> = if D == 1 {
-            MulAir::<p3_uni_stark::Val<SC>, D>::new(proof.mul.rows, mul_lanes)
+        let mul_air: MulAir<Val<SC>, D> = if D == 1 {
+            MulAir::<Val<SC>, D>::new(proof.mul.rows, mul_lanes)
         } else {
             let w = w_binomial.ok_or(ProverError::MissingWForExtension)?;
-            MulAir::<p3_uni_stark::Val<SC>, D>::new_binomial(proof.mul.rows, mul_lanes, w)
+            MulAir::<Val<SC>, D>::new_binomial(proof.mul.rows, mul_lanes, w)
         };
         verify(&self.config, &mul_air, &proof.mul.proof, pis)
             .map_err(|_| ProverError::VerificationFailed { phase: "mul" })?;
 
         // FakeMerkle
-        let fake_merkle_air =
-            FakeMerkleVerifyAir::<p3_uni_stark::Val<SC>>::new(proof.fake_merkle.rows);
+        let fake_merkle_air = FakeMerkleVerifyAir::<Val<SC>>::new(proof.fake_merkle.rows);
         verify(
             &self.config,
             &fake_merkle_air,
