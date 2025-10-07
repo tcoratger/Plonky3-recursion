@@ -18,6 +18,7 @@ use p3_circuit::{CircuitBuilderError, CircuitError};
 use p3_field::{BasedVectorSpace, Field};
 use p3_uni_stark::{StarkGenericConfig, prove, verify};
 use thiserror::Error;
+use tracing::instrument;
 
 use crate::air::{AddAir, ConstAir, FakeMerkleVerifyAir, MulAir, PublicAir, WitnessAir};
 use crate::config::StarkField;
@@ -158,6 +159,7 @@ where
     /// Automatically detects whether to use base field or binomial extension field
     /// proving based on the circuit element type `EF`. For extension fields,
     /// the binomial parameter W is automatically extracted.
+    #[instrument(skip_all)]
     pub fn prove_all_tables<EF>(
         &self,
         traces: &Traces<EF>,
