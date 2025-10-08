@@ -7,8 +7,8 @@ use p3_baby_bear::BabyBear;
 use p3_circuit::op::MmcsVerifyConfig;
 use p3_circuit::tables::MmcsPrivateData;
 use p3_circuit::{CircuitBuilder, ExprId, MmcsOps, NonPrimitiveOpPrivateData};
-use p3_circuit_prover::MultiTableProver;
 use p3_circuit_prover::prover::ProverError;
+use p3_circuit_prover::{MultiTableProver, config};
 use p3_field::PrimeCharacteristicRing;
 use p3_field::extension::BinomialExtensionField;
 use tracing_forest::ForestLayer;
@@ -34,7 +34,7 @@ fn main() -> Result<(), ProverError> {
     init_logger();
 
     let depth = env::args().nth(1).and_then(|s| s.parse().ok()).unwrap_or(3);
-    let config = build_standard_config_babybear();
+    let config = config::baby_bear().build();
     let compress = baby_bear_standard_compression_function();
     let mmcs_config = MmcsVerifyConfig::babybear_quartic_extension_default();
 
