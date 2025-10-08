@@ -149,6 +149,11 @@ pub fn baby_bear() -> ConfigBuilder<BabyBear, Poseidon2BabyBear<16>, 16, 8, 8, 8
 }
 
 /// Creates the standard BabyBear compression function.
+///
+/// # Parameters
+/// - **Input arrays**: 2
+/// - **Elements per array**: 8 (256 bits / 32 bits per element)
+/// - **Output size**: 8 BabyBear elements (256 bits)
 #[inline]
 pub fn baby_bear_compression() -> impl PseudoCompressionFunction<[BabyBear; 8], 2> {
     baby_bear().compression_function()
@@ -176,6 +181,11 @@ pub fn koala_bear() -> ConfigBuilder<KoalaBear, Poseidon2KoalaBear<16>, 16, 8, 8
 }
 
 /// Creates the standard KoalaBear compression function.
+///
+/// # Parameters
+/// - **Input arrays**: 2
+/// - **Elements per array**: 8 (256 bits / 32 bits per element)
+/// - **Output size**: 8 KoalaBear elements (256 bits)
 #[inline]
 pub fn koala_bear_compression() -> impl PseudoCompressionFunction<[KoalaBear; 8], 2> {
     koala_bear().compression_function()
@@ -206,6 +216,11 @@ pub fn goldilocks() -> ConfigBuilder<Goldilocks, Poseidon2Goldilocks<8>, 8, 4, 4
 }
 
 /// Creates the standard Goldilocks compression function.
+///
+/// # Parameters
+/// - **Input arrays**: 2
+/// - **Elements per array**: 4 (256 bits / 64 bits per element)
+/// - **Output size**: 4 Goldilocks elements (256 bits)
 #[inline]
 pub fn goldilocks_compression() -> impl PseudoCompressionFunction<[Goldilocks; 4], 2> {
     goldilocks().compression_function()
