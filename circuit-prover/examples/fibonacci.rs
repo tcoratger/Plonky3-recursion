@@ -3,7 +3,7 @@ use std::env;
 /// Fibonacci circuit: Compute F(n) and prove correctness
 /// Public input: expected_result (F(n))
 use p3_baby_bear::BabyBear;
-use p3_circuit::builder::CircuitBuilder;
+use p3_circuit::CircuitBuilder;
 use p3_circuit_prover::prover::ProverError;
 use p3_circuit_prover::{MultiTableProver, TablePacking, config};
 use p3_field::PrimeCharacteristicRing;
@@ -34,7 +34,7 @@ fn main() -> Result<(), ProverError> {
         .and_then(|s| s.parse().ok())
         .unwrap_or(100);
 
-    let mut builder = CircuitBuilder::<F>::new();
+    let mut builder = CircuitBuilder::new();
 
     // Public input: expected F(n)
     let expected_result = builder.add_public_input();

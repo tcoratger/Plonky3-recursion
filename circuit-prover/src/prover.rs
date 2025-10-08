@@ -16,11 +16,12 @@ use alloc::vec::Vec;
 use p3_circuit::tables::Traces;
 use p3_circuit::{CircuitBuilderError, CircuitError};
 use p3_field::{BasedVectorSpace, Field};
+use p3_mmcs_air::air::{MmcsTableConfig, MmcsVerifyAir};
 use p3_uni_stark::{StarkGenericConfig, Val, prove, verify};
 use thiserror::Error;
 use tracing::instrument;
 
-use crate::air::{AddAir, ConstAir, FakeMerkleVerifyAir, MulAir, PublicAir, WitnessAir};
+use crate::air::{AddAir, ConstAir, MulAir, PublicAir, WitnessAir};
 use crate::config::StarkField;
 use crate::field_params::ExtractBinomialW;
 
@@ -85,7 +86,7 @@ where
     pub public: TableProof<SC>,
     pub add: TableProof<SC>,
     pub mul: TableProof<SC>,
-    pub fake_merkle: TableProof<SC>,
+    pub mmcs: TableProof<SC>,
     /// Packing configuration used when generating the proofs.
     pub table_packing: TablePacking,
     /// Extension field degree: 1 for base field; otherwise the extension degree used.
@@ -103,6 +104,7 @@ where
 {
     config: SC,
     table_packing: TablePacking,
+    mmcs_config: MmcsTableConfig,
 }
 
 /// Errors that can arise during proving or verification.
@@ -138,6 +140,7 @@ where
         Self {
             config,
             table_packing: TablePacking::default(),
+            mmcs_config: MmcsTableConfig::default(),
         }
     }
 
@@ -152,6 +155,11 @@ where
 
     pub const fn table_packing(&self) -> TablePacking {
         self.table_packing
+    }
+
+    pub fn with_mmcs_table(mut self, mmcs_config: MmcsTableConfig) -> Self {
+        self.mmcs_config = mmcs_config;
+        self
     }
 
     /// Generate proofs for all circuit tables.
@@ -241,10 +249,9 @@ where
         };
         let mul_proof = prove(&self.config, &mul_air, mul_matrix, pis);
 
-        // FakeMerkle (always uses base field regardless of traces D)
-        let fake_merkle_matrix = FakeMerkleVerifyAir::trace_to_matrix(&traces.fake_merkle_trace);
-        let fake_merkle_air = FakeMerkleVerifyAir::new(traces.fake_merkle_trace.left_values.len());
-        let fake_merkle_proof = prove(&self.config, &fake_merkle_air, fake_merkle_matrix, pis);
+        let mmcs_matrix = MmcsVerifyAir::trace_to_matrix(&self.mmcs_config, &traces.mmcs_trace);
+        let mmcs_air = MmcsVerifyAir::new(self.mmcs_config);
+        let mmcs_proof = prove(&self.config, &mmcs_air, mmcs_matrix, pis);
 
         Ok(MultiTableProof {
             witness: TableProof {
@@ -267,9 +274,14 @@ where
                 proof: mul_proof,
                 rows: traces.mul_trace.lhs_values.len(),
             },
-            fake_merkle: TableProof {
-                proof: fake_merkle_proof,
-                rows: traces.fake_merkle_trace.left_values.len(),
+            mmcs: TableProof {
+                proof: mmcs_proof,
+                rows: traces
+                    .mmcs_trace
+                    .mmcs_paths
+                    .iter()
+                    .map(|path| path.left_values.len() + 1)
+                    .sum(),
             },
             table_packing,
             ext_degree: D,
@@ -317,16 +329,13 @@ where
         verify(&self.config, &mul_air, &proof.mul.proof, pis)
             .map_err(|_| ProverError::VerificationFailed { phase: "mul" })?;
 
-        // FakeMerkle
-        let fake_merkle_air = FakeMerkleVerifyAir::new(proof.fake_merkle.rows);
-        verify(
-            &self.config,
-            &fake_merkle_air,
-            &proof.fake_merkle.proof,
-            pis,
-        )
-        .map_err(|_| ProverError::VerificationFailed {
-            phase: "fake_merkle",
+        // MmcsVerify
+
+        let mmcs_air = MmcsVerifyAir::new(self.mmcs_config);
+        verify(&self.config, &mmcs_air, &proof.mmcs.proof, pis).map_err(|_| {
+            ProverError::VerificationFailed {
+                phase: "mmcs_verify",
+            }
         })?;
 
         Ok(())
@@ -336,7 +345,7 @@ where
 #[cfg(test)]
 mod tests {
     use p3_baby_bear::BabyBear;
-    use p3_circuit::builder::CircuitBuilder;
+    use p3_circuit::CircuitBuilder;
     use p3_field::extension::BinomialExtensionField;
     use p3_field::{BasedVectorSpace, PrimeCharacteristicRing};
     use p3_goldilocks::Goldilocks;
@@ -373,6 +382,7 @@ mod tests {
         let x_val = BabyBear::from_u64(7);
         let expected_val = BabyBear::from_u64(13); // 7 + 10 - 3 - 1 = 13
         runner.set_public_inputs(&[x_val, expected_val])?;
+
         let traces = runner.run()?;
 
         // Create BabyBear prover and prove all tables
@@ -634,7 +644,6 @@ mod tests {
 
         let expected_val = x_val * y_val + z_val;
         runner.set_public_inputs(&[x_val, y_val, z_val, expected_val])?;
-
         let traces = runner.run()?;
 
         // Build Goldilocks config with challenge degree 2 (Poseidon2)
