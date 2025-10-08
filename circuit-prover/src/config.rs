@@ -101,7 +101,7 @@ where
         let val_mmcs = MerkleTreeMmcs::new(hash, compress);
         let challenge_mmcs = ExtensionMmcs::new(val_mmcs.clone());
         let dft = Radix2DitParallel::default();
-        let fri_params = create_test_fri_params(challenge_mmcs, 0);
+        let fri_params = create_benchmark_fri_params(challenge_mmcs, 0);
         let pcs = TwoAdicFriPcs::new(dft, val_mmcs, fri_params);
         let challenger = DuplexChallenger::new(self.perm);
 
