@@ -35,7 +35,7 @@ fn main() -> Result<(), ProverError> {
 
     let depth = env::args().nth(1).and_then(|s| s.parse().ok()).unwrap_or(3);
     let config = config::baby_bear().build();
-    let compress = baby_bear_standard_compression_function();
+    let compress = config::baby_bear_compression();
     let mmcs_config = MmcsVerifyConfig::babybear_quartic_extension_default();
 
     let mut builder = CircuitBuilder::new();

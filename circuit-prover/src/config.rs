@@ -22,7 +22,9 @@ use p3_fri::{TwoAdicFriPcs, create_benchmark_fri_params};
 use p3_goldilocks::{Goldilocks, Poseidon2Goldilocks};
 use p3_koala_bear::{KoalaBear, Poseidon2KoalaBear, default_koalabear_poseidon2_16};
 use p3_merkle_tree::MerkleTreeMmcs;
-use p3_symmetric::{CryptographicPermutation, PaddingFreeSponge, TruncatedPermutation};
+use p3_symmetric::{
+    CryptographicPermutation, PaddingFreeSponge, PseudoCompressionFunction, TruncatedPermutation,
+};
 use p3_uni_stark::StarkConfig;
 
 /// Cryptographic permutation width.
@@ -107,6 +109,13 @@ where
 
         StarkConfig::new(pcs, challenger)
     }
+
+    /// Creates the compression function for this configuration.
+    pub fn compression_function(
+        &self,
+    ) -> TruncatedPermutation<Perm, COMPRESS_ARITY, COMPRESS_CHUNK, PERM_WIDTH> {
+        TruncatedPermutation::new(self.perm.clone())
+    }
 }
 
 /// Creates a standard BabyBear configuration.
@@ -128,6 +137,12 @@ pub fn baby_bear() -> ConfigBuilder<BabyBear, Poseidon2BabyBear<PERM_WIDTH>, 8, 
     ConfigBuilder::new(default_babybear_poseidon2_16())
 }
 
+/// Creates the standard BabyBear compression function.
+#[inline]
+pub fn baby_bear_compression() -> impl PseudoCompressionFunction<[BabyBear; 8], 2> {
+    baby_bear().compression_function()
+}
+
 /// Creates a standard KoalaBear configuration.
 ///
 /// KoalaBear is a 31-bit prime field (2^31 - 2^24 + 1).
@@ -145,6 +160,12 @@ pub fn baby_bear() -> ConfigBuilder<BabyBear, Poseidon2BabyBear<PERM_WIDTH>, 8, 
 #[inline]
 pub fn koala_bear() -> ConfigBuilder<KoalaBear, Poseidon2KoalaBear<PERM_WIDTH>, 8, 8, 4> {
     ConfigBuilder::new(default_koalabear_poseidon2_16())
+}
+
+/// Creates the standard KoalaBear compression function.
+#[inline]
+pub fn koala_bear_compression() -> impl PseudoCompressionFunction<[KoalaBear; 8], 2> {
+    koala_bear().compression_function()
 }
 
 /// Creates a standard Goldilocks configuration.
@@ -167,6 +188,12 @@ pub fn goldilocks() -> ConfigBuilder<Goldilocks, Poseidon2Goldilocks<PERM_WIDTH>
     let mut rng = rand::rngs::SmallRng::seed_from_u64(1);
     let perm = p3_goldilocks::Poseidon2Goldilocks::<PERM_WIDTH>::new_from_rng_128(&mut rng);
     ConfigBuilder::new(perm)
+}
+
+/// Creates the standard Goldilocks compression function.
+#[inline]
+pub fn goldilocks_compression() -> impl PseudoCompressionFunction<[Goldilocks; 8], 2> {
+    goldilocks().compression_function()
 }
 
 /// Type alias for BabyBear STARK configuration.
@@ -197,5 +224,12 @@ mod tests {
         let _bb: BabyBearConfig = baby_bear().build();
         let _kb: KoalaBearConfig = koala_bear().build();
         let _gl: GoldilocksConfig = goldilocks().build();
+    }
+
+    #[test]
+    fn compression_function_works() {
+        let _compress = baby_bear_compression();
+        let _compress = koala_bear_compression();
+        let _compress = goldilocks_compression();
     }
 }
