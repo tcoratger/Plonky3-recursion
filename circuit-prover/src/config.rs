@@ -31,6 +31,15 @@ use p3_uni_stark::StarkConfig;
 const COMPRESS_ARITY: usize = 2;
 
 /// A STARK configuration with all cryptographic primitives specified.
+///
+/// ### Type Parameters
+/// - `F`: Base field.
+/// - `Perm`: Permutation function used by sponges and compression functions.
+/// - `PERM_WIDTH`: Width of the permutation state.
+/// - `RATE`: Number of field elements absorbed per permutation in sponge mode.
+/// - `OUT`: Number of output elements squeezed per permutation.
+/// - `COMPRESS_CHUNK`: Number of elements per compression chunk in Merkle commitments.
+/// - `CHALLENGE_DEGREE`: Extension field degree.
 pub type Config<
     F,
     Perm,
