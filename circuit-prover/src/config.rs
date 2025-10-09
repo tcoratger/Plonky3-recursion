@@ -34,16 +34,20 @@ const COMPRESS_ARITY: usize = 2;
 ///
 /// ### Type Parameters
 /// - `F`: Base field.
-/// - `Perm`: Permutation function used by sponges and compression functions.
-/// - `PERM_WIDTH`: Width of the permutation state.
+/// - `PermHash`: Permutation function used for sponge hashing (leaves, transcript absorption).
+/// - `PermCompress`: Permutation function used for Merkle tree compression.
+/// - `HASH_PERM_WIDTH`: Width of the hash permutation state.
+/// - `COMPRESS_PERM_WIDTH`: Width of the compression permutation state.
 /// - `RATE`: Number of field elements absorbed per permutation in sponge mode.
 /// - `OUT`: Number of output elements squeezed per permutation.
 /// - `COMPRESS_CHUNK`: Number of elements per compression chunk in Merkle commitments.
 /// - `CHALLENGE_DEGREE`: Extension field degree.
 pub type Config<
     F,
-    Perm,
-    const PERM_WIDTH: usize,
+    PermHash,
+    PermCompress,
+    const HASH_PERM_WIDTH: usize,
+    const COMPRESS_PERM_WIDTH: usize,
     const RATE: usize,
     const OUT: usize,
     const COMPRESS_CHUNK: usize,
@@ -55,8 +59,8 @@ pub type Config<
         MerkleTreeMmcs<
             F,
             F,
-            PaddingFreeSponge<Perm, PERM_WIDTH, RATE, OUT>,
-            TruncatedPermutation<Perm, COMPRESS_ARITY, COMPRESS_CHUNK, PERM_WIDTH>,
+            PaddingFreeSponge<PermHash, HASH_PERM_WIDTH, RATE, OUT>,
+            TruncatedPermutation<PermCompress, COMPRESS_ARITY, COMPRESS_CHUNK, COMPRESS_PERM_WIDTH>,
             COMPRESS_CHUNK,
         >,
         ExtensionMmcs<
@@ -65,65 +69,102 @@ pub type Config<
             MerkleTreeMmcs<
                 F,
                 F,
-                PaddingFreeSponge<Perm, PERM_WIDTH, RATE, OUT>,
-                TruncatedPermutation<Perm, COMPRESS_ARITY, COMPRESS_CHUNK, PERM_WIDTH>,
+                PaddingFreeSponge<PermHash, HASH_PERM_WIDTH, RATE, OUT>,
+                TruncatedPermutation<
+                    PermCompress,
+                    COMPRESS_ARITY,
+                    COMPRESS_CHUNK,
+                    COMPRESS_PERM_WIDTH,
+                >,
                 COMPRESS_CHUNK,
             >,
         >,
     >,
     BinomialExtensionField<F, CHALLENGE_DEGREE>,
-    DuplexChallenger<F, Perm, PERM_WIDTH, RATE>,
+    DuplexChallenger<F, PermHash, HASH_PERM_WIDTH, RATE>,
 >;
 
 /// Configuration builder for STARK provers.
 pub struct ConfigBuilder<
     F,
-    Perm,
-    const PERM_WIDTH: usize,
+    PermHash,
+    PermCompress,
+    const HASH_PERM_WIDTH: usize,
+    const COMPRESS_PERM_WIDTH: usize,
     const RATE: usize,
     const OUT: usize,
     const COMPRESS_CHUNK: usize,
     const CHALLENGE_DEGREE: usize,
 > {
-    perm: Perm,
+    perm_hash: PermHash,
+    perm_compress: PermCompress,
     _phantom: core::marker::PhantomData<F>,
 }
 
 impl<
     F,
-    Perm,
-    const PERM_WIDTH: usize,
+    PermHash,
+    PermCompress,
+    const HASH_PERM_WIDTH: usize,
+    const COMPRESS_PERM_WIDTH: usize,
     const RATE: usize,
     const OUT: usize,
     const COMPRESS_CHUNK: usize,
     const CHALLENGE_DEGREE: usize,
-> ConfigBuilder<F, Perm, PERM_WIDTH, RATE, OUT, COMPRESS_CHUNK, CHALLENGE_DEGREE>
+>
+    ConfigBuilder<
+        F,
+        PermHash,
+        PermCompress,
+        HASH_PERM_WIDTH,
+        COMPRESS_PERM_WIDTH,
+        RATE,
+        OUT,
+        COMPRESS_CHUNK,
+        CHALLENGE_DEGREE,
+    >
 where
     F: Field,
-    Perm: Clone + CryptographicPermutation<[F; PERM_WIDTH]>,
+    PermHash: Clone + CryptographicPermutation<[F; HASH_PERM_WIDTH]>,
+    PermCompress: Clone + CryptographicPermutation<[F; COMPRESS_PERM_WIDTH]>,
 {
-    const fn new(perm: Perm) -> Self {
+    const fn new(perm_hash: PermHash, perm_compress: PermCompress) -> Self {
         Self {
-            perm,
+            perm_hash,
+            perm_compress,
             _phantom: core::marker::PhantomData,
         }
     }
 
     /// Builds the final STARK configuration.
-    pub fn build(self) -> Config<F, Perm, PERM_WIDTH, RATE, OUT, COMPRESS_CHUNK, CHALLENGE_DEGREE> {
+    pub fn build(
+        self,
+    ) -> Config<
+        F,
+        PermHash,
+        PermCompress,
+        HASH_PERM_WIDTH,
+        COMPRESS_PERM_WIDTH,
+        RATE,
+        OUT,
+        COMPRESS_CHUNK,
+        CHALLENGE_DEGREE,
+    > {
         type Hash<Perm, const PERM_WIDTH: usize, const RATE: usize, const OUT: usize> =
             PaddingFreeSponge<Perm, PERM_WIDTH, RATE, OUT>;
         type Compress<Perm, const PERM_WIDTH: usize, const COMPRESS_CHUNK: usize> =
             TruncatedPermutation<Perm, COMPRESS_ARITY, COMPRESS_CHUNK, PERM_WIDTH>;
 
-        let hash = Hash::<Perm, PERM_WIDTH, RATE, OUT>::new(self.perm.clone());
-        let compress = Compress::<Perm, PERM_WIDTH, COMPRESS_CHUNK>::new(self.perm.clone());
+        let hash = Hash::<PermHash, HASH_PERM_WIDTH, RATE, OUT>::new(self.perm_hash.clone());
+        let compress = Compress::<PermCompress, COMPRESS_PERM_WIDTH, COMPRESS_CHUNK>::new(
+            self.perm_compress.clone(),
+        );
         let val_mmcs = MerkleTreeMmcs::new(hash, compress);
         let challenge_mmcs = ExtensionMmcs::new(val_mmcs.clone());
         let dft = Radix2DitParallel::default();
         let fri_params = create_benchmark_fri_params(challenge_mmcs);
         let pcs = TwoAdicFriPcs::new(dft, val_mmcs, fri_params);
-        let challenger = DuplexChallenger::new(self.perm);
+        let challenger = DuplexChallenger::new(self.perm_hash);
 
         StarkConfig::new(pcs, challenger)
     }
@@ -131,8 +172,9 @@ where
     /// Creates the compression function for this configuration.
     pub fn compression_function(
         &self,
-    ) -> TruncatedPermutation<Perm, COMPRESS_ARITY, COMPRESS_CHUNK, PERM_WIDTH> {
-        TruncatedPermutation::new(self.perm.clone())
+    ) -> TruncatedPermutation<PermCompress, COMPRESS_ARITY, COMPRESS_CHUNK, COMPRESS_PERM_WIDTH>
+    {
+        TruncatedPermutation::new(self.perm_compress.clone())
     }
 }
 
@@ -141,7 +183,8 @@ where
 /// BabyBear is a 31-bit prime field (2^31 - 2^27 + 1).
 ///
 /// # Parameters
-/// - **Permutation width**: 16 (appropriate for 32-bit fields)
+/// - **Hash permutation width**: 16 (appropriate for 32-bit fields)
+/// - **Compression permutation width**: 16
 /// - **Rate**: 8 (256 bits / 32 bits per element)
 /// - **Output size**: 8 (256 bits / 32 bits per element)
 /// - **Challenge degree**: 4
@@ -153,8 +196,10 @@ where
 /// let prover = MultiTableProver::new(config);
 /// ```
 #[inline]
-pub fn baby_bear() -> ConfigBuilder<BabyBear, Poseidon2BabyBear<16>, 16, 8, 8, 8, 4> {
-    ConfigBuilder::new(default_babybear_poseidon2_16())
+pub fn baby_bear()
+-> ConfigBuilder<BabyBear, Poseidon2BabyBear<16>, Poseidon2BabyBear<16>, 16, 16, 8, 8, 8, 4> {
+    let perm = default_babybear_poseidon2_16();
+    ConfigBuilder::new(perm.clone(), perm)
 }
 
 /// Creates the standard BabyBear compression function.
@@ -173,7 +218,8 @@ pub fn baby_bear_compression() -> impl PseudoCompressionFunction<[BabyBear; 8], 
 /// KoalaBear is a 31-bit prime field (2^31 - 2^24 + 1).
 ///
 /// # Parameters
-/// - **Permutation width**: 16 (appropriate for 32-bit fields)
+/// - **Hash permutation width**: 16 (appropriate for 32-bit fields)
+/// - **Compression permutation width**: 16
 /// - **Rate**: 8 (256 bits / 32 bits per element)
 /// - **Output size**: 8 (256 bits / 32 bits per element)
 /// - **Challenge degree**: 4
@@ -185,8 +231,10 @@ pub fn baby_bear_compression() -> impl PseudoCompressionFunction<[BabyBear; 8], 
 /// let prover = MultiTableProver::new(config);
 /// ```
 #[inline]
-pub fn koala_bear() -> ConfigBuilder<KoalaBear, Poseidon2KoalaBear<16>, 16, 8, 8, 8, 4> {
-    ConfigBuilder::new(default_koalabear_poseidon2_16())
+pub fn koala_bear()
+-> ConfigBuilder<KoalaBear, Poseidon2KoalaBear<16>, Poseidon2KoalaBear<16>, 16, 16, 8, 8, 8, 4> {
+    let perm = default_koalabear_poseidon2_16();
+    ConfigBuilder::new(perm.clone(), perm)
 }
 
 /// Creates the standard KoalaBear compression function.
@@ -205,7 +253,8 @@ pub fn koala_bear_compression() -> impl PseudoCompressionFunction<[KoalaBear; 8]
 /// Goldilocks is a 64-bit prime field (2^64 - 2^32 + 1).
 ///
 /// # Parameters
-/// - **Permutation width**: 8 (appropriate for 64-bit fields)
+/// - **Hash permutation width**: 8 (appropriate for 64-bit fields)
+/// - **Compression permutation width**: 8
 /// - **Rate**: 4 (256 bits / 64 bits per element)
 /// - **Output size**: 4 (256 bits / 64 bits per element)
 /// - **Challenge degree**: 2
@@ -217,11 +266,12 @@ pub fn koala_bear_compression() -> impl PseudoCompressionFunction<[KoalaBear; 8]
 /// let prover = MultiTableProver::new(config);
 /// ```
 #[inline]
-pub fn goldilocks() -> ConfigBuilder<Goldilocks, Poseidon2Goldilocks<8>, 8, 4, 4, 4, 2> {
+pub fn goldilocks()
+-> ConfigBuilder<Goldilocks, Poseidon2Goldilocks<8>, Poseidon2Goldilocks<8>, 8, 8, 4, 4, 4, 2> {
     use rand::SeedableRng;
     let mut rng = rand::rngs::SmallRng::seed_from_u64(1);
     let perm = p3_goldilocks::Poseidon2Goldilocks::<8>::new_from_rng_128(&mut rng);
-    ConfigBuilder::new(perm)
+    ConfigBuilder::new(perm.clone(), perm)
 }
 
 /// Creates the standard Goldilocks compression function.
@@ -236,13 +286,16 @@ pub fn goldilocks_compression() -> impl PseudoCompressionFunction<[Goldilocks; 4
 }
 
 /// Type alias for BabyBear STARK configuration.
-pub type BabyBearConfig = Config<BabyBear, Poseidon2BabyBear<16>, 16, 8, 8, 8, 4>;
+pub type BabyBearConfig =
+    Config<BabyBear, Poseidon2BabyBear<16>, Poseidon2BabyBear<16>, 16, 16, 8, 8, 8, 4>;
 
 /// Type alias for KoalaBear STARK configuration.
-pub type KoalaBearConfig = Config<KoalaBear, Poseidon2KoalaBear<16>, 16, 8, 8, 8, 4>;
+pub type KoalaBearConfig =
+    Config<KoalaBear, Poseidon2KoalaBear<16>, Poseidon2KoalaBear<16>, 16, 16, 8, 8, 8, 4>;
 
 /// Type alias for Goldilocks STARK configuration.
-pub type GoldilocksConfig = Config<Goldilocks, Poseidon2Goldilocks<8>, 8, 4, 4, 4, 2>;
+pub type GoldilocksConfig =
+    Config<Goldilocks, Poseidon2Goldilocks<8>, Poseidon2Goldilocks<8>, 8, 8, 4, 4, 4, 2>;
 
 /// Trait bounds for STARK-compatible fields.
 pub trait StarkField: Field + PrimeCharacteristicRing + TwoAdicField + PrimeField64 {}
