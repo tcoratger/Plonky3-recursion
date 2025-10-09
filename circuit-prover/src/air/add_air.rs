@@ -64,7 +64,7 @@ impl<F: Field + PrimeCharacteristicRing, const D: usize> AddAir<F, D> {
         Self::LANE_WIDTH
     }
 
-    pub fn total_width(&self) -> usize {
+    pub const fn total_width(&self) -> usize {
         self.lanes * Self::lane_width()
     }
 
