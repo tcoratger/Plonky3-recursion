@@ -7,6 +7,7 @@ use itertools::izip;
 use p3_air::{Air, AirBuilder, BaseAir};
 use p3_circuit::MmcsTrace;
 use p3_circuit::op::MmcsVerifyConfig;
+use p3_circuit::utils::pad_to_power_of_two;
 use p3_field::{BasedVectorSpace, Field, PrimeCharacteristicRing, PrimeField};
 use p3_matrix::Matrix;
 use p3_matrix::dense::RowMajorMatrix;
@@ -486,27 +487,6 @@ impl<F: Field> MmcsVerifyAir<F> {
         pad_to_power_of_two(&mut values, width, row_count);
 
         RowMajorMatrix::new(values, width)
-    }
-}
-
-/// Helper to pad trace values to power-of-two height with zeroes
-/// TODO: There is a duplicated function, we should refactor it.
-pub fn pad_to_power_of_two<F: Field>(values: &mut Vec<F>, width: usize, original_height: usize) {
-    if original_height == 0 {
-        // Empty trace - just ensure we have at least one row of zeros
-        values.resize(width, F::ZERO);
-        return;
-    }
-
-    let target_height = original_height.next_power_of_two();
-    if target_height == original_height {
-        return; // Already power of two
-    }
-
-    // Repeat the last row to reach target height
-
-    for _ in original_height..target_height {
-        values.extend_from_slice(&vec![F::ZERO; width]);
     }
 }
 
