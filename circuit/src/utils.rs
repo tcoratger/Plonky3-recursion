@@ -146,7 +146,7 @@ pub fn decompose_to_bits<F: Field, const N_BITS: usize>(
     bits
 }
 
-/// Helper to pad trace values to power-of-two height by repeating the last row
+/// Helper to pad trace values to power-of-two height with zeros
 pub fn pad_to_power_of_two<F: Field>(values: &mut Vec<F>, width: usize, original_height: usize) {
     if original_height == 0 {
         // Empty trace - just ensure we have at least one row of zeros
