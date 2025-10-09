@@ -1,3 +1,4 @@
+use alloc::vec;
 use alloc::vec::Vec;
 
 use p3_field::Field;
@@ -158,12 +159,9 @@ pub fn pad_to_power_of_two<F: Field>(values: &mut Vec<F>, width: usize, original
         return; // Already power of two
     }
 
-    // Repeat the last row to reach target height
-    let last_row_start = (original_height - 1) * width;
-    let last_row: Vec<F> = values[last_row_start..original_height * width].to_vec();
-
+    // Pad with zeroes
     for _ in original_height..target_height {
-        values.extend_from_slice(&last_row);
+        values.extend_from_slice(&vec![F::ZERO; width]);
     }
 }
 
@@ -431,9 +429,9 @@ mod tests {
         assert_eq!(values[4], F::from_u64(3));
         assert_eq!(values[5], F::from_u64(12));
 
-        // Padded row should repeat the last row exactly
-        assert_eq!(values[6], F::from_u64(3)); // same as row 2
-        assert_eq!(values[7], F::from_u64(12)); // same as row 2
+        // Padded row should be zero
+        assert_eq!(values[6], F::ZERO); // same as row 2
+        assert_eq!(values[7], F::ZERO); // same as row 2
     }
 
     #[test]
