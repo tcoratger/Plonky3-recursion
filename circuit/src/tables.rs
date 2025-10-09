@@ -159,8 +159,9 @@ impl<F: Field + Clone + Default> MmcsPrivateData<F> {
         {
             return Err(CircuitError::IncorrectNonPrimitiveOpPrivateData {
                 op: NonPrimitiveOpType::MmcsVerify,
-                expected: "None".to_string(),
-                got: format!("{:?}", extra_sibling),
+                operation_index: 0, // Unknown at construction time
+                expected: "last sibling should not have extra sibling (None)".to_string(),
+                got: format!("last sibling has extra sibling: {extra_sibling:?}"),
             });
         }
         // Worst case we push two states per step (if `other_sibling` is Some).
@@ -563,6 +564,46 @@ impl<F: CircuitField> CircuitRunner<F> {
                         op: NonPrimitiveOpType::MmcsVerify,
                     }),
                 }?;
+
+                // Validate that the witness data is consistent with public inputs
+                // Check leaf values
+                let witness_leaf: Vec<F> = leaf
+                    .iter()
+                    .map(|&wid| self.get_witness(wid))
+                    .collect::<Result<_, _>>()?;
+                let private_data_leaf = private_data.path_states.first().ok_or(
+                    CircuitError::NonPrimitiveOpMissingPrivateData {
+                        operation_index: op_idx,
+                    },
+                )?;
+                if witness_leaf != *private_data_leaf {
+                    return Err(CircuitError::IncorrectNonPrimitiveOpPrivateData {
+                        op: NonPrimitiveOpType::MmcsVerify,
+                        operation_index: op_idx,
+                        expected: alloc::format!("leaf: {witness_leaf:?}"),
+                        got: alloc::format!("leaf: {private_data_leaf:?}"),
+                    });
+                }
+
+                // Check root values
+                let witness_root: Vec<F> = root
+                    .iter()
+                    .map(|&wid| self.get_witness(wid))
+                    .collect::<Result<_, _>>()?;
+                let computed_root = private_data.path_states.last().ok_or(
+                    CircuitError::NonPrimitiveOpMissingPrivateData {
+                        operation_index: op_idx,
+                    },
+                )?;
+                if witness_root != *computed_root {
+                    return Err(CircuitError::IncorrectNonPrimitiveOpPrivateData {
+                        op: NonPrimitiveOpType::MmcsVerify,
+                        operation_index: op_idx,
+                        expected: alloc::format!("root: {witness_root:?}"),
+                        got: alloc::format!("root: {computed_root:?}"),
+                    });
+                }
+
                 let trace = private_data.to_trace(config, leaf, root, index.0)?;
                 mmcs_paths.push(trace);
             } else {
@@ -859,5 +900,129 @@ mod tests {
         .unwrap();
 
         assert_eq!(private_data, expected_private_data);
+    }
+
+    #[test]
+    fn test_mmcs_witness_validation() {
+        use crate::NonPrimitiveOpPrivateData;
+        use crate::errors::CircuitError;
+        use crate::ops::MmcsOps;
+
+        type F = BinomialExtensionField<BabyBear, 4>;
+
+        let compress = MockCompression {};
+        // Use config with max_tree_height=4 to support 3 layers + 1 extra sibling
+        let config = MmcsVerifyConfig {
+            base_field_digest_elems: 1,
+            ext_field_digest_elems: 1,
+            max_tree_height: 4,
+        };
+
+        // Build circuit once
+        let mut builder = CircuitBuilder::new();
+        builder.enable_mmcs(&config);
+        let leaf = (0..config.ext_field_digest_elems)
+            .map(|_| builder.add_public_input())
+            .collect::<alloc::vec::Vec<_>>();
+        let index = builder.add_public_input();
+        let root = (0..config.ext_field_digest_elems)
+            .map(|_| builder.add_public_input())
+            .collect::<alloc::vec::Vec<_>>();
+        let mmcs_op_id = builder.add_mmcs_verify(&leaf, &index, &root).unwrap();
+        let circuit = builder.build().unwrap();
+
+        // Create test data with 3 layers, varying directions, and one extra sibling
+        let leaf_value = [F::from_u64(42)];
+        let siblings = [
+            // Layer 0: direction=false, no extra sibling
+            (vec![F::from_u64(10)], None),
+            // Layer 1: direction=true, WITH extra sibling
+            (vec![F::from_u64(20)], Some(vec![F::from_u64(25)])),
+            // Layer 2: direction=false, no extra sibling
+            (vec![F::from_u64(30)], None),
+        ];
+        let directions = [false, true, false];
+
+        // Compute what the CORRECT root should be
+        let correct_private_data = MmcsPrivateData::new::<BabyBear, _, 1>(
+            &compress,
+            &config,
+            &leaf_value,
+            &siblings,
+            &directions,
+        )
+        .unwrap();
+        let correct_root = correct_private_data.path_states.last().unwrap();
+
+        // Index corresponds to directions: [false, true, false] -> 0b010 = 2
+        let index_value = F::from_u64(
+            directions
+                .iter()
+                .enumerate()
+                .filter(|(_, dir)| **dir)
+                .map(|(i, _)| 1 << i)
+                .sum::<u64>(),
+        );
+
+        // Helper to run test with given inputs and private data
+        let run_test = |leaf: &[F], root: &[F], private_data: &MmcsPrivateData<F>| {
+            let mut public_inputs = vec![];
+            public_inputs.extend(leaf);
+            public_inputs.push(index_value);
+            public_inputs.extend(root);
+
+            let mut runner = circuit.clone().runner();
+            runner.set_public_inputs(&public_inputs).unwrap();
+            runner
+                .set_non_primitive_op_private_data(
+                    mmcs_op_id,
+                    NonPrimitiveOpPrivateData::MmcsVerify(private_data.clone()),
+                )
+                .unwrap();
+            runner.run()
+        };
+
+        // Test 1: Valid witness should be accepted
+        assert!(
+            run_test(&leaf_value, correct_root, &correct_private_data).is_ok(),
+            "Valid witness should be accepted"
+        );
+
+        // Test 2: Invalid witness (wrong root) should be rejected
+        let wrong_root = [F::from_u64(999)];
+        match run_test(&leaf_value, &wrong_root, &correct_private_data) {
+            Err(CircuitError::IncorrectNonPrimitiveOpPrivateData { .. }) => {
+                // Expected! The witness validation caught the mismatch
+            }
+            Ok(_) => panic!("Expected witness validation to fail, but it succeeded!"),
+            Err(e) => panic!(
+                "Expected IncorrectNonPrimitiveOpPrivateData error, got: {:?}",
+                e
+            ),
+        }
+
+        // Test 3: Invalid witness (wrong leaf) should be rejected
+        let wrong_leaf_value = [F::from_u64(999)];
+        let wrong_private_data = MmcsPrivateData::new::<BabyBear, _, 1>(
+            &compress,
+            &config,
+            &wrong_leaf_value,
+            &siblings,
+            &directions,
+        )
+        .unwrap();
+
+        match run_test(&leaf_value, correct_root, &wrong_private_data) {
+            Err(CircuitError::IncorrectNonPrimitiveOpPrivateData { .. }) => {
+                // Expected! The witness validation caught the mismatch
+            }
+            Ok(_) => {
+                panic!("Expected witness validation to fail for wrong leaf, but it succeeded!")
+            }
+            Err(e) => panic!(
+                "Expected IncorrectNonPrimitiveOpPrivateData error, got: {:?}",
+                e
+            ),
+        }
     }
 }
