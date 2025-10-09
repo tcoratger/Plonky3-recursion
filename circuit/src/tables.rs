@@ -231,9 +231,11 @@ impl<F: Field + Clone + Default> MmcsPrivateData<F> {
         ) {
             // Add a row to the trace.
             let mut add_trace_row = |left_v: &Vec<F>, right_v: &Vec<F>, is_extra_flag: bool| {
+                // Current hash becomes left operand
                 trace.left_values.push(left_v.clone());
                 // Points to witness bus
                 trace.left_index.push(leaf_indices.clone());
+                // Sibling becomes right operand (private data - not on witness bus)
                 trace.right_values.push(right_v.clone());
                 // Not on witness bus - private data
                 trace.right_index.push(0);
