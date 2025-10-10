@@ -2,8 +2,8 @@
 
 use alloc::vec;
 use alloc::vec::Vec;
+use core::iter;
 use core::marker::PhantomData;
-use core::{array, iter};
 
 use p3_challenger::GrindingChallenger;
 use p3_circuit::CircuitBuilder;
@@ -102,10 +102,9 @@ impl<
         }
 
         let final_poly_len = lens.next().unwrap();
-        let mut final_poly = Vec::with_capacity(final_poly_len);
-        for _ in 0..final_poly_len {
-            final_poly.push(circuit.add_public_input());
-        }
+        let final_poly =
+            circuit.alloc_public_inputs(final_poly_len, "FRI final polynomial coefficients");
+
         Self {
             commit_phase_commits,
             query_proofs,
@@ -270,7 +269,7 @@ impl<F: Field, EF: ExtensionField<F>, RecMmcs: RecursiveExtensionMmcs<F, EF>> Re
         lens: &mut impl Iterator<Item = usize>,
         degree_bits: usize,
     ) -> Self {
-        let sibling_value = circuit.add_public_input();
+        let sibling_value = circuit.alloc_public_input("FRI commit phase sibling value");
         let opening_proof = RecMmcs::Proof::new(circuit, lens, degree_bits);
         Self {
             sibling_value,
@@ -327,10 +326,8 @@ impl<F: Field, EF: ExtensionField<F>, Inner: RecursiveMmcs<F, EF>> Recursive<EF>
         let mut opened_values = Vec::with_capacity(opened_vals_len);
         for _ in 0..opened_vals_len {
             let num_opened_values = lens.next().unwrap();
-            let mut inner_opened_vals = Vec::with_capacity(num_opened_values);
-            for _ in 0..num_opened_values {
-                inner_opened_vals.push(circuit.add_public_input());
-            }
+            let inner_opened_vals =
+                circuit.alloc_public_inputs(num_opened_values, "batch opened values");
             opened_values.push(inner_opened_vals);
         }
 
@@ -396,7 +393,7 @@ impl<F: Field, EF: ExtensionField<F>, const DIGEST_ELEMS: usize> Recursive<EF>
         _degree_bits: usize,
     ) -> Self {
         Self {
-            hash_targets: array::from_fn(|_| circuit.add_public_input()),
+            hash_targets: circuit.alloc_public_input_array("MMCS commitment digest"),
             _phantom: PhantomData,
         }
     }
@@ -435,7 +432,7 @@ impl<F: Field, EF: ExtensionField<F>, const DIGEST_ELEMS: usize> Recursive<EF>
         let proof_len = lens.next().unwrap();
         let mut proof = Vec::with_capacity(proof_len);
         for _ in 0..proof_len {
-            proof.push(array::from_fn(|_| circuit.add_public_input()));
+            proof.push(circuit.alloc_public_input_array("Merkle proof hash"));
         }
 
         Self {
@@ -475,7 +472,7 @@ impl<F: Field, EF: ExtensionField<F>> Recursive<EF> for Witness<F> {
         _degree_bits: usize,
     ) -> Self {
         Self {
-            witness: circuit.add_public_input(),
+            witness: circuit.alloc_public_input("FRI proof-of-work witness"),
             _phantom: PhantomData,
         }
     }
