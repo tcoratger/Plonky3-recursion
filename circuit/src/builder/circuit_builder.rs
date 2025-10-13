@@ -455,7 +455,9 @@ mod tests {
     #[test]
     fn test_build_empty_circuit() {
         let builder = CircuitBuilder::<BabyBear>::new();
-        let circuit = builder.build().expect("Empty circuit should build successfully");
+        let circuit = builder
+            .build()
+            .expect("Empty circuit should build successfully");
 
         assert_eq!(circuit.public_flat_len, 0);
         assert_eq!(circuit.witness_count, 1);
@@ -478,7 +480,9 @@ mod tests {
         let mut builder = CircuitBuilder::<BabyBear>::new();
         builder.add_public_input();
         builder.add_public_input();
-        let circuit = builder.build().expect("Circuit with public inputs should build");
+        let circuit = builder
+            .build()
+            .expect("Circuit with public inputs should build");
 
         assert_eq!(circuit.public_flat_len, 2);
         assert_eq!(circuit.public_rows.len(), 2);
@@ -518,7 +522,9 @@ mod tests {
         let mut builder = CircuitBuilder::<BabyBear>::new();
         builder.add_const(BabyBear::from_u64(1));
         builder.add_const(BabyBear::from_u64(2));
-        let circuit = builder.build().expect("Circuit with constants should build");
+        let circuit = builder
+            .build()
+            .expect("Circuit with constants should build");
 
         assert_eq!(circuit.public_flat_len, 0);
         assert!(circuit.public_rows.is_empty());
@@ -556,7 +562,9 @@ mod tests {
         let a = builder.add_const(BabyBear::from_u64(2));
         let b = builder.add_const(BabyBear::from_u64(3));
         builder.add(a, b);
-        let circuit = builder.build().expect("Circuit with operations should build");
+        let circuit = builder
+            .build()
+            .expect("Circuit with operations should build");
 
         assert_eq!(circuit.witness_count, 4);
         assert_eq!(circuit.primitive_ops.len(), 4);
@@ -592,7 +600,9 @@ mod tests {
         let a = builder.add_const(BabyBear::from_u64(5));
         let b = builder.add_const(BabyBear::from_u64(5));
         builder.connect(a, b);
-        let circuit = builder.build().expect("Circuit with constraints should build");
+        let circuit = builder
+            .build()
+            .expect("Circuit with constraints should build");
 
         assert_eq!(circuit.witness_count, 2);
         assert_eq!(circuit.primitive_ops.len(), 2);
