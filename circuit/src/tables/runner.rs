@@ -59,7 +59,7 @@ impl<F: CircuitField> CircuitRunner<F> {
         op_id: NonPrimitiveOpId,
         private_data: NonPrimitiveOpPrivateData<F>,
     ) -> Result<(), CircuitError> {
-        // Validate operation ID range
+        // Validate that the op_id exists in the circuit
         if op_id.0 as usize >= self.circuit.non_primitive_ops.len() {
             return Err(CircuitError::NonPrimitiveOpIdOutOfRange {
                 op_id: op_id.0,
@@ -67,15 +67,26 @@ impl<F: CircuitField> CircuitRunner<F> {
             });
         }
 
+        // Validate that the private data matches the operation type
+        let non_primitive_op = &self.circuit.non_primitive_ops[op_id.0 as usize];
+        match (non_primitive_op, &private_data) {
+            (NonPrimitiveOp::MmcsVerify { .. }, NonPrimitiveOpPrivateData::MmcsVerify(_)) => {
+                // Type match - good!
+            }
+            (NonPrimitiveOp::HashAbsorb { .. }, _) | (NonPrimitiveOp::HashSqueeze { .. }, _) => {
+                // HashAbsorb/HashSqueeze don't use private data
+            }
+        }
+
         // Store private data for this operation
         self.non_primitive_op_private_data[op_id.0 as usize] = Some(private_data);
         Ok(())
     }
 
-    /// Executes circuit and generates all traces.
+    /// Run the circuit and generate traces
     #[instrument(skip_all)]
     pub fn run(mut self) -> Result<Traces<F>, CircuitError> {
-        // Step 1: Execute primitives to compute all witness values
+        // Step 1: Execute primitives to fill witness vector
         self.execute_primitives()?;
 
         // Step 2: Generate all table traces
@@ -100,7 +111,7 @@ impl<F: CircuitField> CircuitRunner<F> {
     ///
     /// Operations run forward or backward depending on known operands.
     fn execute_primitives(&mut self) -> Result<(), CircuitError> {
-        // Clone operations to avoid borrow checker issues
+        // Clone primitive operations to avoid borrowing issues
         let primitive_ops = self.circuit.primitive_ops.clone();
 
         for prim in primitive_ops {
@@ -167,7 +178,7 @@ impl<F: CircuitField> CircuitRunner<F> {
             return Err(CircuitError::WitnessIdOutOfBounds { witness_id: widx });
         }
 
-        // Detect conflicting reassignments
+        // Check for conflicting reassignment
         if let Some(existing_value) = self.witness[widx.0 as usize] {
             if existing_value != value {
                 return Err(CircuitError::WitnessConflict {
