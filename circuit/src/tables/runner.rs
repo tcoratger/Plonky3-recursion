@@ -18,6 +18,8 @@ pub struct CircuitRunner<F> {
     /// Witness values (None = unset, Some = computed).
     witness: Vec<Option<F>>,
     /// Private data for non-primitive operations.
+    ///
+    /// These data are not on the witness bus.
     non_primitive_op_private_data: Vec<Option<NonPrimitiveOpPrivateData<F>>>,
 }
 
@@ -219,7 +221,7 @@ impl<F: CircuitField> CircuitRunner<F> {
         let mut index = Vec::new();
         let mut values = Vec::new();
 
-        // Extract all constant assignments from the circuit
+        // Collect all constants from primitive operations
         for prim in &self.circuit.primitive_ops {
             if let Prim::Const { out, val } = prim {
                 index.push(*out);
@@ -235,7 +237,7 @@ impl<F: CircuitField> CircuitRunner<F> {
         let mut index = Vec::new();
         let mut values = Vec::new();
 
-        // Extract all public input values from primitive operations
+        // Collect all public inputs from primitive operations
         for prim in &self.circuit.primitive_ops {
             if let Prim::Public { out, public_pos: _ } = prim {
                 index.push(*out);
