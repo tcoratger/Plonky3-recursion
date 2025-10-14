@@ -7,64 +7,99 @@ use p3_field::{ExtensionField, Field};
 use p3_symmetric::PseudoCompressionFunction;
 
 use crate::CircuitError;
-use crate::circuit::{Circuit, CircuitField};
-use crate::op::{
-    NonPrimitiveOp, NonPrimitiveOpConfig, NonPrimitiveOpPrivateData, NonPrimitiveOpType,
-};
+use crate::op::NonPrimitiveOpType;
 use crate::ops::MmcsVerifyConfig;
 use crate::types::WitnessId;
 
+/// MMCS Merkle path verification table.
+///
+/// Stores all Merkle path verification operations in the circuit.
+/// Each operation proves a leaf is included in a Merkle tree.
 #[derive(Debug, Clone)]
 pub struct MmcsTrace<F> {
-    /// All the mmcs paths computed in this trace
+    /// All Merkle path verifications in this trace.
+    ///
+    /// Each entry is one complete leaf-to-root verification.
     pub mmcs_paths: Vec<MmcsPathTrace<F>>,
 }
 
-/// A single Mmcs Path verification table
+/// Single Merkle path verification trace.
+///
+/// Represents one complete leaf-to-root path verification.
+/// Each row corresponds to one tree layer.
+/// Some layers have extra rows for variable-sized matrices.
 #[derive(Debug, Clone, Default)]
 pub struct MmcsPathTrace<F> {
-    /// Left operand values (current hash). A vector of field elements representing a digest.
+    /// Current hash state at each layer.
+    ///
+    /// Left operand in the hash compression function.
+    /// State evolves as we climb the tree.
     pub left_values: Vec<Vec<F>>,
-    /// Left operand indices. These are the witness indices of the original leaf digest
-    /// used as the left operand; the evolving state is private and not on the witness bus.
+
+    /// Witness IDs for the leaf digest.
+    ///
+    /// Points to leaf values in the witness table.
+    /// Intermediate states are private (not on witness bus).
     pub left_index: Vec<Vec<u32>>,
-    /// Right operand values (sibling hash). A vector of field elements representing a digest
+
+    /// Sibling hash values at each layer.
+    ///
+    /// Right operand in the hash compression function.
+    /// Private data provided by the prover.
     pub right_values: Vec<Vec<F>>,
-    /// Right operand indices (not on witness bus - private)
+
+    /// Witness IDs for siblings (private, set to 0).
     pub right_index: Vec<u32>,
-    /// Path direction bits (0 = left, 1 = right) - private
+
+    /// Path direction bits.
+    ///
+    /// - false = hash(sibling, state),
+    /// - true = hash(state, sibling).
     pub path_directions: Vec<bool>,
-    /// Indicates if the current row is processing a smaller
-    /// matrix of the Mmcs.
+
+    /// Flags for extra hashing steps in variable-sized trees.
     pub is_extra: Vec<bool>,
-    /// Final digest after traversing the path (expected root value).
+
+    /// Final root digest value.
+    ///
+    /// Expected root after traversing the path.
     pub final_value: Vec<F>,
-    /// Witness indices corresponding to the final digest.
+
+    /// Witness IDs for the root digest.
     pub final_index: Vec<u32>,
 }
 
-/// Private Mmcs path data for Mmcs verification
+/// Private Merkle path witness data.
 ///
-/// This represents the private witness information that the prover needs
-/// to demonstrate knowledge of a valid Mmcs path from leaf to root.
+/// Prover's private information demonstrating a valid leaf-to-root path.
+/// - It includes all intermediate hash states and sibling hashes.
+/// - Some layers have extra siblings for variable-sized trees.
 #[derive(Debug, Clone, PartialEq)]
 pub struct MmcsPrivateData<F> {
-    /// Sibling and state hash values along the Mmcs path
+    /// Hash states along the path: [leaf, state1, state2, ..., root].
     ///
-    /// The sequence of states along the path.
+    /// Each state results from hashing the previous state with a sibling.
     pub path_states: Vec<Vec<F>>,
-    /// The sequence of sibling with optional tuple of extra state
-    /// and siblings, present when the Mmcs has a smaller matrix at this step.
+
+    /// Sibling hashes at each layer.
+    ///
+    /// Optional extra (state, sibling) pair for variable-sized MMCS layers.
     pub path_siblings: Vec<SiblingWithExtra<F>>,
-    /// Direction bits for each layer (false = left, true = right)
+
+    /// Direction bits encoding the leaf's position.
+    ///
+    /// - false = sibling on left,
+    /// - true = sibling on right.
     pub directions: Vec<bool>,
 }
 
 type SiblingWithExtra<F> = (Vec<F>, Option<(Vec<F>, Vec<F>)>);
 
 impl<F: Field + Clone + Default> MmcsPrivateData<F> {
-    /// Computes the private mmcs data for the mmcs path defined by `leaf`, `siblings` and `directions`,
-    /// for a given a compression function.
+    /// Computes private data for a Merkle path verification.
+    ///
+    /// Takes public inputs and computes all intermediate hash states.
+    /// Uses the compression function to hash at each layer.
     pub fn new<BF, C, const DIGEST_ELEMS: usize>(
         compress: &C,
         config: &MmcsVerifyConfig,
@@ -150,8 +185,10 @@ impl<F: Field + Clone + Default> MmcsPrivateData<F> {
         Ok(private_data)
     }
 
-    /// Builds a valid `MmcsVerifyAir` trace from a private Mmcs proof,
-    /// given the leaf's digest witness IDs and the expected root witness IDs.
+    /// Converts private data to trace format for AIR verification.
+    ///
+    /// References the witness table for leaf and root digests.
+    /// Includes all intermediate states and direction bits.
     pub fn to_trace(
         &self,
         mmcs_config: &MmcsVerifyConfig,
@@ -203,101 +240,6 @@ impl<F: Field + Clone + Default> MmcsPrivateData<F> {
     }
 }
 
-/// Generate MMCS trace from circuit runner state
-pub fn generate_mmcs_trace<F: CircuitField>(
-    circuit: &Circuit<F>,
-    non_primitive_op_private_data: &[Option<NonPrimitiveOpPrivateData<F>>],
-    get_witness: impl Fn(WitnessId) -> Result<F, CircuitError>,
-) -> Result<MmcsTrace<F>, CircuitError> {
-    let mut mmcs_paths = Vec::new();
-
-    // Process each complex operation by index to avoid borrowing conflicts
-    for op_idx in 0..circuit.non_primitive_ops.len() {
-        // Copy out leaf/root to end immutable borrow immediately
-        let NonPrimitiveOp::MmcsVerify { leaf, index, root } = &circuit.non_primitive_ops[op_idx]
-        else {
-            // Skip non-MMCS operations (e.g., HashAbsorb, HashSqueeze)
-            continue;
-        };
-
-        if let Some(Some(NonPrimitiveOpPrivateData::MmcsVerify(private_data))) =
-            non_primitive_op_private_data.get(op_idx).cloned()
-        {
-            let config = match circuit.enabled_ops.get(&NonPrimitiveOpType::MmcsVerify) {
-                Some(NonPrimitiveOpConfig::MmcsVerifyConfig(config)) => Ok(config),
-                _ => Err(CircuitError::InvalidNonPrimitiveOpConfiguration {
-                    op: NonPrimitiveOpType::MmcsVerify,
-                }),
-            }?;
-
-            // Validate that the witness data is consistent with public inputs
-            // Check leaf values
-            let witness_leaf: Vec<F> = leaf
-                .iter()
-                .map(|&wid| get_witness(wid))
-                .collect::<Result<_, _>>()?;
-            let private_data_leaf = private_data.path_states.first().ok_or(
-                CircuitError::NonPrimitiveOpMissingPrivateData {
-                    operation_index: op_idx,
-                },
-            )?;
-            if witness_leaf != *private_data_leaf {
-                return Err(CircuitError::IncorrectNonPrimitiveOpPrivateData {
-                    op: NonPrimitiveOpType::MmcsVerify,
-                    operation_index: op_idx,
-                    expected: alloc::format!("leaf: {witness_leaf:?}"),
-                    got: alloc::format!("leaf: {private_data_leaf:?}"),
-                });
-            }
-
-            // Check root values
-            let witness_root: Vec<F> = root
-                .iter()
-                .map(|&wid| get_witness(wid))
-                .collect::<Result<_, _>>()?;
-            let computed_root = private_data.path_states.last().ok_or(
-                CircuitError::NonPrimitiveOpMissingPrivateData {
-                    operation_index: op_idx,
-                },
-            )?;
-            if witness_root != *computed_root {
-                return Err(CircuitError::IncorrectNonPrimitiveOpPrivateData {
-                    op: NonPrimitiveOpType::MmcsVerify,
-                    operation_index: op_idx,
-                    expected: alloc::format!("root: {witness_root:?}"),
-                    got: alloc::format!("root: {computed_root:?}"),
-                });
-            }
-
-            // Compute index from private directions (as u64) and validate against witness value
-            let priv_index_u64: u64 = private_data
-                .directions
-                .iter()
-                .enumerate()
-                .filter_map(|(i, &b)| if b { Some(1u64 << i) } else { None })
-                .sum();
-
-            let idx_f = get_witness(*index)?;
-            if idx_f != F::from_u64(priv_index_u64) {
-                return Err(CircuitError::IncorrectNonPrimitiveOpPrivateData {
-                    op: NonPrimitiveOpType::MmcsVerify,
-                    operation_index: op_idx,
-                    expected: alloc::format!("public index value {}", F::from_u64(priv_index_u64)),
-                    got: alloc::format!("{idx_f:?}"),
-                });
-            }
-            let trace = private_data.to_trace(config, leaf, root)?;
-            mmcs_paths.push(trace);
-        } else {
-            return Err(CircuitError::NonPrimitiveOpMissingPrivateData {
-                operation_index: op_idx,
-            });
-        }
-    }
-
-    Ok(MmcsTrace { mmcs_paths })
-}
-
 #[cfg(test)]
 mod tests {
     extern crate std;
@@ -309,6 +251,7 @@ mod tests {
     use p3_symmetric::PseudoCompressionFunction;
 
     use super::*;
+    use crate::NonPrimitiveOpPrivateData;
     use crate::builder::CircuitBuilder;
     use crate::errors::CircuitError;
     use crate::ops::MmcsOps;
