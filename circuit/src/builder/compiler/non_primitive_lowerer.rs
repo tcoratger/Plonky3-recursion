@@ -2,8 +2,7 @@ use alloc::vec::Vec;
 
 use hashbrown::HashMap;
 
-use crate::builder::CircuitBuilderError;
-use crate::builder::config::BuilderConfig;
+use crate::builder::{BuilderConfig, CircuitBuilderError};
 use crate::op::{NonPrimitiveOp, NonPrimitiveOpConfig, NonPrimitiveOpType};
 use crate::types::{ExprId, NonPrimitiveOpId, WitnessId};
 
@@ -93,6 +92,31 @@ impl<'a> NonPrimitiveLowerer<'a> {
                         index: index_widx,
                         root: root_widx,
                     });
+                }
+                NonPrimitiveOpType::HashAbsorb { reset } => {
+                    // Map inputs from ExprId to WitnessId
+                    let inputs = witness_exprs
+                        .iter()
+                        .map(|&expr| {
+                            Self::get_witness_id(self.expr_to_widx, expr, "HashAbsorb input")
+                        })
+                        .collect::<Result<_, _>>()?;
+
+                    lowered_ops.push(NonPrimitiveOp::HashAbsorb {
+                        reset_flag: *reset,
+                        inputs,
+                    });
+                }
+                NonPrimitiveOpType::HashSqueeze => {
+                    // Map outputs from ExprId to WitnessId
+                    let outputs = witness_exprs
+                        .iter()
+                        .map(|&expr| {
+                            Self::get_witness_id(self.expr_to_widx, expr, "HashSqueeze output")
+                        })
+                        .collect::<Result<_, _>>()?;
+
+                    lowered_ops.push(NonPrimitiveOp::HashSqueeze { outputs });
                 }
                 NonPrimitiveOpType::FriVerify => {
                     todo!() // TODO: Add FRIVerify when it lands
@@ -191,6 +215,7 @@ mod tests {
                 assert_eq!(root.len(), 1);
                 assert_eq!(root[0], WitnessId(2));
             }
+            _ => panic!("Expected MmcsVerify operation"),
         }
     }
 
@@ -235,6 +260,7 @@ mod tests {
                     assert_eq!(root_witness, WitnessId((9 + i) as u32));
                 }
             }
+            _ => panic!("Expected MmcsVerify operation"),
         }
     }
 
@@ -281,6 +307,7 @@ mod tests {
                     assert_eq!(root.len(), 1);
                     assert_eq!(root[0], WitnessId(base + 2));
                 }
+                _ => panic!("Expected MmcsVerify operation"),
             }
         }
     }

@@ -1,3 +1,4 @@
+#[cfg(debug_assertions)]
 use alloc::vec;
 use alloc::vec::Vec;
 
@@ -59,6 +60,7 @@ where
     /// Adds a constant to the expression graph (deduplicated).
     ///
     /// If this value was previously added, returns the original ExprId.
+    #[allow(unused_variables)]
     pub fn add_const(&mut self, val: F, label: &'static str) -> ExprId {
         #[cfg(debug_assertions)]
         let current_scope = self.current_scope();
@@ -80,6 +82,7 @@ where
     }
 
     /// Adds a public input expression to the graph.
+    #[allow(unused_variables)]
     pub fn add_public(&mut self, pos: usize, label: &'static str) -> ExprId {
         let expr_id = self.graph.add_expr(Expr::Public(pos));
 
@@ -96,6 +99,7 @@ where
     }
 
     /// Adds an addition expression to the graph.
+    #[allow(unused_variables)]
     pub fn add_add(&mut self, lhs: ExprId, rhs: ExprId, label: &'static str) -> ExprId {
         let expr_id = self.graph.add_expr(Expr::Add { lhs, rhs });
 
@@ -112,6 +116,7 @@ where
     }
 
     /// Adds a subtraction expression to the graph.
+    #[allow(unused_variables)]
     pub fn add_sub(&mut self, lhs: ExprId, rhs: ExprId, label: &'static str) -> ExprId {
         let expr_id = self.graph.add_expr(Expr::Sub { lhs, rhs });
 
@@ -128,6 +133,7 @@ where
     }
 
     /// Adds a multiplication expression to the graph.
+    #[allow(unused_variables)]
     pub fn add_mul(&mut self, lhs: ExprId, rhs: ExprId, label: &'static str) -> ExprId {
         let expr_id = self.graph.add_expr(Expr::Mul { lhs, rhs });
 
@@ -144,6 +150,7 @@ where
     }
 
     /// Adds a division expression to the graph.
+    #[allow(unused_variables)]
     pub fn add_div(&mut self, lhs: ExprId, rhs: ExprId, label: &'static str) -> ExprId {
         let expr_id = self.graph.add_expr(Expr::Div { lhs, rhs });
 

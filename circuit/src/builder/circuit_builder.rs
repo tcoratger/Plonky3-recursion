@@ -234,6 +234,7 @@ where
     }
 
     /// Pushes a non-primitive op. Returns op id.
+    #[allow(unused_variables)]
     pub(crate) fn push_non_primitive_op(
         &mut self,
         op_type: NonPrimitiveOpType,
@@ -260,7 +261,9 @@ where
     /// `pop_scope` is called. Scopes can be nested.
     ///
     /// If debug_assertions are not enabled, this is a no-op.
+    #[allow(unused_variables)]
     pub fn push_scope(&mut self, scope: &'static str) {
+        #[cfg(debug_assertions)]
         self.expr_builder.push_scope(scope);
     }
 
@@ -268,6 +271,7 @@ where
     ///
     /// If debug_assertions are not enabled, this is a no-op.
     pub fn pop_scope(&mut self) {
+        #[cfg(debug_assertions)]
         self.expr_builder.pop_scope();
     }
 
@@ -606,5 +610,151 @@ mod tests {
 
         assert_eq!(circuit.witness_count, 2);
         assert_eq!(circuit.primitive_ops.len(), 2);
+    }
+}
+
+#[cfg(test)]
+mod proptests {
+    use p3_baby_bear::BabyBear;
+    use p3_field::PrimeCharacteristicRing;
+    use proptest::prelude::*;
+
+    use super::*;
+
+    // Strategy for generating valid field elements
+    fn field_element() -> impl Strategy<Value = BabyBear> {
+        any::<u64>().prop_map(BabyBear::from_u64)
+    }
+
+    proptest! {
+        #[test]
+        fn field_add_commutative(a in field_element(), b in field_element()) {
+            let mut builder1 = CircuitBuilder::<BabyBear>::new();
+            let ca = builder1.add_const(a);
+            let cb = builder1.add_const(b);
+            let sum1 = builder1.add(ca, cb);
+
+            let mut builder2 = CircuitBuilder::<BabyBear>::new();
+            let ca2 = builder2.add_const(a);
+            let cb2 = builder2.add_const(b);
+            let sum2 = builder2.add(cb2, ca2);
+
+            let circuit1 = builder1.build().unwrap();
+            let circuit2 = builder2.build().unwrap();
+
+            let  runner1 = circuit1.runner();
+            let  runner2 = circuit2.runner();
+
+            let traces1 = runner1.run().unwrap();
+            let traces2 = runner2.run().unwrap();
+
+            prop_assert_eq!(
+                traces1.witness_trace.values[sum1.0 as usize],
+                traces2.witness_trace.values[sum2.0 as usize],
+                "addition should be commutative"
+            );
+        }
+
+        #[test]
+        fn field_mul_commutative(a in field_element(), b in field_element()) {
+            let mut builder1 = CircuitBuilder::<BabyBear>::new();
+            let ca = builder1.add_const(a);
+            let cb = builder1.add_const(b);
+            let prod1 = builder1.mul(ca, cb);
+
+            let mut builder2 = CircuitBuilder::<BabyBear>::new();
+            let ca2 = builder2.add_const(a);
+            let cb2 = builder2.add_const(b);
+            let prod2 = builder2.mul(cb2, ca2);
+
+            let circuit1 = builder1.build().unwrap();
+            let circuit2 = builder2.build().unwrap();
+
+            let  runner1 = circuit1.runner();
+            let  runner2 = circuit2.runner();
+
+            let traces1 = runner1.run().unwrap();
+            let traces2 = runner2.run().unwrap();
+
+            prop_assert_eq!(
+                traces1.witness_trace.values[prod1.0 as usize],
+                traces2.witness_trace.values[prod2.0 as usize],
+                "multiplication should be commutative"
+            );
+        }
+
+        #[test]
+        fn field_add_identity(a in field_element()) {
+            let mut builder = CircuitBuilder::<BabyBear>::new();
+            let ca = builder.add_const(a);
+            let zero = builder.add_const(BabyBear::ZERO);
+            let result = builder.add(ca, zero);
+
+            let circuit = builder.build().unwrap();
+            let  runner = circuit.runner();
+            let traces = runner.run().unwrap();
+
+            prop_assert_eq!(
+                traces.witness_trace.values[result.0 as usize],
+                a,
+                "a + 0 = a"
+            );
+        }
+
+        #[test]
+        fn field_mul_identity(a in field_element()) {
+            let mut builder = CircuitBuilder::<BabyBear>::new();
+            let ca = builder.add_const(a);
+            let one = builder.add_const(BabyBear::ONE);
+            let result = builder.mul(ca, one);
+
+            let circuit = builder.build().unwrap();
+            let  runner = circuit.runner();
+            let traces = runner.run().unwrap();
+
+            prop_assert_eq!(
+                traces.witness_trace.values[result.0 as usize],
+                a,
+                "a * 1 = a"
+            );
+        }
+
+        #[test]
+        fn field_add_sub(a in field_element(), b in field_element()) {
+            let mut builder = CircuitBuilder::<BabyBear>::new();
+            let ca = builder.add_const(a);
+            let cb = builder.add_const(b);
+            let diff = builder.sub(ca, cb);
+            let result = builder.add(diff, cb);
+
+            let circuit = builder.build().unwrap();
+            let  runner = circuit.runner();
+            let traces = runner.run().unwrap();
+
+            prop_assert_eq!(
+                traces.witness_trace.values[result.0 as usize],
+                a,
+                "(a - b) + b = a"
+            );
+        }
+
+        #[test]
+        fn field_mul_div(a in field_element(), b in field_element().prop_filter("b must be non-zero", |&x| x != BabyBear::ZERO)) {
+            let mut builder = CircuitBuilder::<BabyBear>::new();
+            let ca = builder.add_const(a);
+            let cb = builder.add_const(b);
+            let quot = builder.div(ca, cb);
+            let result = builder.mul(quot, cb);
+
+            let circuit = builder.build().unwrap();
+            let  runner = circuit.runner();
+            let traces = runner.run().unwrap();
+
+            prop_assert_eq!(
+                traces.witness_trace.values[result.0 as usize],
+                a,
+                "(a / b) * b = a"
+            );
+        }
     }
 }

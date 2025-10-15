@@ -1,0 +1,1682 @@
+   Compiling proc-macro2 v1.0.101
+   Compiling unicode-ident v1.0.19
+   Compiling quote v1.0.41
+   Compiling autocfg v1.5.0
+   Compiling once_cell v1.21.3
+   Compiling serde_core v1.0.228
+   Compiling pin-project-lite v0.2.16
+   Compiling serde v1.0.228
+   Compiling paste v1.0.15
+   Compiling rand_core v0.9.3
+   Compiling either v1.15.0
+   Compiling p3-maybe-rayon v0.3.0 (https://github.com/Plonky3/Plonky3#33e58c77)
+   Compiling strength_reduce v0.2.4
+   Compiling crunchy v0.2.4
+   Compiling thiserror v2.0.17
+   Compiling tracing-core v0.1.34
+   Compiling rand v0.9.2
+   Compiling itertools v0.14.0
+   Compiling tiny-keccak v2.0.2
+   Compiling regex-syntax v0.8.7
+   Compiling equivalent v1.0.2
+   Compiling foldhash v0.2.0
+   Compiling num-traits v0.2.19
+   Compiling cfg-if v1.0.3
+   Compiling lazy_static v1.5.0
+   Compiling allocator-api2 v0.2.21
+   Compiling log v0.4.28
+   Compiling tracing-log v0.2.0
+   Compiling hashbrown v0.16.0
+   Compiling regex-automata v0.4.12
+   Compiling sharded-slab v0.1.7
+   Compiling thread_local v1.1.9
+   Compiling smallvec v1.15.1
+   Compiling nu-ansi-term v0.50.3
+   Compiling ansi_term v0.12.1
+   Compiling matchers v0.2.0
+   Compiling syn v2.0.106
+   Compiling tracing-attributes v0.1.30
+   Compiling serde_derive v1.0.228
+   Compiling thiserror-impl v2.0.17
+   Compiling tracing v0.1.41
+   Compiling num-integer v0.1.46
+   Compiling num-bigint v0.4.6
+   Compiling transpose v0.2.3
+   Compiling tracing-subscriber v0.3.20
+   Compiling tracing-forest v0.2.0
+   Compiling p3-util v0.3.0 (https://github.com/Plonky3/Plonky3#33e58c77)
+   Compiling p3-field v0.3.0 (https://github.com/Plonky3/Plonky3#33e58c77)
+   Compiling p3-matrix v0.3.0 (https://github.com/Plonky3/Plonky3#33e58c77)
+   Compiling p3-symmetric v0.3.0 (https://github.com/Plonky3/Plonky3#33e58c77)
+   Compiling p3-challenger v0.3.0 (https://github.com/Plonky3/Plonky3#33e58c77)
+   Compiling p3-keccak v0.3.0 (https://github.com/Plonky3/Plonky3#33e58c77)
+   Compiling p3-dft v0.3.0 (https://github.com/Plonky3/Plonky3#33e58c77)
+   Compiling p3-air v0.3.0 (https://github.com/Plonky3/Plonky3#33e58c77)
+   Compiling p3-interpolation v0.3.0 (https://github.com/Plonky3/Plonky3#33e58c77)
+   Compiling p3-mds v0.3.0 (https://github.com/Plonky3/Plonky3#33e58c77)
+   Compiling p3-commit v0.3.0 (https://github.com/Plonky3/Plonky3#33e58c77)
+   Compiling p3-poseidon2 v0.3.0 (https://github.com/Plonky3/Plonky3#33e58c77)
+   Compiling p3-uni-stark v0.3.0 (https://github.com/Plonky3/Plonky3#33e58c77)
+   Compiling p3-fri v0.3.0 (https://github.com/Plonky3/Plonky3#33e58c77)
+   Compiling p3-merkle-tree v0.3.0 (https://github.com/Plonky3/Plonky3#33e58c77)
+   Compiling p3-monty-31 v0.3.0 (https://github.com/Plonky3/Plonky3#33e58c77)
+   Compiling p3-goldilocks v0.3.0 (https://github.com/Plonky3/Plonky3#33e58c77)
+   Compiling p3-baby-bear v0.3.0 (https://github.com/Plonky3/Plonky3#33e58c77)
+   Compiling p3-koala-bear v0.3.0 (https://github.com/Plonky3/Plonky3#33e58c77)
+   Compiling p3-circuit v0.1.0 (/Users/rsalen/workspace/Polygon/Plonky3-recursion/circuit)
+warning: methods `instruction_combining` and `dead_code_elimination` are never used
+    --> circuit/src/builder.rs:959:8
+     |
+526  | / impl<F> CircuitBuilder<F>
+527  | | where
+528  | |     F: Clone + PrimeCharacteristicRing + PartialEq + Eq + core::hash::Hash,
+     | |___________________________________________________________________________- methods in this implementation
+...
+959  |       fn instruction_combining(&mut self, primitive_ops: Vec<Prim<F>>) -> Vec<Prim<F>> {
+     |          ^^^^^^^^^^^^^^^^^^^^^
+...
+1041 |       fn dead_code_elimination(&mut self, primitive_ops: Vec<Prim<F>>) -> Vec<Prim<F>> {
+     |          ^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: `#[warn(dead_code)]` on by default
+
+   Compiling p3-recursion v0.1.0 (/Users/rsalen/workspace/Polygon/Plonky3-recursion/recursion)
+warning: `p3-circuit` (lib) generated 1 warning
+    Finished `profiling` profile [optimized + debuginfo] target(s) in 11.41s
+     Running tests/fibonacci.rs (target/profiling/deps/fibonacci-05af159095654809)
+
+running 1 test
+[1;32mINFO    [0m prove [ 328µs | 14.34% / 100.00% ]
+[1;32mINFO    [0m ┝━ check constraints [ 11.7µs | 3.57% ]
+[1;34mDEBUG   [0m ┝━ evaluate constraints symbolically [ 14.2µs | 4.34% ]
+[1;32mINFO    [0m ┝━ infer log of constraint degree [ 3.42µs | 0.55% / 1.04% ]
+[1;34mDEBUG   [0m │  ┕━ infer constraint degree [ 1.62µs | 0.22% / 0.50% ]
+[1;34mDEBUG   [0m │     ┕━ evaluate constraints symbolically [ 917ns | 0.28% ]
+[1;32mINFO    [0m ┝━ commit to trace data [ 120µs | 18.68% / 36.78% ]
+[1;32mINFO    [0m │  ┝━ coset_lde_batch [ 40.3µs | 5.07% / 12.30% ] [2;37mdims[0m: 2x8 | [2;37madded_bits[0m: 2
+[1;34mDEBUG   [0m │  │  ┝━ compute_inverse_twiddles [ 542ns | 0.17% ]
+[1;34mDEBUG   [0m │  │  ┝━ reverse_matrix_index_bits [ 125ns | 0.04% ]
+[1;34mDEBUG   [0m │  │  ┝━ first_half [ 333ns | 0.10% ]
+[1;34mDEBUG   [0m │  │  ┝━ reverse_matrix_index_bits [ 84.0ns | 0.03% ]
+[1;34mDEBUG   [0m │  │  ┝━ second_half [ 209ns | 0.06% ]
+[1;34mDEBUG   [0m │  │  ┝━ reserve_exact [ 208ns | 0.06% ]
+[1;34mDEBUG   [0m │  │  ┝━ coset_dft_oop [ 3.21µs | 0.64% / 0.98% ]
+[1;34mDEBUG   [0m │  │  │  ┝━ compute_coset_twiddles [ 416ns | 0.13% ]
+[1;34mDEBUG   [0m │  │  │  ┝━ first_half_general_oop [ 417ns | 0.13% ]
+[1;34mDEBUG   [0m │  │  │  ┝━ reverse_matrix_index_bits [ 125ns | 0.04% ]
+[1;34mDEBUG   [0m │  │  │  ┕━ second_half_general [ 167ns | 0.05% ]
+[1;34mDEBUG   [0m │  │  ┝━ coset_dft_oop [ 13.6µs | 3.94% / 4.16% ]
+[1;34mDEBUG   [0m │  │  │  ┝━ compute_coset_twiddles [ 334ns | 0.10% ]
+[1;34mDEBUG   [0m │  │  │  ┝━ first_half_general_oop [ 208ns | 0.06% ]
+[1;34mDEBUG   [0m │  │  │  ┝━ reverse_matrix_index_bits [ 83.0ns | 0.03% ]
+[1;34mDEBUG   [0m │  │  │  ┕━ second_half_general [ 84.0ns | 0.03% ]
+[1;34mDEBUG   [0m │  │  ┝━ coset_dft_oop [ 3.08µs | 0.78% / 0.94% ]
+[1;34mDEBUG   [0m │  │  │  ┝━ compute_coset_twiddles [ 292ns | 0.09% ]
+[1;34mDEBUG   [0m │  │  │  ┝━ first_half_general_oop [ 125ns | 0.04% ]
+[1;34mDEBUG   [0m │  │  │  ┝━ reverse_matrix_index_bits [ 42.0ns | 0.01% ]
+[1;34mDEBUG   [0m │  │  │  ┕━ second_half_general [ 84.0ns | 0.03% ]
+[1;34mDEBUG   [0m │  │  ┕━ coset_dft [ 2.25µs | 0.47% / 0.69% ]
+[1;34mDEBUG   [0m │  │     ┝━ compute_coset_twiddles [ 208ns | 0.06% ]
+[1;34mDEBUG   [0m │  │     ┝━ first_half_general [ 291ns | 0.09% ]
+[1;34mDEBUG   [0m │  │     ┝━ reverse_matrix_index_bits [ 83.0ns | 0.03% ]
+[1;34mDEBUG   [0m │  │     ┕━ second_half_general [ 125ns | 0.04% ]
+[1;34mDEBUG   [0m │  ┕━ build merkle tree [ 19.0µs | 3.48% / 5.80% ] [2;37mdimensions[0m: "[2x32]"
+[1;34mDEBUG   [0m │     ┕━ first digest layer [ 7.58µs | 2.31% ]
+[1;32mINFO    [0m ┝━ compute quotient polynomial [ 7.71µs | 1.08% / 2.35% ]
+[1;34mDEBUG   [0m │  ┕━ Compute Selectors [ 4.17µs | 0.94% / 1.27% ]
+[1;34mDEBUG   [0m │     ┝━ batch_multiplicative_inverse [ 500ns | 0.15% ]
+[1;34mDEBUG   [0m │     ┝━ batch_multiplicative_inverse [ 250ns | 0.08% ]
+[1;34mDEBUG   [0m │     ┕━ batch_multiplicative_inverse [ 333ns | 0.10% ]
+[1;32mINFO    [0m ┝━ commit to quotient poly chunks [ 33.4µs | 0.88% / 10.20% ]
+[1;32mINFO    [0m │  ┝━ coset_lde_batch [ 12.5µs | 1.14% / 3.80% ] [2;37mdims[0m: 4x8 | [2;37madded_bits[0m: 2
+[1;34mDEBUG   [0m │  │  ┝━ reverse_matrix_index_bits [ 84.0ns | 0.03% ]
+[1;34mDEBUG   [0m │  │  ┝━ first_half [ 292ns | 0.09% ]
+[1;34mDEBUG   [0m │  │  ┝━ reverse_matrix_index_bits [ 125ns | 0.04% ]
+[1;34mDEBUG   [0m │  │  ┝━ second_half [ 208ns | 0.06% ]
+[1;34mDEBUG   [0m │  │  ┝━ reserve_exact [ 208ns | 0.06% ]
+[1;34mDEBUG   [0m │  │  ┝━ coset_dft_oop [ 2.08µs | 0.42% / 0.64% ]
+[1;34mDEBUG   [0m │  │  │  ┝━ compute_coset_twiddles [ 292ns | 0.09% ]
+[1;34mDEBUG   [0m │  │  │  ┝━ first_half_general_oop [ 208ns | 0.06% ]
+[1;34mDEBUG   [0m │  │  │  ┝━ reverse_matrix_index_bits [ 125ns | 0.04% ]
+[1;34mDEBUG   [0m │  │  │  ┕━ second_half_general [ 84.0ns | 0.03% ]
+[1;34mDEBUG   [0m │  │  ┝━ coset_dft_oop [ 1.88µs | 0.43% / 0.57% ]
+[1;34mDEBUG   [0m │  │  │  ┝━ compute_coset_twiddles [ 166ns | 0.05% ]
+[1;34mDEBUG   [0m │  │  │  ┝━ first_half_general_oop [ 84.0ns | 0.03% ]
+[1;34mDEBUG   [0m │  │  │  ┝━ reverse_matrix_index_bits [ 83.0ns | 0.03% ]
+[1;34mDEBUG   [0m │  │  │  ┕━ second_half_general [ 125ns | 0.04% ]
+[1;34mDEBUG   [0m │  │  ┝━ coset_dft_oop [ 1.88µs | 0.42% / 0.57% ]
+[1;34mDEBUG   [0m │  │  │  ┝━ compute_coset_twiddles [ 250ns | 0.08% ]
+[1;34mDEBUG   [0m │  │  │  ┝━ first_half_general_oop [ 125ns | 0.04% ]
+[1;34mDEBUG   [0m │  │  │  ┝━ reverse_matrix_index_bits [ 42.0ns | 0.01% ]
+[1;34mDEBUG   [0m │  │  │  ┕━ second_half_general [ 83.0ns | 0.03% ]
+[1;34mDEBUG   [0m │  │  ┕━ coset_dft [ 1.96µs | 0.43% / 0.60% ]
+[1;34mDEBUG   [0m │  │     ┝━ compute_coset_twiddles [ 250ns | 0.08% ]
+[1;34mDEBUG   [0m │  │     ┝━ first_half_general [ 166ns | 0.05% ]
+[1;34mDEBUG   [0m │  │     ┝━ reverse_matrix_index_bits [ 41.0ns | 0.01% ]
+[1;34mDEBUG   [0m │  │     ┕━ second_half_general [ 83.0ns | 0.03% ]
+[1;34mDEBUG   [0m │  ┕━ build merkle tree [ 18.1µs | 3.28% / 5.52% ] [2;37mdimensions[0m: "[4x32]"
+[1;34mDEBUG   [0m │     ┕━ first digest layer [ 7.33µs | 2.24% ]
+[1;32mINFO    [0m ┕━ open [ 89.7µs | 2.20% / 27.38% ]
+[1;32mINFO    [0m    ┝━ compute_inverse_denominators [ 4.00µs | 0.46% / 1.22% ]
+[1;34mDEBUG   [0m    │  ┝━ batch_multiplicative_inverse [ 1.50µs | 0.46% ]
+[1;34mDEBUG   [0m    │  ┕━ batch_multiplicative_inverse [ 1.00µs | 0.31% ]
+[1;32mINFO    [0m    ┝━ evaluate matrix [ 4.96µs | 0.53% / 1.51% ] [2;37mdims[0m: 2x32
+[1;32mINFO    [0m    │  ┕━ compute opened values with Lagrange interpolation [ 3.21µs | 0.83% / 0.98% ]
+[1;34mDEBUG   [0m    │     ┕━ columnwise_dot_product [ 500ns | 0.15% ] [2;37mdims[0m: 2x8
+[1;32mINFO    [0m    ┝━ evaluate matrix [ 2.67µs | 0.47% / 0.81% ] [2;37mdims[0m: 2x32
+[1;32mINFO    [0m    │  ┕━ compute opened values with Lagrange interpolation [ 1.12µs | 0.27% / 0.34% ]
+[1;34mDEBUG   [0m    │     ┕━ columnwise_dot_product [ 250ns | 0.08% ] [2;37mdims[0m: 2x8
+[1;32mINFO    [0m    ┝━ evaluate matrix [ 3.75µs | 0.81% / 1.14% ] [2;37mdims[0m: 4x32
+[1;32mINFO    [0m    │  ┕━ compute opened values with Lagrange interpolation [ 1.08µs | 0.25% / 0.33% ]
+[1;34mDEBUG   [0m    │     ┕━ columnwise_dot_product [ 250ns | 0.08% ] [2;37mdims[0m: 4x8
+[1;32mINFO    [0m    ┝━ reduce matrix quotient [ 3.46µs | 0.93% / 1.06% ] [2;37mdims[0m: 2x32
+[1;32mINFO    [0m    │  ┕━ compress mat [ 417ns | 0.13% ]
+[1;32mINFO    [0m    ┝━ reduce matrix quotient [ 2.04µs | 0.51% / 0.62% ] [2;37mdims[0m: 4x32
+[1;32mINFO    [0m    │  ┕━ compress mat [ 375ns | 0.11% ]
+[1;32mINFO    [0m    ┕━ FRI prover [ 61.6µs | 0.89% / 18.81% ]
+[1;32mINFO    [0m       ┝━ commit phase [ 48.8µs | 6.18% / 14.89% ]
+[1;34mDEBUG   [0m       │  ┝━ build merkle tree [ 14.0µs | 2.24% / 4.26% ] [2;37mdimensions[0m: "[8x16]"
+[1;34mDEBUG   [0m       │  │  ┕━ first digest layer [ 6.62µs | 2.02% ]
+[1;34mDEBUG   [0m       │  ┝━ build merkle tree [ 8.21µs | 1.60% / 2.50% ] [2;37mdimensions[0m: "[8x8]"
+[1;34mDEBUG   [0m       │  │  ┕━ first digest layer [ 2.96µs | 0.90% ]
+[1;34mDEBUG   [0m       │  ┝━ build merkle tree [ 5.62µs | 1.25% / 1.72% ] [2;37mdimensions[0m: "[8x4]"
+[1;34mDEBUG   [0m       │  │  ┕━ first digest layer [ 1.54µs | 0.47% ]
+[1;34mDEBUG   [0m       │  ┕━ idft final poly [ 750ns | 0.22% / 0.23% ]
+[1;34mDEBUG   [0m       │     ┕━ reverse_matrix_index_bits [ 42.0ns | 0.01% ]
+[1;32mINFO    [0m       ┝━ grind for proof-of-work witness [ 4.42µs | 1.35% ]
+[1;32mINFO    [0m       ┕━ query phase [ 5.50µs | 1.68% ]
+[1;32mINFO    [0m verify [ 93.2µs | 95.98% / 100.00% ]
+[1;32mINFO    [0m ┕━ infer log of constraint degree [ 3.75µs | 1.65% / 4.02% ]
+[1;34mDEBUG   [0m    ┕━ infer constraint degree [ 2.21µs | 0.63% / 2.37% ]
+[1;34mDEBUG   [0m       ┕━ evaluate constraints symbolically [ 1.62µs | 1.74% ]
+[1;32mINFO    [0m infer log of constraint degree [ 3.92µs | 42.54% / 100.00% ]
+[1;34mDEBUG   [0m ┕━ infer constraint degree [ 2.25µs | 15.96% / 57.46% ]
+[1;34mDEBUG   [0m    ┕━ evaluate constraints symbolically [ 1.62µs | 41.50% ]
+[1;34mDEBUG   [0m evaluate constraints symbolically [ 1.33µs | 100.00% ]
+[1;34mDEBUG   [0m 🐛 [debug]: === Circuit Allocation Log ===
+[1;34mDEBUG   [0m 🐛 [debug]: Total allocations: 1326
+
+[1;34mDEBUG   [0m 🐛 [debug]: === Allocation Log for scope 'compute_evaluation_point' ===
+[1;34mDEBUG   [0m 🐛 [debug]: Total allocations in scope: 90
+
+[1;34mDEBUG   [0m 🐛 [debug]: --- Constants (6) ---
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_892 (Const)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_893 (Const)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_894 (Const)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_895 (Const)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_896 (Const)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_917 (Const): coset_generator
+[1;34mDEBUG   [0m 🐛 [debug]: 
+[1;34mDEBUG   [0m 🐛 [debug]: --- Additions (20) ---
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_899 = expr_386 + expr_898
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_903 = expr_386 + expr_902
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_907 = expr_386 + expr_906
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_911 = expr_386 + expr_910
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_915 = expr_386 + expr_914
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_947 = expr_386 + expr_946
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_951 = expr_386 + expr_950
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_955 = expr_386 + expr_954
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_959 = expr_386 + expr_958
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_963 = expr_386 + expr_962
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1097 = expr_386 + expr_1096
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1101 = expr_386 + expr_1100
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1105 = expr_386 + expr_1104
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1109 = expr_386 + expr_1108
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1113 = expr_386 + expr_1112
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1144 = expr_386 + expr_1143
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1148 = expr_386 + expr_1147
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1152 = expr_386 + expr_1151
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1156 = expr_386 + expr_1155
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1160 = expr_386 + expr_1159
+[1;34mDEBUG   [0m 🐛 [debug]: 
+[1;34mDEBUG   [0m 🐛 [debug]: --- Subtractions (20) ---
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_897 = expr_892 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_901 = expr_893 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_905 = expr_894 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_909 = expr_895 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_913 = expr_896 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_945 = expr_892 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_949 = expr_893 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_953 = expr_894 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_957 = expr_895 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_961 = expr_896 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1095 = expr_892 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1099 = expr_893 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1103 = expr_894 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1107 = expr_895 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1111 = expr_896 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1142 = expr_892 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1146 = expr_893 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1150 = expr_894 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1154 = expr_895 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1158 = expr_896 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]: 
+[1;34mDEBUG   [0m 🐛 [debug]: --- Multiplications (44) ---
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_898 = expr_398 * expr_897
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_900 = expr_386 * expr_899
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_902 = expr_395 * expr_901
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_904 = expr_900 * expr_903
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_906 = expr_392 * expr_905
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_908 = expr_904 * expr_907
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_910 = expr_389 * expr_909
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_912 = expr_908 * expr_911
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_914 = expr_385 * expr_913
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_916 = expr_912 * expr_915
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_918 = expr_917 * expr_916: eval_point
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_946 = expr_398 * expr_945
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_948 = expr_386 * expr_947
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_950 = expr_395 * expr_949
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_952 = expr_948 * expr_951
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_954 = expr_392 * expr_953
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_956 = expr_952 * expr_955
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_958 = expr_389 * expr_957
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_960 = expr_956 * expr_959
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_962 = expr_385 * expr_961
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_964 = expr_960 * expr_963
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_965 = expr_917 * expr_964: eval_point
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1096 = expr_646 * expr_1095
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1098 = expr_386 * expr_1097
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1100 = expr_643 * expr_1099
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1102 = expr_1098 * expr_1101
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1104 = expr_640 * expr_1103
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1106 = expr_1102 * expr_1105
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1108 = expr_637 * expr_1107
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1110 = expr_1106 * expr_1109
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1112 = expr_634 * expr_1111
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1114 = expr_1110 * expr_1113
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1115 = expr_917 * expr_1114: eval_point
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1143 = expr_646 * expr_1142
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1145 = expr_386 * expr_1144
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1147 = expr_643 * expr_1146
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1149 = expr_1145 * expr_1148
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1151 = expr_640 * expr_1150
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1153 = expr_1149 * expr_1152
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1155 = expr_637 * expr_1154
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1157 = expr_1153 * expr_1156
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1159 = expr_634 * expr_1158
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1161 = expr_1157 * expr_1160
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1162 = expr_917 * expr_1161: eval_point
+[1;34mDEBUG   [0m 🐛 [debug]: 
+[1;34mDEBUG   [0m 🐛 [debug]: === End Scope Log ===
+
+[1;34mDEBUG   [0m 🐛 [debug]: === Allocation Log for scope 'compute_final_query_point' ===
+[1;34mDEBUG   [0m 🐛 [debug]: Total allocations in scope: 40
+
+[1;34mDEBUG   [0m 🐛 [debug]: --- Additions (10) ---
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_991 = expr_386 + expr_990
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_995 = expr_386 + expr_994
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_999 = expr_386 + expr_998
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1003 = expr_386 + expr_1002
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1007 = expr_386 + expr_1006
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1188 = expr_386 + expr_1187
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1192 = expr_386 + expr_1191
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1196 = expr_386 + expr_1195
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1200 = expr_386 + expr_1199
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1204 = expr_386 + expr_1203
+[1;34mDEBUG   [0m 🐛 [debug]: 
+[1;34mDEBUG   [0m 🐛 [debug]: --- Subtractions (10) ---
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_989 = expr_892 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_993 = expr_893 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_997 = expr_894 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1001 = expr_895 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1005 = expr_896 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1186 = expr_892 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1190 = expr_893 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1194 = expr_894 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1198 = expr_895 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1202 = expr_896 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]: 
+[1;34mDEBUG   [0m 🐛 [debug]: --- Multiplications (20) ---
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_990 = expr_0 * expr_989
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_992 = expr_386 * expr_991
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_994 = expr_0 * expr_993
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_996 = expr_992 * expr_995
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_998 = expr_0 * expr_997
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1000 = expr_996 * expr_999
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1002 = expr_398 * expr_1001
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1004 = expr_1000 * expr_1003
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1006 = expr_395 * expr_1005
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1008 = expr_1004 * expr_1007
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1187 = expr_0 * expr_1186
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1189 = expr_386 * expr_1188
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1191 = expr_0 * expr_1190
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1193 = expr_1189 * expr_1192
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1195 = expr_0 * expr_1194
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1197 = expr_1193 * expr_1196
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1199 = expr_646 * expr_1198
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1201 = expr_1197 * expr_1200
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1203 = expr_643 * expr_1202
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1205 = expr_1201 * expr_1204
+[1;34mDEBUG   [0m 🐛 [debug]: 
+[1;34mDEBUG   [0m 🐛 [debug]: === End Scope Log ===
+
+[1;34mDEBUG   [0m 🐛 [debug]: === Allocation Log for scope 'compute_single_reduced_opening' ===
+[1;34mDEBUG   [0m 🐛 [debug]: Total allocations in scope: 92
+
+[1;34mDEBUG   [0m 🐛 [debug]: --- Additions (16) ---
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_924 = expr_0 + expr_923
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_929 = expr_924 + expr_928
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_937 = expr_0 + expr_936
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_942 = expr_937 + expr_941
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_971 = expr_0 + expr_970
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_976 = expr_971 + expr_975
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_981 = expr_976 + expr_980
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_986 = expr_981 + expr_985
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1121 = expr_0 + expr_1120
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1126 = expr_1121 + expr_1125
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1134 = expr_0 + expr_1133
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1139 = expr_1134 + expr_1138
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1168 = expr_0 + expr_1167
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1173 = expr_1168 + expr_1172
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1178 = expr_1173 + expr_1177
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1183 = expr_1178 + expr_1182
+[1;34mDEBUG   [0m 🐛 [debug]: 
+[1;34mDEBUG   [0m 🐛 [debug]: --- Subtractions (22) ---
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_919 = expr_377 - expr_918
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_921 = expr_20 - expr_52
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_926 = expr_21 - expr_53
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_932 = expr_378 - expr_918
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_934 = expr_22 - expr_52
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_939 = expr_23 - expr_53
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_966 = expr_377 - expr_965
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_968 = expr_24 - expr_94
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_973 = expr_25 - expr_95
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_978 = expr_26 - expr_96
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_983 = expr_27 - expr_97
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1116 = expr_377 - expr_1115
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1118 = expr_20 - expr_213
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1123 = expr_21 - expr_214
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1129 = expr_378 - expr_1115
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1131 = expr_22 - expr_213
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1136 = expr_23 - expr_214
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1163 = expr_377 - expr_1162
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1165 = expr_24 - expr_255
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1170 = expr_25 - expr_256
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1175 = expr_26 - expr_257
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1180 = expr_27 - expr_258
+[1;34mDEBUG   [0m 🐛 [debug]: 
+[1;34mDEBUG   [0m 🐛 [debug]: --- Multiplications (48) ---
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_922 = expr_386 * expr_921
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_923 = expr_922 * expr_920
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_925 = expr_386 * expr_379
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_927 = expr_925 * expr_926
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_928 = expr_927 * expr_920
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_930 = expr_925 * expr_379
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_935 = expr_930 * expr_934
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_936 = expr_935 * expr_933
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_938 = expr_930 * expr_379
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_940 = expr_938 * expr_939
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_941 = expr_940 * expr_933
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_943 = expr_938 * expr_379
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_969 = expr_943 * expr_968
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_970 = expr_969 * expr_967
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_972 = expr_943 * expr_379
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_974 = expr_972 * expr_973
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_975 = expr_974 * expr_967
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_977 = expr_972 * expr_379
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_979 = expr_977 * expr_978
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_980 = expr_979 * expr_967
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_982 = expr_977 * expr_379
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_984 = expr_982 * expr_983
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_985 = expr_984 * expr_967
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_987 = expr_982 * expr_379
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1119 = expr_386 * expr_1118
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1120 = expr_1119 * expr_1117
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1122 = expr_386 * expr_379
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1124 = expr_1122 * expr_1123
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1125 = expr_1124 * expr_1117
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1127 = expr_1122 * expr_379
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1132 = expr_1127 * expr_1131
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1133 = expr_1132 * expr_1130
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1135 = expr_1127 * expr_379
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1137 = expr_1135 * expr_1136
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1138 = expr_1137 * expr_1130
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1140 = expr_1135 * expr_379
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1166 = expr_1140 * expr_1165
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1167 = expr_1166 * expr_1164
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1169 = expr_1140 * expr_379
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1171 = expr_1169 * expr_1170
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1172 = expr_1171 * expr_1164
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1174 = expr_1169 * expr_379
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1176 = expr_1174 * expr_1175
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1177 = expr_1176 * expr_1164
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1179 = expr_1174 * expr_379
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1181 = expr_1179 * expr_1180
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1182 = expr_1181 * expr_1164
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1184 = expr_1179 * expr_379
+[1;34mDEBUG   [0m 🐛 [debug]: 
+[1;34mDEBUG   [0m 🐛 [debug]: --- Divisions (6) ---
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_920 = expr_386 / expr_919
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_933 = expr_386 / expr_932
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_967 = expr_386 / expr_966
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1117 = expr_386 / expr_1116
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1130 = expr_386 / expr_1129
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1164 = expr_386 / expr_1163
+[1;34mDEBUG   [0m 🐛 [debug]: 
+[1;34mDEBUG   [0m 🐛 [debug]: === End Scope Log ===
+
+[1;34mDEBUG   [0m 🐛 [debug]: === Allocation Log for scope 'compute_x0_from_index_bits' ===
+[1;34mDEBUG   [0m 🐛 [debug]: Total allocations in scope: 72
+
+[1;34mDEBUG   [0m 🐛 [debug]: --- Additions (18) ---
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1011 = expr_386 + expr_1010
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1015 = expr_386 + expr_1014
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1019 = expr_386 + expr_1018
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1023 = expr_386 + expr_1022
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1028 = expr_386 + expr_1027
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1032 = expr_386 + expr_1031
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1036 = expr_386 + expr_1035
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1041 = expr_386 + expr_1040
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1045 = expr_386 + expr_1044
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1208 = expr_386 + expr_1207
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1212 = expr_386 + expr_1211
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1216 = expr_386 + expr_1215
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1220 = expr_386 + expr_1219
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1225 = expr_386 + expr_1224
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1229 = expr_386 + expr_1228
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1233 = expr_386 + expr_1232
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1238 = expr_386 + expr_1237
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1242 = expr_386 + expr_1241
+[1;34mDEBUG   [0m 🐛 [debug]: 
+[1;34mDEBUG   [0m 🐛 [debug]: --- Subtractions (18) ---
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1009 = expr_892 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1013 = expr_893 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1017 = expr_894 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1021 = expr_895 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1026 = expr_893 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1030 = expr_894 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1034 = expr_895 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1039 = expr_894 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1043 = expr_895 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1206 = expr_892 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1210 = expr_893 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1214 = expr_894 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1218 = expr_895 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1223 = expr_893 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1227 = expr_894 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1231 = expr_895 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1236 = expr_894 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1240 = expr_895 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]: 
+[1;34mDEBUG   [0m 🐛 [debug]: --- Multiplications (36) ---
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1010 = expr_1009 * expr_398
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1012 = expr_386 * expr_1011
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1014 = expr_1013 * expr_395
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1016 = expr_1012 * expr_1015
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1018 = expr_1017 * expr_392
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1020 = expr_1016 * expr_1019
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1022 = expr_1021 * expr_389
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1024 = expr_1020 * expr_1023
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1027 = expr_1026 * expr_398
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1029 = expr_386 * expr_1028
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1031 = expr_1030 * expr_395
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1033 = expr_1029 * expr_1032
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1035 = expr_1034 * expr_392
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1037 = expr_1033 * expr_1036
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1040 = expr_1039 * expr_398
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1042 = expr_386 * expr_1041
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1044 = expr_1043 * expr_395
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1046 = expr_1042 * expr_1045
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1207 = expr_1206 * expr_646
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1209 = expr_386 * expr_1208
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1211 = expr_1210 * expr_643
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1213 = expr_1209 * expr_1212
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1215 = expr_1214 * expr_640
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1217 = expr_1213 * expr_1216
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1219 = expr_1218 * expr_637
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1221 = expr_1217 * expr_1220
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1224 = expr_1223 * expr_646
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1226 = expr_386 * expr_1225
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1228 = expr_1227 * expr_643
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1230 = expr_1226 * expr_1229
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1232 = expr_1231 * expr_640
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1234 = expr_1230 * expr_1233
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1237 = expr_1236 * expr_646
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1239 = expr_386 * expr_1238
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1241 = expr_1240 * expr_643
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1243 = expr_1239 * expr_1242
+[1;34mDEBUG   [0m 🐛 [debug]: 
+[1;34mDEBUG   [0m 🐛 [debug]: === End Scope Log ===
+
+[1;34mDEBUG   [0m 🐛 [debug]: === Allocation Log for scope 'decompose_to_bits' ===
+[1;34mDEBUG   [0m 🐛 [debug]: Total allocations in scope: 187
+
+[1;34mDEBUG   [0m 🐛 [debug]: --- Public Inputs (62) ---
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_385 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_389 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_392 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_395 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_398 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_401 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_404 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_407 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_410 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_413 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_416 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_419 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_422 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_425 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_428 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_431 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_434 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_437 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_440 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_443 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_446 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_449 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_452 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_455 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_458 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_461 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_464 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_467 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_470 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_473 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_476 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_634 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_637 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_640 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_643 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_646 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_649 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_652 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_655 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_658 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_661 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_664 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_667 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_670 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_673 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_676 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_679 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_682 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_685 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_688 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_691 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_694 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_697 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_700 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_703 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_706 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_709 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_712 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_715 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_718 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_721 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_724 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]: 
+[1;34mDEBUG   [0m 🐛 [debug]: --- Constants (1) ---
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_386 (Const)
+[1;34mDEBUG   [0m 🐛 [debug]: 
+[1;34mDEBUG   [0m 🐛 [debug]: --- Subtractions (62) ---
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_387 = expr_385 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_390 = expr_389 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_393 = expr_392 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_396 = expr_395 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_399 = expr_398 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_402 = expr_401 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_405 = expr_404 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_408 = expr_407 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_411 = expr_410 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_414 = expr_413 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_417 = expr_416 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_420 = expr_419 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_423 = expr_422 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_426 = expr_425 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_429 = expr_428 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_432 = expr_431 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_435 = expr_434 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_438 = expr_437 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_441 = expr_440 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_444 = expr_443 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_447 = expr_446 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_450 = expr_449 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_453 = expr_452 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_456 = expr_455 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_459 = expr_458 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_462 = expr_461 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_465 = expr_464 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_468 = expr_467 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_471 = expr_470 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_474 = expr_473 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_477 = expr_476 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_635 = expr_634 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_638 = expr_637 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_641 = expr_640 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_644 = expr_643 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_647 = expr_646 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_650 = expr_649 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_653 = expr_652 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_656 = expr_655 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_659 = expr_658 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_662 = expr_661 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_665 = expr_664 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_668 = expr_667 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_671 = expr_670 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_674 = expr_673 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_677 = expr_676 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_680 = expr_679 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_683 = expr_682 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_686 = expr_685 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_689 = expr_688 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_692 = expr_691 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_695 = expr_694 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_698 = expr_697 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_701 = expr_700 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_704 = expr_703 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_707 = expr_706 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_710 = expr_709 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_713 = expr_712 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_716 = expr_715 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_719 = expr_718 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_722 = expr_721 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_725 = expr_724 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]: 
+[1;34mDEBUG   [0m 🐛 [debug]: --- Multiplications (62) ---
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_388 = expr_385 * expr_387
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_391 = expr_389 * expr_390
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_394 = expr_392 * expr_393
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_397 = expr_395 * expr_396
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_400 = expr_398 * expr_399
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_403 = expr_401 * expr_402
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_406 = expr_404 * expr_405
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_409 = expr_407 * expr_408
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_412 = expr_410 * expr_411
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_415 = expr_413 * expr_414
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_418 = expr_416 * expr_417
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_421 = expr_419 * expr_420
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_424 = expr_422 * expr_423
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_427 = expr_425 * expr_426
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_430 = expr_428 * expr_429
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_433 = expr_431 * expr_432
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_436 = expr_434 * expr_435
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_439 = expr_437 * expr_438
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_442 = expr_440 * expr_441
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_445 = expr_443 * expr_444
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_448 = expr_446 * expr_447
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_451 = expr_449 * expr_450
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_454 = expr_452 * expr_453
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_457 = expr_455 * expr_456
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_460 = expr_458 * expr_459
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_463 = expr_461 * expr_462
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_466 = expr_464 * expr_465
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_469 = expr_467 * expr_468
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_472 = expr_470 * expr_471
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_475 = expr_473 * expr_474
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_478 = expr_476 * expr_477
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_636 = expr_634 * expr_635
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_639 = expr_637 * expr_638
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_642 = expr_640 * expr_641
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_645 = expr_643 * expr_644
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_648 = expr_646 * expr_647
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_651 = expr_649 * expr_650
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_654 = expr_652 * expr_653
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_657 = expr_655 * expr_656
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_660 = expr_658 * expr_659
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_663 = expr_661 * expr_662
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_666 = expr_664 * expr_665
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_669 = expr_667 * expr_668
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_672 = expr_670 * expr_671
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_675 = expr_673 * expr_674
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_678 = expr_676 * expr_677
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_681 = expr_679 * expr_680
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_684 = expr_682 * expr_683
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_687 = expr_685 * expr_686
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_690 = expr_688 * expr_689
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_693 = expr_691 * expr_692
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_696 = expr_694 * expr_695
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_699 = expr_697 * expr_698
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_702 = expr_700 * expr_701
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_705 = expr_703 * expr_704
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_708 = expr_706 * expr_707
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_711 = expr_709 * expr_710
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_714 = expr_712 * expr_713
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_717 = expr_715 * expr_716
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_720 = expr_718 * expr_719
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_723 = expr_721 * expr_722
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_726 = expr_724 * expr_725
+[1;34mDEBUG   [0m 🐛 [debug]: 
+[1;34mDEBUG   [0m 🐛 [debug]: === End Scope Log ===
+
+[1;34mDEBUG   [0m 🐛 [debug]: === Allocation Log for scope 'eval_folded_circuit' ===
+[1;34mDEBUG   [0m 🐛 [debug]: Total allocations in scope: 21
+
+[1;34mDEBUG   [0m 🐛 [debug]: --- Additions (6) ---
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1308 = expr_1305 + expr_1307
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1312 = expr_1309 + expr_1311
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1316 = expr_1313 + expr_1315
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1318 = expr_20 + expr_21
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1321 = expr_1317 + expr_1320
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1325 = expr_1322 + expr_1324
+[1;34mDEBUG   [0m 🐛 [debug]: 
+[1;34mDEBUG   [0m 🐛 [debug]: --- Subtractions (5) ---
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1306 = expr_20 - expr_1
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1310 = expr_21 - expr_2
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1314 = expr_21 - expr_22
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1319 = expr_1318 - expr_23
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1323 = expr_21 - expr_3
+[1;34mDEBUG   [0m 🐛 [debug]: 
+[1;34mDEBUG   [0m 🐛 [debug]: --- Multiplications (10) ---
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1305 = expr_0 * expr_376
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1307 = expr_1302 * expr_1306
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1309 = expr_1308 * expr_376
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1311 = expr_1302 * expr_1310
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1313 = expr_1312 * expr_376
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1315 = expr_1301 * expr_1314
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1317 = expr_1316 * expr_376
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1320 = expr_1301 * expr_1319
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1322 = expr_1321 * expr_376
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1324 = expr_1303 * expr_1323
+[1;34mDEBUG   [0m 🐛 [debug]: 
+[1;34mDEBUG   [0m 🐛 [debug]: === End Scope Log ===
+
+[1;34mDEBUG   [0m 🐛 [debug]: === Allocation Log for scope 'fold_row_chain' ===
+[1;34mDEBUG   [0m 🐛 [debug]: Total allocations in scope: 73
+
+[1;34mDEBUG   [0m 🐛 [debug]: --- Constants (1) ---
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1048 (Const): −1/2
+[1;34mDEBUG   [0m 🐛 [debug]: 
+[1;34mDEBUG   [0m 🐛 [debug]: --- Additions (18) ---
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1051 = expr_138 + expr_1050
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1054 = expr_1025 + expr_1025: two_b
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1060 = expr_1051 + expr_1059: folded 1
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1063 = expr_171 + expr_1062
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1066 = expr_1038 + expr_1038: two_b
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1072 = expr_1063 + expr_1071: folded 1
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1075 = expr_196 + expr_1074
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1078 = expr_1047 + expr_1047: two_b
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1084 = expr_1075 + expr_1083: folded 1
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1247 = expr_299 + expr_1246
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1250 = expr_1222 + expr_1222: two_b
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1256 = expr_1247 + expr_1255: folded 1
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1259 = expr_332 + expr_1258
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1262 = expr_1235 + expr_1235: two_b
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1268 = expr_1259 + expr_1267: folded 1
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1271 = expr_357 + expr_1270
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1274 = expr_1244 + expr_1244: two_b
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1280 = expr_1271 + expr_1279: folded 1
+[1;34mDEBUG   [0m 🐛 [debug]: 
+[1;34mDEBUG   [0m 🐛 [debug]: --- Subtractions (24) ---
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1049 = expr_988 - expr_138
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1053 = expr_138 - expr_988: d
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1055 = expr_1054 - expr_386: two_b_minus_one
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1057 = expr_380 - expr_1024: beta_minus_x0
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1061 = expr_1060 - expr_171
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1065 = expr_171 - expr_1060: d
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1067 = expr_1066 - expr_386: two_b_minus_one
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1069 = expr_381 - expr_1037: beta_minus_x0
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1073 = expr_1072 - expr_196
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1077 = expr_196 - expr_1072: d
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1079 = expr_1078 - expr_386: two_b_minus_one
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1081 = expr_382 - expr_1046: beta_minus_x0
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1245 = expr_1185 - expr_299
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1249 = expr_299 - expr_1185: d
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1251 = expr_1250 - expr_386: two_b_minus_one
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1253 = expr_380 - expr_1221: beta_minus_x0
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1257 = expr_1256 - expr_332
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1261 = expr_332 - expr_1256: d
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1263 = expr_1262 - expr_386: two_b_minus_one
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1265 = expr_381 - expr_1234: beta_minus_x0
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1269 = expr_1268 - expr_357
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1273 = expr_357 - expr_1268: d
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1275 = expr_1274 - expr_386: two_b_minus_one
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1277 = expr_382 - expr_1243: beta_minus_x0
+[1;34mDEBUG   [0m 🐛 [debug]: 
+[1;34mDEBUG   [0m 🐛 [debug]: --- Multiplications (24) ---
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1050 = expr_1025 * expr_1049
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1056 = expr_1055 * expr_1053: e1_minus_e0
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1058 = expr_1057 * expr_1056: t
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1059 = expr_1058 * expr_1052: t_inv
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1062 = expr_1038 * expr_1061
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1068 = expr_1067 * expr_1065: e1_minus_e0
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1070 = expr_1069 * expr_1068: t
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1071 = expr_1070 * expr_1064: t_inv
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1074 = expr_1047 * expr_1073
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1080 = expr_1079 * expr_1077: e1_minus_e0
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1082 = expr_1081 * expr_1080: t
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1083 = expr_1082 * expr_1076: t_inv
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1246 = expr_1222 * expr_1245
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1252 = expr_1251 * expr_1249: e1_minus_e0
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1254 = expr_1253 * expr_1252: t
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1255 = expr_1254 * expr_1248: t_inv
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1258 = expr_1235 * expr_1257
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1264 = expr_1263 * expr_1261: e1_minus_e0
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1266 = expr_1265 * expr_1264: t
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1267 = expr_1266 * expr_1260: t_inv
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1270 = expr_1244 * expr_1269
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1276 = expr_1275 * expr_1273: e1_minus_e0
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1278 = expr_1277 * expr_1276: t
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1279 = expr_1278 * expr_1272: t_inv
+[1;34mDEBUG   [0m 🐛 [debug]: 
+[1;34mDEBUG   [0m 🐛 [debug]: --- Divisions (6) ---
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1052 = expr_1048 / expr_1024: inv
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1064 = expr_1048 / expr_1037: inv
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1076 = expr_1048 / expr_1046: inv
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1248 = expr_1048 / expr_1221: inv
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1260 = expr_1048 / expr_1234: inv
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1272 = expr_1048 / expr_1243: inv
+[1;34mDEBUG   [0m 🐛 [debug]: 
+[1;34mDEBUG   [0m 🐛 [debug]: === End Scope Log ===
+
+[1;34mDEBUG   [0m 🐛 [debug]: === Allocation Log for scope 'open_input' ===
+[1;34mDEBUG   [0m 🐛 [debug]: Total allocations in scope: 26
+
+[1;34mDEBUG   [0m 🐛 [debug]: --- Additions (6) ---
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_931 = expr_0 + expr_929
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_944 = expr_931 + expr_942
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_988 = expr_944 + expr_986
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1128 = expr_0 + expr_1126
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1141 = expr_1128 + expr_1139
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1185 = expr_1141 + expr_1183
+[1;34mDEBUG   [0m 🐛 [debug]: 
+[1;34mDEBUG   [0m 🐛 [debug]: --- Subtractions (10) ---
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_882 = expr_385 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_884 = expr_389 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_886 = expr_392 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_888 = expr_395 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_890 = expr_398 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1085 = expr_634 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1087 = expr_637 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1089 = expr_640 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1091 = expr_643 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1093 = expr_646 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]: 
+[1;34mDEBUG   [0m 🐛 [debug]: --- Multiplications (10) ---
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_883 = expr_385 * expr_882
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_885 = expr_389 * expr_884
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_887 = expr_392 * expr_886
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_889 = expr_395 * expr_888
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_891 = expr_398 * expr_890
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1086 = expr_634 * expr_1085
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1088 = expr_637 * expr_1087
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1090 = expr_640 * expr_1089
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1092 = expr_643 * expr_1091
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1094 = expr_646 * expr_1093
+[1;34mDEBUG   [0m 🐛 [debug]: 
+[1;34mDEBUG   [0m 🐛 [debug]: === End Scope Log ===
+
+[1;34mDEBUG   [0m 🐛 [debug]: === Allocation Log for scope 'reconstruct_index_from_bits' ===
+[1;34mDEBUG   [0m 🐛 [debug]: Total allocations in scope: 310
+
+[1;34mDEBUG   [0m 🐛 [debug]: --- Additions (124) ---
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_482 = expr_0 + expr_481
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_483 = expr_386 + expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_487 = expr_482 + expr_486
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_488 = expr_483 + expr_483
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_492 = expr_487 + expr_491
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_493 = expr_488 + expr_488
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_497 = expr_492 + expr_496
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_498 = expr_493 + expr_493
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_502 = expr_497 + expr_501
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_503 = expr_498 + expr_498
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_507 = expr_502 + expr_506
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_508 = expr_503 + expr_503
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_512 = expr_507 + expr_511
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_513 = expr_508 + expr_508
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_517 = expr_512 + expr_516
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_518 = expr_513 + expr_513
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_522 = expr_517 + expr_521
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_523 = expr_518 + expr_518
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_527 = expr_522 + expr_526
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_528 = expr_523 + expr_523
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_532 = expr_527 + expr_531
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_533 = expr_528 + expr_528
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_537 = expr_532 + expr_536
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_538 = expr_533 + expr_533
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_542 = expr_537 + expr_541
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_543 = expr_538 + expr_538
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_547 = expr_542 + expr_546
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_548 = expr_543 + expr_543
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_552 = expr_547 + expr_551
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_553 = expr_548 + expr_548
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_557 = expr_552 + expr_556
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_558 = expr_553 + expr_553
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_562 = expr_557 + expr_561
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_563 = expr_558 + expr_558
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_567 = expr_562 + expr_566
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_568 = expr_563 + expr_563
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_572 = expr_567 + expr_571
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_573 = expr_568 + expr_568
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_577 = expr_572 + expr_576
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_578 = expr_573 + expr_573
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_582 = expr_577 + expr_581
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_583 = expr_578 + expr_578
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_587 = expr_582 + expr_586
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_588 = expr_583 + expr_583
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_592 = expr_587 + expr_591
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_593 = expr_588 + expr_588
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_597 = expr_592 + expr_596
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_598 = expr_593 + expr_593
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_602 = expr_597 + expr_601
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_603 = expr_598 + expr_598
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_607 = expr_602 + expr_606
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_608 = expr_603 + expr_603
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_612 = expr_607 + expr_611
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_613 = expr_608 + expr_608
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_617 = expr_612 + expr_616
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_618 = expr_613 + expr_613
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_622 = expr_617 + expr_621
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_623 = expr_618 + expr_618
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_627 = expr_622 + expr_626
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_628 = expr_623 + expr_623
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_632 = expr_627 + expr_631
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_633 = expr_628 + expr_628
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_730 = expr_0 + expr_729
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_731 = expr_386 + expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_735 = expr_730 + expr_734
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_736 = expr_731 + expr_731
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_740 = expr_735 + expr_739
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_741 = expr_736 + expr_736
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_745 = expr_740 + expr_744
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_746 = expr_741 + expr_741
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_750 = expr_745 + expr_749
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_751 = expr_746 + expr_746
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_755 = expr_750 + expr_754
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_756 = expr_751 + expr_751
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_760 = expr_755 + expr_759
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_761 = expr_756 + expr_756
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_765 = expr_760 + expr_764
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_766 = expr_761 + expr_761
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_770 = expr_765 + expr_769
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_771 = expr_766 + expr_766
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_775 = expr_770 + expr_774
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_776 = expr_771 + expr_771
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_780 = expr_775 + expr_779
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_781 = expr_776 + expr_776
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_785 = expr_780 + expr_784
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_786 = expr_781 + expr_781
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_790 = expr_785 + expr_789
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_791 = expr_786 + expr_786
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_795 = expr_790 + expr_794
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_796 = expr_791 + expr_791
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_800 = expr_795 + expr_799
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_801 = expr_796 + expr_796
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_805 = expr_800 + expr_804
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_806 = expr_801 + expr_801
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_810 = expr_805 + expr_809
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_811 = expr_806 + expr_806
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_815 = expr_810 + expr_814
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_816 = expr_811 + expr_811
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_820 = expr_815 + expr_819
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_821 = expr_816 + expr_816
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_825 = expr_820 + expr_824
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_826 = expr_821 + expr_821
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_830 = expr_825 + expr_829
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_831 = expr_826 + expr_826
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_835 = expr_830 + expr_834
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_836 = expr_831 + expr_831
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_840 = expr_835 + expr_839
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_841 = expr_836 + expr_836
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_845 = expr_840 + expr_844
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_846 = expr_841 + expr_841
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_850 = expr_845 + expr_849
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_851 = expr_846 + expr_846
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_855 = expr_850 + expr_854
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_856 = expr_851 + expr_851
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_860 = expr_855 + expr_859
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_861 = expr_856 + expr_856
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_865 = expr_860 + expr_864
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_866 = expr_861 + expr_861
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_870 = expr_865 + expr_869
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_871 = expr_866 + expr_866
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_875 = expr_870 + expr_874
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_876 = expr_871 + expr_871
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_880 = expr_875 + expr_879
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_881 = expr_876 + expr_876
+[1;34mDEBUG   [0m 🐛 [debug]: 
+[1;34mDEBUG   [0m 🐛 [debug]: --- Subtractions (62) ---
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_479 = expr_385 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_484 = expr_389 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_489 = expr_392 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_494 = expr_395 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_499 = expr_398 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_504 = expr_401 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_509 = expr_404 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_514 = expr_407 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_519 = expr_410 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_524 = expr_413 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_529 = expr_416 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_534 = expr_419 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_539 = expr_422 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_544 = expr_425 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_549 = expr_428 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_554 = expr_431 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_559 = expr_434 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_564 = expr_437 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_569 = expr_440 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_574 = expr_443 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_579 = expr_446 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_584 = expr_449 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_589 = expr_452 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_594 = expr_455 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_599 = expr_458 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_604 = expr_461 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_609 = expr_464 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_614 = expr_467 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_619 = expr_470 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_624 = expr_473 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_629 = expr_476 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_727 = expr_634 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_732 = expr_637 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_737 = expr_640 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_742 = expr_643 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_747 = expr_646 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_752 = expr_649 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_757 = expr_652 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_762 = expr_655 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_767 = expr_658 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_772 = expr_661 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_777 = expr_664 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_782 = expr_667 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_787 = expr_670 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_792 = expr_673 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_797 = expr_676 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_802 = expr_679 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_807 = expr_682 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_812 = expr_685 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_817 = expr_688 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_822 = expr_691 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_827 = expr_694 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_832 = expr_697 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_837 = expr_700 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_842 = expr_703 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_847 = expr_706 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_852 = expr_709 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_857 = expr_712 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_862 = expr_715 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_867 = expr_718 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_872 = expr_721 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_877 = expr_724 - expr_386
+[1;34mDEBUG   [0m 🐛 [debug]: 
+[1;34mDEBUG   [0m 🐛 [debug]: --- Multiplications (124) ---
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_480 = expr_385 * expr_479
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_481 = expr_385 * expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_485 = expr_389 * expr_484
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_486 = expr_389 * expr_483
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_490 = expr_392 * expr_489
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_491 = expr_392 * expr_488
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_495 = expr_395 * expr_494
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_496 = expr_395 * expr_493
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_500 = expr_398 * expr_499
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_501 = expr_398 * expr_498
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_505 = expr_401 * expr_504
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_506 = expr_401 * expr_503
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_510 = expr_404 * expr_509
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_511 = expr_404 * expr_508
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_515 = expr_407 * expr_514
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_516 = expr_407 * expr_513
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_520 = expr_410 * expr_519
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_521 = expr_410 * expr_518
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_525 = expr_413 * expr_524
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_526 = expr_413 * expr_523
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_530 = expr_416 * expr_529
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_531 = expr_416 * expr_528
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_535 = expr_419 * expr_534
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_536 = expr_419 * expr_533
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_540 = expr_422 * expr_539
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_541 = expr_422 * expr_538
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_545 = expr_425 * expr_544
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_546 = expr_425 * expr_543
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_550 = expr_428 * expr_549
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_551 = expr_428 * expr_548
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_555 = expr_431 * expr_554
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_556 = expr_431 * expr_553
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_560 = expr_434 * expr_559
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_561 = expr_434 * expr_558
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_565 = expr_437 * expr_564
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_566 = expr_437 * expr_563
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_570 = expr_440 * expr_569
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_571 = expr_440 * expr_568
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_575 = expr_443 * expr_574
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_576 = expr_443 * expr_573
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_580 = expr_446 * expr_579
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_581 = expr_446 * expr_578
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_585 = expr_449 * expr_584
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_586 = expr_449 * expr_583
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_590 = expr_452 * expr_589
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_591 = expr_452 * expr_588
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_595 = expr_455 * expr_594
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_596 = expr_455 * expr_593
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_600 = expr_458 * expr_599
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_601 = expr_458 * expr_598
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_605 = expr_461 * expr_604
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_606 = expr_461 * expr_603
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_610 = expr_464 * expr_609
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_611 = expr_464 * expr_608
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_615 = expr_467 * expr_614
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_616 = expr_467 * expr_613
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_620 = expr_470 * expr_619
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_621 = expr_470 * expr_618
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_625 = expr_473 * expr_624
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_626 = expr_473 * expr_623
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_630 = expr_476 * expr_629
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_631 = expr_476 * expr_628
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_728 = expr_634 * expr_727
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_729 = expr_634 * expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_733 = expr_637 * expr_732
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_734 = expr_637 * expr_731
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_738 = expr_640 * expr_737
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_739 = expr_640 * expr_736
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_743 = expr_643 * expr_742
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_744 = expr_643 * expr_741
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_748 = expr_646 * expr_747
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_749 = expr_646 * expr_746
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_753 = expr_649 * expr_752
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_754 = expr_649 * expr_751
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_758 = expr_652 * expr_757
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_759 = expr_652 * expr_756
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_763 = expr_655 * expr_762
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_764 = expr_655 * expr_761
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_768 = expr_658 * expr_767
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_769 = expr_658 * expr_766
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_773 = expr_661 * expr_772
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_774 = expr_661 * expr_771
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_778 = expr_664 * expr_777
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_779 = expr_664 * expr_776
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_783 = expr_667 * expr_782
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_784 = expr_667 * expr_781
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_788 = expr_670 * expr_787
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_789 = expr_670 * expr_786
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_793 = expr_673 * expr_792
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_794 = expr_673 * expr_791
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_798 = expr_676 * expr_797
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_799 = expr_676 * expr_796
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_803 = expr_679 * expr_802
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_804 = expr_679 * expr_801
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_808 = expr_682 * expr_807
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_809 = expr_682 * expr_806
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_813 = expr_685 * expr_812
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_814 = expr_685 * expr_811
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_818 = expr_688 * expr_817
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_819 = expr_688 * expr_816
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_823 = expr_691 * expr_822
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_824 = expr_691 * expr_821
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_828 = expr_694 * expr_827
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_829 = expr_694 * expr_826
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_833 = expr_697 * expr_832
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_834 = expr_697 * expr_831
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_838 = expr_700 * expr_837
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_839 = expr_700 * expr_836
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_843 = expr_703 * expr_842
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_844 = expr_703 * expr_841
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_848 = expr_706 * expr_847
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_849 = expr_706 * expr_846
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_853 = expr_709 * expr_852
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_854 = expr_709 * expr_851
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_858 = expr_712 * expr_857
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_859 = expr_712 * expr_856
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_863 = expr_715 * expr_862
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_864 = expr_715 * expr_861
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_868 = expr_718 * expr_867
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_869 = expr_718 * expr_866
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_873 = expr_721 * expr_872
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_874 = expr_721 * expr_871
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_878 = expr_724 * expr_877
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_879 = expr_724 * expr_876
+[1;34mDEBUG   [0m 🐛 [debug]: 
+[1;34mDEBUG   [0m 🐛 [debug]: === End Scope Log ===
+
+[1;34mDEBUG   [0m 🐛 [debug]: === Allocation Log for scope 'verify_fri' ===
+[1;34mDEBUG   [0m 🐛 [debug]: Total allocations in scope: 25
+
+[1;34mDEBUG   [0m 🐛 [debug]: --- Constants (4) ---
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1283 (Const)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1286 (Const)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1289 (Const)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1294 (Const): subgroup_gen_inv
+[1;34mDEBUG   [0m 🐛 [debug]: 
+[1;34mDEBUG   [0m 🐛 [debug]: --- Additions (5) ---
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1282 = expr_0 + expr_1281
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1285 = expr_1282 + expr_1284
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1288 = expr_1285 + expr_1287
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1291 = expr_1288 + expr_1290
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1293 = expr_0 + expr_1292
+[1;34mDEBUG   [0m 🐛 [debug]: 
+[1;34mDEBUG   [0m 🐛 [debug]: --- Subtractions (3) ---
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1299 = expr_1298 - expr_386: z_h
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1300 = expr_1295 - expr_386: us_minus_one
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1301 = expr_1295 - expr_1294: us_minus_gen_inv
+[1;34mDEBUG   [0m 🐛 [debug]: 
+[1;34mDEBUG   [0m 🐛 [debug]: --- Multiplications (10) ---
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1281 = expr_386 * expr_24
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1284 = expr_1283 * expr_25
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1287 = expr_1286 * expr_26
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1290 = expr_1289 * expr_27
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1292 = expr_1291 * expr_386
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1295 = expr_386 * expr_377: unshifted_point
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1296 = expr_1295 * expr_1295
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1297 = expr_1296 * expr_1296
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1298 = expr_1297 * expr_1297
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1326 = expr_1325 * expr_1304
+[1;34mDEBUG   [0m 🐛 [debug]: 
+[1;34mDEBUG   [0m 🐛 [debug]: --- Divisions (3) ---
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1302 = expr_1299 / expr_1300: is_first_row
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1303 = expr_1299 / expr_1301: is_last_row
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1304 = expr_386 / expr_1299: inv_vanishing
+[1;34mDEBUG   [0m 🐛 [debug]: 
+[1;34mDEBUG   [0m 🐛 [debug]: === End Scope Log ===
+
+[1;34mDEBUG   [0m 🐛 [debug]: === Allocation Log for scope 'verify_query_from_index_bits' ===
+[1;34mDEBUG   [0m 🐛 [debug]: Total allocations in scope: 6
+
+[1;34mDEBUG   [0m 🐛 [debug]: --- Subtractions (6) ---
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1025 = expr_386 - expr_385
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1038 = expr_386 - expr_389
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1047 = expr_386 - expr_392
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1222 = expr_386 - expr_634
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1235 = expr_386 - expr_637
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1244 = expr_386 - expr_640
+[1;34mDEBUG   [0m 🐛 [debug]: 
+[1;34mDEBUG   [0m 🐛 [debug]: === End Scope Log ===
+
+[1;34mDEBUG   [0m 🐛 [debug]: === Allocation Log for scope 'main' ===
+[1;34mDEBUG   [0m 🐛 [debug]: Total allocations in scope: 384
+
+[1;34mDEBUG   [0m 🐛 [debug]: --- Public Inputs (384) ---
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_1 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_2 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_3 (Public)
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_4 (Public): MMCS commitment digest
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_5 (Public): MMCS commitment digest
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_6 (Public): MMCS commitment digest
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_7 (Public): MMCS commitment digest
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_8 (Public): MMCS commitment digest
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_9 (Public): MMCS commitment digest
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_10 (Public): MMCS commitment digest
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_11 (Public): MMCS commitment digest
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_12 (Public): MMCS commitment digest
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_13 (Public): MMCS commitment digest
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_14 (Public): MMCS commitment digest
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_15 (Public): MMCS commitment digest
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_16 (Public): MMCS commitment digest
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_17 (Public): MMCS commitment digest
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_18 (Public): MMCS commitment digest
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_19 (Public): MMCS commitment digest
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_20 (Public): trace local values
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_21 (Public): trace local values
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_22 (Public): trace next values
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_23 (Public): trace next values
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_24 (Public): quotient chunk columns
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_25 (Public): quotient chunk columns
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_26 (Public): quotient chunk columns
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_27 (Public): quotient chunk columns
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_28 (Public): MMCS commitment digest
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_29 (Public): MMCS commitment digest
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_30 (Public): MMCS commitment digest
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_31 (Public): MMCS commitment digest
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_32 (Public): MMCS commitment digest
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_33 (Public): MMCS commitment digest
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_34 (Public): MMCS commitment digest
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_35 (Public): MMCS commitment digest
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_36 (Public): MMCS commitment digest
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_37 (Public): MMCS commitment digest
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_38 (Public): MMCS commitment digest
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_39 (Public): MMCS commitment digest
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_40 (Public): MMCS commitment digest
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_41 (Public): MMCS commitment digest
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_42 (Public): MMCS commitment digest
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_43 (Public): MMCS commitment digest
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_44 (Public): MMCS commitment digest
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_45 (Public): MMCS commitment digest
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_46 (Public): MMCS commitment digest
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_47 (Public): MMCS commitment digest
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_48 (Public): MMCS commitment digest
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_49 (Public): MMCS commitment digest
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_50 (Public): MMCS commitment digest
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_51 (Public): MMCS commitment digest
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_52 (Public): batch opened values
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_53 (Public): batch opened values
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_54 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_55 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_56 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_57 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_58 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_59 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_60 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_61 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_62 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_63 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_64 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_65 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_66 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_67 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_68 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_69 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_70 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_71 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_72 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_73 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_74 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_75 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_76 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_77 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_78 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_79 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_80 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_81 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_82 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_83 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_84 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_85 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_86 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_87 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_88 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_89 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_90 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_91 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_92 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_93 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_94 (Public): batch opened values
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_95 (Public): batch opened values
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_96 (Public): batch opened values
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_97 (Public): batch opened values
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_98 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_99 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_100 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_101 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_102 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_103 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_104 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_105 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_106 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_107 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_108 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_109 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_110 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_111 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_112 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_113 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_114 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_115 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_116 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_117 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_118 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_119 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_120 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_121 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_122 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_123 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_124 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_125 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_126 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_127 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_128 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_129 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_130 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_131 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_132 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_133 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_134 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_135 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_136 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_137 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_138 (Public): FRI commit phase sibling value
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_139 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_140 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_141 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_142 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_143 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_144 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_145 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_146 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_147 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_148 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_149 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_150 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_151 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_152 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_153 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_154 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_155 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_156 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_157 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_158 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_159 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_160 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_161 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_162 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_163 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_164 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_165 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_166 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_167 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_168 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_169 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_170 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_171 (Public): FRI commit phase sibling value
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_172 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_173 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_174 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_175 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_176 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_177 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_178 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_179 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_180 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_181 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_182 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_183 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_184 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_185 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_186 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_187 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_188 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_189 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_190 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_191 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_192 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_193 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_194 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_195 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_196 (Public): FRI commit phase sibling value
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_197 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_198 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_199 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_200 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_201 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_202 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_203 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_204 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_205 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_206 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_207 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_208 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_209 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_210 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_211 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_212 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_213 (Public): batch opened values
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_214 (Public): batch opened values
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_215 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_216 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_217 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_218 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_219 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_220 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_221 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_222 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_223 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_224 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_225 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_226 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_227 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_228 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_229 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_230 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_231 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_232 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_233 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_234 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_235 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_236 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_237 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_238 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_239 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_240 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_241 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_242 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_243 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_244 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_245 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_246 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_247 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_248 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_249 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_250 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_251 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_252 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_253 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_254 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_255 (Public): batch opened values
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_256 (Public): batch opened values
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_257 (Public): batch opened values
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_258 (Public): batch opened values
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_259 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_260 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_261 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_262 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_263 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_264 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_265 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_266 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_267 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_268 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_269 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_270 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_271 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_272 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_273 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_274 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_275 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_276 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_277 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_278 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_279 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_280 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_281 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_282 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_283 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_284 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_285 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_286 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_287 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_288 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_289 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_290 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_291 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_292 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_293 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_294 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_295 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_296 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_297 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_298 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_299 (Public): FRI commit phase sibling value
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_300 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_301 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_302 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_303 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_304 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_305 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_306 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_307 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_308 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_309 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_310 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_311 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_312 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_313 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_314 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_315 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_316 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_317 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_318 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_319 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_320 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_321 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_322 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_323 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_324 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_325 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_326 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_327 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_328 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_329 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_330 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_331 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_332 (Public): FRI commit phase sibling value
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_333 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_334 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_335 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_336 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_337 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_338 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_339 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_340 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_341 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_342 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_343 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_344 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_345 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_346 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_347 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_348 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_349 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_350 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_351 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_352 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_353 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_354 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_355 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_356 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_357 (Public): FRI commit phase sibling value
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_358 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_359 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_360 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_361 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_362 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_363 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_364 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_365 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_366 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_367 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_368 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_369 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_370 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_371 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_372 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_373 (Public): Merkle proof hash
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_374 (Public): FRI final polynomial coefficients
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_375 (Public): FRI proof-of-work witness
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_376 (Public): alpha challenge
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_377 (Public): zeta challenge
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_378 (Public): zeta_next challenge
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_379 (Public): proof challenges
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_380 (Public): proof challenges
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_381 (Public): proof challenges
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_382 (Public): proof challenges
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_383 (Public): proof challenges
+[1;34mDEBUG   [0m 🐛 [debug]:   expr_384 (Public): proof challenges
+[1;34mDEBUG   [0m 🐛 [debug]: 
+[1;34mDEBUG   [0m 🐛 [debug]: === End Scope Log ===
+
+[1;34mDEBUG   [0m 🐛 [debug]: === End Allocation Log ===
+
+[1;32mINFO    [0m infer log of constraint degree [ 4.75µs | 37.73% / 100.00% ]
+[1;34mDEBUG   [0m ┕━ infer constraint degree [ 2.96µs | 20.17% / 62.27% ]
+[1;34mDEBUG   [0m    ┕━ evaluate constraints symbolically [ 2.00µs | 42.11% ]
+[1;32mINFO    [0m run [ 24.4µs | 100.00% ]
+test test_fibonacci_verifier ... FAILED
+
+failures:
+
+---- test_fibonacci_verifier stdout ----
+Error: Circuit(WitnessNotSetForIndex { index: 989 })
+
+
+failures:
+    test_fibonacci_verifier
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p p3-recursion --test fibonacci`
