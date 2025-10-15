@@ -212,6 +212,7 @@ mod tests {
     extern crate std;
 
     use alloc::vec;
+    use std::println;
 
     use p3_baby_bear::BabyBear;
     use p3_field::extension::BinomialExtensionField;
@@ -254,8 +255,8 @@ mod tests {
     }
 
     #[test]
+    // Proves that we know x such that 37 * x - 111 = 0
     fn test_toy_example_37_times_x_minus_111() {
-        // Proves that we know x such that 37 * x - 111 = 0
         let mut builder = CircuitBuilder::new();
 
         let x = builder.add_public_input();
@@ -267,9 +268,9 @@ mod tests {
         builder.assert_zero(sub_result);
 
         let circuit = builder.build().unwrap();
-        std::println!("=== CIRCUIT PRIMITIVE OPERATIONS ===");
+        println!("=== CIRCUIT PRIMITIVE OPERATIONS ===");
         for (i, prim) in circuit.primitive_ops.iter().enumerate() {
-            std::println!("{i}: {prim:?}");
+            println!("{i}: {prim:?}");
         }
 
         let witness_count = circuit.witness_count;
@@ -280,7 +281,7 @@ mod tests {
 
         let traces = runner.run().unwrap();
 
-        std::println!("\n=== WITNESS TRACE ===");
+        println!("\n=== WITNESS TRACE ===");
         for (i, (idx, val)) in traces
             .witness_trace
             .index
@@ -288,10 +289,10 @@ mod tests {
             .zip(traces.witness_trace.values.iter())
             .enumerate()
         {
-            std::println!("Row {i}: WitnessId({idx}) = {val:?}");
+            println!("Row {i}: WitnessId({idx}) = {val:?}");
         }
 
-        std::println!("\n=== CONST TRACE ===");
+        println!("\n=== CONST TRACE ===");
         for (i, (idx, val)) in traces
             .const_trace
             .index
@@ -299,10 +300,10 @@ mod tests {
             .zip(traces.const_trace.values.iter())
             .enumerate()
         {
-            std::println!("Row {i}: WitnessId({idx}) = {val:?}");
+            println!("Row {i}: WitnessId({idx}) = {val:?}");
         }
 
-        std::println!("\n=== PUBLIC TRACE ===");
+        println!("\n=== PUBLIC TRACE ===");
         for (i, (idx, val)) in traces
             .public_trace
             .index
@@ -310,12 +311,12 @@ mod tests {
             .zip(traces.public_trace.values.iter())
             .enumerate()
         {
-            std::println!("Row {i}: WitnessId({idx}) = {val:?}");
+            println!("Row {i}: WitnessId({idx}) = {val:?}");
         }
 
-        std::println!("\n=== MUL TRACE ===");
+        println!("\n=== MUL TRACE ===");
         for i in 0..traces.mul_trace.lhs_values.len() {
-            std::println!(
+            println!(
                 "Row {}: WitnessId({}) * WitnessId({}) -> WitnessId({}) | {:?} * {:?} -> {:?}",
                 i,
                 traces.mul_trace.lhs_index[i],
@@ -327,9 +328,9 @@ mod tests {
             );
         }
 
-        std::println!("\n=== ADD TRACE ===");
+        println!("\n=== ADD TRACE ===");
         for i in 0..traces.add_trace.lhs_values.len() {
-            std::println!(
+            println!(
                 "Row {}: WitnessId({}) + WitnessId({}) -> WitnessId({}) | {:?} + {:?} -> {:?}",
                 i,
                 traces.add_trace.lhs_index[i],
