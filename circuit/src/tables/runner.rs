@@ -210,7 +210,6 @@ impl<F: CircuitField> CircuitRunner<F> {
 #[cfg(test)]
 mod tests {
     extern crate std;
-
     use alloc::vec;
     use std::println;
 
