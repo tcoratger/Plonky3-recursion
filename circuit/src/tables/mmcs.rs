@@ -385,7 +385,6 @@ impl<'a, F: CircuitField> MmcsTraceBuilder<'a, F> {
 
 #[cfg(test)]
 mod tests {
-    extern crate std;
     use alloc::vec;
 
     use p3_baby_bear::BabyBear;
