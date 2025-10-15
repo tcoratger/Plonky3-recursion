@@ -16,8 +16,6 @@ pub struct ConstTrace<F> {
     /// Maps each constant to its location in the witness table.
     pub index: Vec<WitnessId>,
     /// Constant field element values.
-    ///
-    /// These values remain fixed across all executions.
     pub values: Vec<F>,
 }
 
