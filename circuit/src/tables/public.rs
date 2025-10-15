@@ -6,9 +6,8 @@ use crate::types::WitnessId;
 
 /// Public input table.
 ///
-/// Tracks all public inputs to the circuit.
-/// Both prover and verifier know these values.
-/// They represent the externally visible interface to the computation.
+/// Unlike compile-time `Const` values, these inputs are provided at runtime
+/// and are known to both the prover and the verifier.
 #[derive(Debug, Clone)]
 pub struct PublicTrace<F> {
     /// Witness IDs of each public input.
@@ -18,7 +17,7 @@ pub struct PublicTrace<F> {
 
     /// Public input field element values.
     ///
-    /// Provided by the external caller.
+    /// Provided at the start of the execution.
     /// Serve as the starting point for computation.
     pub values: Vec<F>,
 }
