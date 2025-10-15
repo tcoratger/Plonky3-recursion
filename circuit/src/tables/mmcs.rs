@@ -6,10 +6,13 @@ use itertools::izip;
 use p3_field::{ExtensionField, Field};
 use p3_symmetric::PseudoCompressionFunction;
 
-use crate::CircuitError;
-use crate::op::NonPrimitiveOpType;
+use crate::circuit::Circuit;
+use crate::op::{
+    NonPrimitiveOp, NonPrimitiveOpConfig, NonPrimitiveOpPrivateData, NonPrimitiveOpType,
+};
 use crate::ops::MmcsVerifyConfig;
 use crate::types::WitnessId;
+use crate::{CircuitError, CircuitField};
 
 /// MMCS Merkle path verification table.
 ///
@@ -237,6 +240,146 @@ impl<F: Field + Clone + Default> MmcsPrivateData<F> {
         trace.final_value = self.path_states.last().cloned().unwrap_or_default();
         trace.final_index = root_indices;
         Ok(trace)
+    }
+}
+
+/// Builder for generating MMCS traces.
+pub struct MmcsTraceBuilder<'a, F> {
+    circuit: &'a Circuit<F>,
+    witness: &'a [Option<F>],
+    non_primitive_op_private_data: &'a [Option<NonPrimitiveOpPrivateData<F>>],
+}
+
+impl<'a, F: CircuitField> MmcsTraceBuilder<'a, F> {
+    /// Creates a new MMCS trace builder.
+    pub fn new(
+        circuit: &'a Circuit<F>,
+        witness: &'a [Option<F>],
+        non_primitive_op_private_data: &'a [Option<NonPrimitiveOpPrivateData<F>>],
+    ) -> Self {
+        Self {
+            circuit,
+            witness,
+            non_primitive_op_private_data,
+        }
+    }
+
+    /// Builds the MMCS trace from non-primitive operations.
+    ///
+    /// Validates that private data matches public witness values
+    /// for leaf, root, and index. Converts private data to trace format.
+    pub fn build(self) -> Result<MmcsTrace<F>, CircuitError> {
+        let mut mmcs_paths = Vec::new();
+
+        for op_idx in 0..self.circuit.non_primitive_ops.len() {
+            let NonPrimitiveOp::MmcsVerify { leaf, index, root } =
+                &self.circuit.non_primitive_ops[op_idx]
+            else {
+                continue;
+            };
+
+            if let Some(Some(NonPrimitiveOpPrivateData::MmcsVerify(private_data))) =
+                self.non_primitive_op_private_data.get(op_idx).cloned()
+            {
+                let config = match self
+                    .circuit
+                    .enabled_ops
+                    .get(&NonPrimitiveOpType::MmcsVerify)
+                {
+                    Some(NonPrimitiveOpConfig::MmcsVerifyConfig(config)) => Ok(config),
+                    _ => Err(CircuitError::InvalidNonPrimitiveOpConfiguration {
+                        op: NonPrimitiveOpType::MmcsVerify,
+                    }),
+                }?;
+
+                // Validate leaf values
+                let witness_leaf: Vec<F> = leaf
+                    .iter()
+                    .map(|&wid| {
+                        self.witness
+                            .get(wid.0 as usize)
+                            .and_then(|opt| opt.as_ref())
+                            .cloned()
+                            .ok_or(CircuitError::WitnessNotSet { witness_id: wid })
+                    })
+                    .collect::<Result<_, _>>()?;
+
+                let private_data_leaf = private_data.path_states.first().ok_or(
+                    CircuitError::NonPrimitiveOpMissingPrivateData {
+                        operation_index: op_idx,
+                    },
+                )?;
+
+                if witness_leaf != *private_data_leaf {
+                    return Err(CircuitError::IncorrectNonPrimitiveOpPrivateData {
+                        op: NonPrimitiveOpType::MmcsVerify,
+                        operation_index: op_idx,
+                        expected: format!("leaf: {witness_leaf:?}"),
+                        got: format!("leaf: {private_data_leaf:?}"),
+                    });
+                }
+
+                // Validate root values
+                let witness_root: Vec<F> = root
+                    .iter()
+                    .map(|&wid| {
+                        self.witness
+                            .get(wid.0 as usize)
+                            .and_then(|opt| opt.as_ref())
+                            .cloned()
+                            .ok_or(CircuitError::WitnessNotSet { witness_id: wid })
+                    })
+                    .collect::<Result<_, _>>()?;
+
+                let computed_root = private_data.path_states.last().ok_or(
+                    CircuitError::NonPrimitiveOpMissingPrivateData {
+                        operation_index: op_idx,
+                    },
+                )?;
+
+                if witness_root != *computed_root {
+                    return Err(CircuitError::IncorrectNonPrimitiveOpPrivateData {
+                        op: NonPrimitiveOpType::MmcsVerify,
+                        operation_index: op_idx,
+                        expected: format!("root: {witness_root:?}"),
+                        got: format!("root: {computed_root:?}"),
+                    });
+                }
+
+                // Validate index
+                let priv_index_u64: u64 = private_data
+                    .directions
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(i, &b)| if b { Some(1u64 << i) } else { None })
+                    .sum();
+
+                let idx_f = self
+                    .witness
+                    .get(index.0 as usize)
+                    .and_then(|opt| opt.as_ref())
+                    .cloned()
+                    .ok_or(CircuitError::WitnessNotSet { witness_id: *index })?;
+
+                if idx_f != F::from_u64(priv_index_u64) {
+                    return Err(CircuitError::IncorrectNonPrimitiveOpPrivateData {
+                        op: NonPrimitiveOpType::MmcsVerify,
+                        operation_index: op_idx,
+                        expected: format!("public index value {}", F::from_u64(priv_index_u64)),
+                        got: format!("{idx_f:?}"),
+                    });
+                }
+
+                let trace = private_data.to_trace(config, leaf, root)?;
+                mmcs_paths.push(trace);
+            } else {
+                return Err(CircuitError::NonPrimitiveOpMissingPrivateData {
+                    operation_index: op_idx,
+                });
+            }
+        }
+
+        Ok(MmcsTrace { mmcs_paths })
     }
 }
 
