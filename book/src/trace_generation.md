@@ -36,16 +36,15 @@ The output is a fully populated witness table where every slot contains a concre
 
 Trace extraction happens internally within `runner.run()` after execution completes. This phase delegates to specialized trace builders that transform the populated witness table into operation-specific trace tables.
 
-Each operation family has a dedicated builder that extracts its operations from the IR and produces trace columns:
+Each primitive operation has a dedicated builder that extracts its operations from the IR and produces trace columns:
 
 - **WitnessTraceBuilder** — Generates the central [witness table](./construction.md#witness-table) with sequential `(index, value)` pairs
 - **ConstTraceBuilder** — Extracts constants (both columns preprocessed)
 - **PublicTraceBuilder** — Extracts public inputs (index preprocessed, values at runtime)
 - **AddTraceBuilder** — Extracts additions with six columns: `(lhs_index, lhs_value, rhs_index, rhs_value, result_index, result_value)`
 - **MulTraceBuilder** — Extracts multiplications with the same six-column structure
-- **MmcsTraceBuilder** — Validates and extracts MMCS path verification traces
 
-Each builder operates independently in a single pass, producing isolated trace tables. All index columns are preprocessed since the IR is fixed and known to the verifier.
+Non-primitive operations require custom trace builders. For example, **MmcsTraceBuilder** validates and extracts MMCS path verification traces. Custom trace builders follow the same pattern, operating independently in a single pass to produce isolated trace tables. All index columns are preprocessed since the IR is fixed and known to the verifier.
 
 The output is a `Traces<F>` structure containing all execution traces needed by the prover to generate STARK proofs for each [operation-specific chip](./construction.md#operation-specific-stark-chips).
 
