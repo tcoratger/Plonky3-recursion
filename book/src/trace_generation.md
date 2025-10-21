@@ -6,7 +6,7 @@ After building a circuit, the next step is execution: running the program with c
 
 The trace generation pipeline consists of three distinct phases:
 
-1. **Circuit compilation** — Transform high-level symbolic expressions into a fixed intermediate representation.
+1. **Circuit compilation** — Transform high-level circuit expressions into a fixed intermediate representation.
 2. **Circuit execution** — Populate the witness table by evaluating operations with concrete input values.
 3. **Trace extraction** — Generate operation-specific traces from the populated witness table.
 
@@ -14,7 +14,7 @@ Each phase has a clear responsibility and produces well-defined outputs that fee
 
 ## Phase 1: Circuit Compilation
 
-Circuit compilation happens when calling `builder.build()`. This phase translates symbolic expressions into a deterministic sequence of primitive and non-primitive operations.
+Circuit compilation happens when calling `builder.build()`. This phase translates circuit expressions into a deterministic sequence of primitive and non-primitive operations.
 
 The compilation process is described in detail in the [Circuit Building](./circuit_building.md#building-pipeline) section. In summary, it performs three successive passes to lower expressions to primitives, handle non-primitive operations, and optimize the resulting graph.
 
@@ -113,7 +113,7 @@ The witness table acts as the central bus, with each operation table containing 
 
 **Determinism** — Given the same circuit and inputs, trace generation is completely deterministic, ensuring reproducible proofs.
 
-**Separation of concerns** — Each phase has a single responsibility: compilation handles symbolic lowering, execution populates concrete values, and trace builders format data for proving.
+**Separation of concerns** — Each phase has a single responsibility: compilation handles expression lowering, execution populates concrete values, and trace builders format data for proving.
 
 **Builder pattern efficiency** — Trace builders operate in a single pass using only the data they need. No builder depends on another's output, enabling future parallelization.
 
