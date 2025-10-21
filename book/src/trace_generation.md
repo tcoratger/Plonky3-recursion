@@ -106,7 +106,7 @@ add_trace: [
 mul_trace: []
 ```
 
-The witness table acts as the central bus, with each operation table containing [lookups](./construction.md#lookups) into it. The aggregated LogUp argument enforces that all these lookups are consistent.
+The witness table acts as the central bus, with each operation table containing [lookups](./construction.md#lookups) into it. The aggregated lookup argument enforces that all these lookups are consistent.
 
 ## Key Properties
 
