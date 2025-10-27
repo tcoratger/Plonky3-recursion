@@ -13,22 +13,6 @@ use crate::types::ProofTargets;
 use crate::verifier::ObservableCommitment;
 
 /// Base STARK challenges (independent of PCS choice).
-///
-/// These are the fundamental challenges needed for any STARK verification:
-/// - **Alpha**: for folding constraint polynomials
-/// - **Zeta**: for out-of-domain evaluation point
-/// - **Zeta_next**: for evaluation at the next row (zeta * g in the trace domain)
-///
-/// # Fiat-Shamir Ordering
-/// The challenges are derived using the Fiat-Shamir heuristic in this order:
-/// 1. Observe domain parameters (degree_bits, log_quotient_degree)
-/// 2. Observe trace commitment
-/// 3. Observe public values
-/// 4. **Sample alpha** (for constraint folding)
-/// 5. Observe quotient chunks commitment
-/// 6. Observe random commitment (if ZK mode)
-/// 7. **Sample zeta** (OOD evaluation point)
-/// 8. **Sample zeta_next** (next row evaluation point)
 #[derive(Debug, Clone)]
 pub struct StarkChallenges {
     /// Alpha: challenge for folding all constraint polynomials
