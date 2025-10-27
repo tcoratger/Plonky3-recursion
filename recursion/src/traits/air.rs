@@ -59,10 +59,6 @@ pub trait RecursiveAir<F: Field> {
     fn get_log_quotient_degree(&self, num_public_values: usize, is_zk: usize) -> usize;
 }
 
-/// Blanket implementation for any type implementing the standard `Air` trait.
-///
-/// This allows any AIR definition to automatically work in recursive circuits
-/// without requiring manual implementation of circuit evaluation logic.
 impl<F: Field, A> RecursiveAir<F> for A
 where
     A: Air<SymbolicAirBuilder<F>>,
