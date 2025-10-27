@@ -26,16 +26,16 @@ type ChallengeMmcs = p3_commit::ExtensionMmcs<F, Challenge, ValMmcs>;
 type PCS = TwoAdicFriPcs<F, Dft<F>, ValMmcs, ChallengeMmcs>;
 
 // Recursive target graph pieces
-use p3_recursion::recursive_pcs::{
+use p3_recursion::Recursive;
+use p3_recursion::pcs::fri::{
     FriProofTargets, InputProofTargets, RecExtensionValMmcs, RecValMmcs, Witness as RecWitness,
 };
-use p3_recursion::recursive_traits::Recursive;
 
 type RecVal = RecValMmcs<F, 8, MyHash, MyCompress>;
 type RecExt = RecExtensionValMmcs<F, Challenge, 8, RecVal>;
 
 // Bring the circuit we're testing.
-use p3_recursion::circuit_fri_verifier::verify_fri_circuit;
+use p3_recursion::pcs::fri::verify_fri_circuit;
 
 /// Alias for FriProofTargets used for lens/value extraction and allocation
 type FriTargets =
