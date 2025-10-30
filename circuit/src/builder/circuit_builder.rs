@@ -2,6 +2,7 @@ use alloc::vec::Vec;
 use core::hash::Hash;
 
 use hashbrown::HashMap;
+use itertools::zip_eq;
 use p3_field::{Field, PrimeCharacteristicRing};
 
 use super::compiler::{ExpressionLowerer, NonPrimitiveLowerer, Optimizer};
@@ -248,14 +249,10 @@ where
     /// # Cost
     /// `N` multiplications and `N-1` additions, where `N` is the length of the slices.
     pub fn inner_product(&mut self, a: &[ExprId], b: &[ExprId]) -> ExprId {
-        assert_eq!(a.len(), b.len(), "Input vectors must have the same length");
-
         let zero = self.add_const(F::ZERO);
 
         // Calculate the sum of element-wise products.
-        a.iter()
-            .zip(b.iter())
-            .fold(zero, |acc, (&x, &y)| self.mul_add(x, y, acc))
+        zip_eq(a, b).fold(zero, |acc, (&x, &y)| self.mul_add(x, y, acc))
     }
 
     /// Divides two expressions.
@@ -1000,7 +997,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Input vectors must have the same length")]
+    #[should_panic]
     fn test_inner_product_mismatched_lengths() {
         // Verify that inner_product panics with mismatched vector lengths
         let mut builder = CircuitBuilder::<BabyBear>::new();
