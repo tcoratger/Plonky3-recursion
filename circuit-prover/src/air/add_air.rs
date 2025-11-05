@@ -124,14 +124,6 @@ impl<F: Field + PrimeCharacteristicRing, const D: usize> AddAir<F, D> {
     }
 
     /// Total number of columns in the main trace for this AIR instance.
-    ///
-    /// This is computed as
-    ///
-    /// ```text
-    /// total_width = lanes x LANE_WIDTH.
-    /// ```
-    ///
-    /// Every row of the trace matrix must have exactly this width.
     pub const fn total_width(&self) -> usize {
         self.lanes * Self::lane_width()
     }
@@ -278,9 +270,8 @@ where
         // Make sure that the matrix width matches what this AIR expects.
         debug_assert_eq!(main.width(), self.total_width(), "column width mismatch");
 
-        // Read the current row at offset 0 relative to the evaluation point.
+        // Get the evaluation at evaluation point `zeta`
         let local = main.row_slice(0).expect("matrix must be non-empty");
-        // Each lane occupies this many base-field columns.
         let lane_width = Self::lane_width();
 
         // Iterate over the row in fixed-size chunks, each chunk describing one lane:
