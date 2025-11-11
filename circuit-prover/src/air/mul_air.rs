@@ -375,13 +375,13 @@ where
                 // We perform "schoolbook" multiplication term-by-term.
                 //
                 // We reduce each term *immediately* using the rule $x^D = W$.
-                for i in 0..D {
+                for (i, lhs) in lhs_slice.iter().enumerate().take(D) {
                     // This is the i-th term of L(x): lhs[i] * x^i
-                    for j in 0..D {
+                    for (j, rhs) in rhs_slice.iter().enumerate().take(D) {
                         // This is the j-th term of R(x): rhs[j] * x^j
 
                         // Multiplying them gives: (lhs[i] * rhs[j]) * x^(i+j)
-                        let term = lhs_slice[i].clone() * rhs_slice[j].clone();
+                        let term = lhs.clone() * rhs.clone();
                         let k = i + j;
 
                         // Now, we reduce the $x^k$ term and add its coefficient
