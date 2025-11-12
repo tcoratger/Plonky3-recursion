@@ -182,7 +182,7 @@ impl<F: Field + PrimeCharacteristicRing, const D: usize> MulAir<F, D> {
     ///
     /// The resulting matrix has:
     ///
-    /// - width `= lanes * LANE_WIDTH`,
+    /// - width = lanes * `LANE_WIDTH`,
     /// - height equal to the number of rows after packing and padding.
     ///
     /// The layout within a row is:
