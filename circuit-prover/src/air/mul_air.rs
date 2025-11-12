@@ -65,9 +65,9 @@
 //!
 //! The AIR enforces the polynomial identity:
 //!
-//! \begin{equation}
-//!     L(x) \cdot R(x) \equiv O(x) \pmod{x^D - W}
-//! \end{equation}
+//! $$
+//! L(x) \cdot R(x) \equiv O(x) \pmod{x^D - W}
+//! $$
 //!
 //! # Global interactions
 //!
