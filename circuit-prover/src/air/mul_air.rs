@@ -168,7 +168,7 @@ impl<F: Field + PrimeCharacteristicRing, const D: usize> MulAir<F, D> {
         self.lanes * Self::lane_width()
     }
 
-    /// Convert an `MulTrace` into a `RowMajorMatrix` suitable for the STARK prover.
+    /// Convert a `MulTrace` into a `RowMajorMatrix` suitable for the STARK prover.
     ///
     /// This function is responsible for:
     ///
