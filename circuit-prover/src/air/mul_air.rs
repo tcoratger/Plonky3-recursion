@@ -1,16 +1,19 @@
 //! [`MulAir`] defines the AIR for proving multiplication and division over both base and extension fields.
 //!
 //! Conceptually, each row of the trace encodes one or more multiplication constraints of the form
-//!
+//! ```text
 //!     lhs * rhs = result
+//! ```
 //!
 //! When the circuit wants to prove a division, it is expressed as a multiplication by rewriting
-//!
+//! ```text
 //!     a / b = c
+//! ```
 //!
 //! as
-//!
+//! ```text
 //!     b * c = a
+//! ```
 //!
 //! so that division is handled uniformly as a multiplication gate in the AIR.
 //!
