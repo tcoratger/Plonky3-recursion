@@ -50,9 +50,9 @@
 //! Let `left`, `right`, and `output` be the single base-field coordinates. The AIR
 //! enforces the constraint:
 //!
-//! \begin{equation}
-//!     left \cdot right - output = 0.
-//! \end{equation}
+//! $$
+//! left \cdot right - output = 0.
+//! $$
 //!
 //! ## Binomial Extension (D > 1)
 //!
