@@ -38,7 +38,9 @@
 //!
 //! In other words, for a single lane the layout is:
 //!
+//! ```text
 //!     [lhs[0..D), lhs_index, rhs[0..D), rhs_index, result[0..D), result_index]
+//! ```
 //!
 //! A single row can pack several of these lanes side-by-side, so the full row layout is
 //! this pattern repeated `lanes` times.
@@ -82,6 +84,7 @@
 //! bus interaction logic elsewhere in the system.
 
 use alloc::vec;
+use core::marker::PhantomData;
 
 use p3_air::{Air, AirBuilder, BaseAir};
 use p3_circuit::tables::MulTrace;
@@ -120,7 +123,7 @@ pub struct MulAir<F, const D: usize = 1> {
     /// - `None` if `D == 1`.
     pub w_binomial: Option<F>,
     /// Marker tying this AIR to its base field.
-    _phantom: core::marker::PhantomData<F>,
+    _phantom: PhantomData<F>,
 }
 
 impl<F: Field + PrimeCharacteristicRing, const D: usize> MulAir<F, D> {
@@ -134,7 +137,7 @@ impl<F: Field + PrimeCharacteristicRing, const D: usize> MulAir<F, D> {
             num_ops,
             lanes,
             w_binomial: None,
-            _phantom: core::marker::PhantomData,
+            _phantom: PhantomData,
         }
     }
 
@@ -148,7 +151,7 @@ impl<F: Field + PrimeCharacteristicRing, const D: usize> MulAir<F, D> {
             num_ops,
             lanes,
             w_binomial: Some(w),
-            _phantom: core::marker::PhantomData,
+            _phantom: PhantomData,
         }
     }
 
@@ -187,7 +190,9 @@ impl<F: Field + PrimeCharacteristicRing, const D: usize> MulAir<F, D> {
     ///
     /// The layout within a row is:
     ///
-    ///     [lhs[D], lhs_idx, rhs[D], rhs_idx, result[D], result_idx] repeated `lanes` times.
+    /// ```text
+    ///     [lhs[0..D), lhs_index, rhs[0..D), rhs_index, result[0..D), result_index] repeated `lanes` times.
+    /// ```
     pub fn trace_to_matrix<ExtF: BasedVectorSpace<F>>(
         trace: &MulTrace<ExtF>,
         lanes: usize,
@@ -450,10 +455,7 @@ mod tests {
 
     use p3_baby_bear::BabyBear as Val;
     use p3_circuit::WitnessId;
-    use p3_circuit::tables::MulTrace;
     use p3_field::extension::BinomialExtensionField;
-    use p3_field::{BasedVectorSpace, Field};
-    use p3_matrix::dense::RowMajorMatrix;
     use p3_uni_stark::{prove, verify};
 
     use super::*;
