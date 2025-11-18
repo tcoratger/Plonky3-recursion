@@ -185,7 +185,6 @@ where
     /// 1. AIR public values
     /// 2. Proof values
     /// 3. All challenges (alpha, zeta, zeta_next, betas, query indices)
-    /// 4. Query index bit decompositions (MAX_QUERY_INDEX_BITS per query)
     pub fn build(self) -> Vec<EF> {
         let mut builder = PublicInputBuilder::new();
 
@@ -193,24 +192,6 @@ where
         builder.add_proof_values(self.proof_values);
         builder.add_proof_values(self.preprocessed);
         builder.add_challenges(self.challenges.iter().copied());
-
-        // The circuit calls decompose_to_bits on each query index,
-        // which creates MAX_QUERY_INDEX_BITS additional public inputs per query
-        let num_regular_challenges = self.challenges.len() - self.num_queries;
-        for &query_index in &self.challenges[num_regular_challenges..] {
-            let coeffs = query_index.as_basis_coefficients_slice();
-            let index_usize = coeffs[0].as_canonical_u64() as usize;
-
-            // Add bit decomposition (MAX_QUERY_INDEX_BITS public inputs)
-            for k in 0..MAX_QUERY_INDEX_BITS {
-                let bit: EF = if (index_usize >> k) & 1 == 1 {
-                    EF::ONE
-                } else {
-                    EF::ZERO
-                };
-                builder.add_challenge(bit);
-            }
-        }
 
         builder.build()
     }
@@ -252,7 +233,6 @@ pub fn construct_batch_stark_verifier_inputs<F, EF>(
     air_public_values: &[Vec<F>],
     proof_values: &[EF],
     challenges: &[EF],
-    num_queries: usize,
 ) -> Vec<EF>
 where
     F: Field + PrimeField64,
@@ -266,21 +246,6 @@ where
 
     builder.add_proof_values(proof_values.iter().copied());
     builder.add_challenges(challenges.iter().copied());
-
-    let num_regular_challenges = challenges.len().saturating_sub(num_queries);
-    for &query_index in &challenges[num_regular_challenges..] {
-        let coeffs = query_index.as_basis_coefficients_slice();
-        let index_usize = coeffs[0].as_canonical_u64() as usize;
-
-        for k in 0..MAX_QUERY_INDEX_BITS {
-            let bit: EF = if (index_usize >> k) & 1 == 1 {
-                EF::ONE
-            } else {
-                EF::ZERO
-            };
-            builder.add_challenge(bit);
-        }
-    }
 
     builder.build()
 }
@@ -466,7 +431,6 @@ where
         air_public_values: &[Vec<Val<SC>>],
         proof: &BatchProof<SC>,
         challenges: &[SC::Challenge],
-        num_queries: usize,
     ) -> Vec<SC::Challenge>
     where
         Val<SC>: PrimeField64,
@@ -474,12 +438,7 @@ where
     {
         let proof_values = BatchProofTargets::<SC, Comm, OpeningProof>::get_values(proof);
 
-        construct_batch_stark_verifier_inputs(
-            air_public_values,
-            &proof_values,
-            challenges,
-            num_queries,
-        )
+        construct_batch_stark_verifier_inputs(air_public_values, &proof_values, challenges)
     }
 }
 

@@ -511,7 +511,7 @@ where
         flattened,
         opened_values_targets,
         pcs_params,
-    );
+    )?;
 
     pcs.verify_circuit(
         circuit,
