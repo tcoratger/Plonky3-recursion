@@ -9,7 +9,7 @@ use core::mem::transmute;
 
 use p3_air::{Air, AirBuilder, BaseAir};
 use p3_baby_bear::{BabyBear, default_babybear_poseidon2_16, default_babybear_poseidon2_24};
-use p3_batch_stark::{BatchProof, StarkGenericConfig, StarkInstance, Val};
+use p3_batch_stark::{BatchProof, CommonData, StarkGenericConfig, StarkInstance, Val};
 use p3_circuit::op::PrimitiveOpType;
 use p3_circuit::ops::MmcsVerifyConfig;
 use p3_circuit::tables::{
@@ -1248,7 +1248,9 @@ where
             })
             .collect();
 
-        let proof = p3_batch_stark::prove_batch(&self.config, instances);
+        let instances_len = instances.len();
+        let common = CommonData::empty(instances_len);
+        let proof = p3_batch_stark::prove_batch(&self.config, instances, &common);
 
         // Ensure all primitive table row counts are at least 1
         // RowCounts::new requires non-zero counts, so pad zeros to 1
@@ -1342,7 +1344,8 @@ where
             pvs.push(entry.public_values.clone());
         }
 
-        p3_batch_stark::verify_batch(&self.config, &airs, &proof.proof, &pvs)
+        let common = CommonData::empty(airs.len());
+        p3_batch_stark::verify_batch(&self.config, &airs, &proof.proof, &pvs, &common)
             .map_err(|e| BatchStarkProverError::Verify(format!("{e:?}")))
     }
 }
