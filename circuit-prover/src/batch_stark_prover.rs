@@ -488,7 +488,7 @@ unsafe impl Sync for Poseidon2Prover {}
 
 impl Poseidon2Prover {
     /// Create a new Poseidon2Prover with the given configuration
-    pub fn new(config: Poseidon2Config) -> Self {
+    pub const fn new(config: Poseidon2Config) -> Self {
         Self { config }
     }
 
@@ -600,10 +600,9 @@ impl Poseidon2Prover {
                 constants,
             } => {
                 let air = Poseidon2CircuitAirBabyBearD4Width16::new(constants.clone());
-                let perm_clone = permutation.clone();
                 let ops_babybear: Poseidon2CircuitTrace<BabyBear> =
                     unsafe { transmute(ops_converted) };
-                let matrix_f = air.generate_trace_rows(ops_babybear, constants, 0, perm_clone);
+                let matrix_f = air.generate_trace_rows(&ops_babybear, constants, 0, permutation);
                 let matrix: RowMajorMatrix<Val<SC>> = unsafe { transmute(matrix_f) };
                 (
                     Poseidon2AirWrapper {
@@ -618,10 +617,9 @@ impl Poseidon2Prover {
                 constants,
             } => {
                 let air = Poseidon2CircuitAirBabyBearD4Width24::new(constants.clone());
-                let perm_clone = permutation.clone();
                 let ops_babybear: Poseidon2CircuitTrace<BabyBear> =
                     unsafe { transmute(ops_converted) };
-                let matrix_f = air.generate_trace_rows(ops_babybear, constants, 0, perm_clone);
+                let matrix_f = air.generate_trace_rows(&ops_babybear, constants, 0, permutation);
                 let matrix: RowMajorMatrix<Val<SC>> = unsafe { transmute(matrix_f) };
                 (
                     Poseidon2AirWrapper {
@@ -636,10 +634,9 @@ impl Poseidon2Prover {
                 constants,
             } => {
                 let air = Poseidon2CircuitAirKoalaBearD4Width16::new(constants.clone());
-                let perm_clone = permutation.clone();
                 let ops_koalabear: Poseidon2CircuitTrace<KoalaBear> =
                     unsafe { transmute(ops_converted) };
-                let matrix_f = air.generate_trace_rows(ops_koalabear, constants, 0, perm_clone);
+                let matrix_f = air.generate_trace_rows(&ops_koalabear, constants, 0, permutation);
                 let matrix: RowMajorMatrix<Val<SC>> = unsafe { transmute(matrix_f) };
                 (
                     Poseidon2AirWrapper {
@@ -654,10 +651,9 @@ impl Poseidon2Prover {
                 constants,
             } => {
                 let air = Poseidon2CircuitAirKoalaBearD4Width24::new(constants.clone());
-                let perm_clone = permutation.clone();
                 let ops_koalabear: p3_circuit::tables::Poseidon2CircuitTrace<KoalaBear> =
                     unsafe { core::mem::transmute(ops_converted) };
-                let matrix_f = air.generate_trace_rows(ops_koalabear, constants, 0, perm_clone);
+                let matrix_f = air.generate_trace_rows(&ops_koalabear, constants, 0, permutation);
                 let matrix: RowMajorMatrix<Val<SC>> = unsafe { core::mem::transmute(matrix_f) };
                 (
                     Poseidon2AirWrapper {
@@ -954,7 +950,7 @@ where
             Self::Add(a) => a.eval(builder),
             Self::Mul(a) => a.eval(builder),
             Self::Dynamic(a) => {
-                <dyn BatchAir<SC> as Air<SymbolicAirBuilder<Val<SC>>>>::eval(a.air(), builder)
+                <dyn BatchAir<SC> as Air<SymbolicAirBuilder<Val<SC>>>>::eval(a.air(), builder);
             }
         }
     }
@@ -973,7 +969,7 @@ where
             Self::Add(a) => a.eval(builder),
             Self::Mul(a) => a.eval(builder),
             Self::Dynamic(a) => {
-                <dyn BatchAir<SC> as Air<ProverConstraintFolder<'a, SC>>>::eval(a.air(), builder)
+                <dyn BatchAir<SC> as Air<ProverConstraintFolder<'a, SC>>>::eval(a.air(), builder);
             }
         }
     }
@@ -992,7 +988,7 @@ where
             Self::Add(a) => a.eval(builder),
             Self::Mul(a) => a.eval(builder),
             Self::Dynamic(a) => {
-                <dyn BatchAir<SC> as Air<VerifierConstraintFolder<'a, SC>>>::eval(a.air(), builder)
+                <dyn BatchAir<SC> as Air<VerifierConstraintFolder<'a, SC>>>::eval(a.air(), builder);
             }
         }
     }
@@ -1012,7 +1008,7 @@ where
     }
 
     #[must_use]
-    pub fn with_table_packing(mut self, table_packing: TablePacking) -> Self {
+    pub const fn with_table_packing(mut self, table_packing: TablePacking) -> Self {
         self.table_packing = table_packing;
         self
     }
@@ -1694,7 +1690,7 @@ mod tests {
         runner
             .set_non_primitive_op_private_data(
                 mmcs_op_id,
-                NonPrimitiveOpPrivateData::MmcsVerify(private_data.clone()),
+                NonPrimitiveOpPrivateData::MmcsVerify(private_data),
             )
             .unwrap();
 
