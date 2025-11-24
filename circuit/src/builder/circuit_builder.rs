@@ -115,7 +115,7 @@ where
     }
 
     /// Enables FRI verification operations.
-    pub fn enable_fri(&mut self) {
+    pub const fn enable_fri(&mut self) {
         self.config.enable_fri();
     }
 
@@ -162,7 +162,7 @@ where
     }
 
     /// Returns the current public input count.
-    pub fn public_input_count(&self) -> usize {
+    pub const fn public_input_count(&self) -> usize {
         self.public_tracker.count()
     }
 

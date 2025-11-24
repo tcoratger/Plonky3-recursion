@@ -94,14 +94,15 @@ pub enum PrimitiveOpType {
     Mul = 4,
 }
 
+#[allow(clippy::fallible_impl_from)]
 impl From<usize> for PrimitiveOpType {
     fn from(value: usize) -> Self {
         match value {
-            0 => PrimitiveOpType::Witness,
-            1 => PrimitiveOpType::Const,
-            2 => PrimitiveOpType::Public,
-            3 => PrimitiveOpType::Add,
-            4 => PrimitiveOpType::Mul,
+            0 => Self::Witness,
+            1 => Self::Const,
+            2 => Self::Public,
+            3 => Self::Add,
+            4 => Self::Mul,
             _ => panic!("Invalid PrimitiveOpType value: {}", value),
         }
     }
@@ -109,13 +110,13 @@ impl From<usize> for PrimitiveOpType {
 
 impl PrimitiveOpType {
     /// Get the number of columns in the preprocessed table for this operation
-    pub fn get_prep_width(&self) -> usize {
+    pub const fn get_prep_width(&self) -> usize {
         match self {
-            PrimitiveOpType::Witness => 1, // index
-            PrimitiveOpType::Const => 2,   // index, val
-            PrimitiveOpType::Public => 1,  // index
-            PrimitiveOpType::Add => 3,     // index_a, index_b, index_out
-            PrimitiveOpType::Mul => 3,     // index_a, index_b, index_out
+            Self::Witness => 1, // index
+            Self::Const => 2,   // index, val
+            Self::Public => 1,  // index
+            Self::Add => 3,     // index_a, index_b, index_out
+            Self::Mul => 3,     // index_a, index_b, index_out
         }
     }
 }
@@ -124,39 +125,39 @@ impl PrimitiveOpType {
 impl<F: Field + Clone> Clone for Op<F> {
     fn clone(&self) -> Self {
         match self {
-            Op::Const { out, val } => Op::Const {
+            Self::Const { out, val } => Self::Const {
                 out: *out,
                 val: *val,
             },
-            Op::Public { out, public_pos } => Op::Public {
+            Self::Public { out, public_pos } => Self::Public {
                 out: *out,
                 public_pos: *public_pos,
             },
-            Op::Add { a, b, out } => Op::Add {
+            Self::Add { a, b, out } => Self::Add {
                 a: *a,
                 b: *b,
                 out: *out,
             },
-            Op::Mul { a, b, out } => Op::Mul {
+            Self::Mul { a, b, out } => Self::Mul {
                 a: *a,
                 b: *b,
                 out: *out,
             },
-            Op::Unconstrained {
+            Self::Unconstrained {
                 inputs,
                 outputs,
                 filler,
-            } => Op::Unconstrained {
+            } => Self::Unconstrained {
                 inputs: inputs.clone(),
                 outputs: outputs.clone(),
                 filler: filler.clone(),
             },
-            Op::NonPrimitiveOpWithExecutor {
+            Self::NonPrimitiveOpWithExecutor {
                 inputs,
                 outputs,
                 executor,
                 op_id,
-            } => Op::NonPrimitiveOpWithExecutor {
+            } => Self::NonPrimitiveOpWithExecutor {
                 inputs: inputs.clone(),
                 outputs: outputs.clone(),
                 executor: executor.boxed(),
@@ -170,51 +171,51 @@ impl<F: Field + Clone> Clone for Op<F> {
 impl<F: Field + PartialEq> PartialEq for Op<F> {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Op::Const { out: o1, val: v1 }, Op::Const { out: o2, val: v2 }) => {
+            (Self::Const { out: o1, val: v1 }, Self::Const { out: o2, val: v2 }) => {
                 o1 == o2 && v1 == v2
             }
             (
-                Op::Public {
+                Self::Public {
                     out: o1,
                     public_pos: p1,
                 },
-                Op::Public {
+                Self::Public {
                     out: o2,
                     public_pos: p2,
                 },
             ) => o1 == o2 && p1 == p2,
             (
-                Op::Add {
+                Self::Add {
                     a: a1,
                     b: b1,
                     out: o1,
                 },
-                Op::Add {
+                Self::Add {
                     a: a2,
                     b: b2,
                     out: o2,
                 },
             ) => a1 == a2 && b1 == b2 && o1 == o2,
             (
-                Op::Mul {
+                Self::Mul {
                     a: a1,
                     b: b1,
                     out: o1,
                 },
-                Op::Mul {
+                Self::Mul {
                     a: a2,
                     b: b2,
                     out: o2,
                 },
             ) => a1 == a2 && b1 == b2 && o1 == o2,
             (
-                Op::NonPrimitiveOpWithExecutor {
+                Self::NonPrimitiveOpWithExecutor {
                     inputs: i1,
                     outputs: o1,
                     executor: e1,
                     op_id: id1,
                 },
-                Op::NonPrimitiveOpWithExecutor {
+                Self::NonPrimitiveOpWithExecutor {
                     inputs: i2,
                     outputs: o2,
                     executor: e2,
@@ -261,7 +262,7 @@ pub enum NonPrimitiveOpConfig {
 /// 2. Allow specialized constraint systems for each operation type
 /// 3. Enable parallel development of different cryptographic primitives
 /// 4. Avoid optimization passes breaking complex constraint relationships
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NonPrimitiveOp {
     /// Verifies that a leaf value is contained in a Mmcs with given root.
     /// The actual Mmcs path verification logic is implemented in a dedicated
@@ -305,7 +306,7 @@ pub enum NonPrimitiveOp {
 /// - Is set during circuit execution via `NonPrimitiveOpId`
 /// - Contains sensitive information like cryptographic witnesses
 /// - Is used by AIR tables to generate the appropriate constraints
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NonPrimitiveOpPrivateData<F> {
     /// Private data for Mmcs verification
     ///
@@ -391,11 +392,11 @@ impl<'a, F: Field> ExecutionContext<'a, F> {
         &self,
         op_type: &NonPrimitiveOpType,
     ) -> Result<&NonPrimitiveOpConfig, CircuitError> {
-        self.enabled_ops
-            .get(op_type)
-            .ok_or(CircuitError::InvalidNonPrimitiveOpConfiguration {
+        self.enabled_ops.get(op_type).ok_or_else(|| {
+            CircuitError::InvalidNonPrimitiveOpConfiguration {
                 op: op_type.clone(),
-            })
+            }
+        })
     }
 
     /// Get the current operation ID
@@ -419,7 +420,7 @@ pub trait NonPrimitiveExecutor<F: Field>: Debug {
         &self,
         inputs: &[Vec<WitnessId>],
         outputs: &[Vec<WitnessId>],
-        ctx: &mut ExecutionContext<F>,
+        ctx: &mut ExecutionContext<'_, F>,
     ) -> Result<(), CircuitError>;
 
     /// Get operation type identifier (for config lookup, error reporting)
@@ -883,7 +884,7 @@ mod tests {
         let op_id = NonPrimitiveOpId(0);
 
         // Create execution context
-        let ctx: ExecutionContext<F> =
+        let ctx: ExecutionContext<'_, F> =
             ExecutionContext::new(&mut witness, &private_data, &configs, op_id);
 
         // Attempt to access private data that wasn't provided
@@ -910,7 +911,7 @@ mod tests {
         let mut witness = vec![];
         let private_data = vec![];
         let op_id = NonPrimitiveOpId(0);
-        let ctx: ExecutionContext<F> =
+        let ctx: ExecutionContext<'_, F> =
             ExecutionContext::new(&mut witness, &private_data, &configs, op_id);
 
         // Operations can query their configuration at runtime
@@ -929,7 +930,7 @@ mod tests {
         let op_id = NonPrimitiveOpId(0);
 
         // Create execution context
-        let ctx: ExecutionContext<F> =
+        let ctx: ExecutionContext<'_, F> =
             ExecutionContext::new(&mut witness, &private_data, &configs, op_id);
 
         // Attempt to access a configuration that wasn't registered
@@ -987,7 +988,7 @@ mod tests {
         let private_data = vec![];
         let configs = HashMap::new();
         let expected_id = NonPrimitiveOpId(42);
-        let ctx: ExecutionContext<F> =
+        let ctx: ExecutionContext<'_, F> =
             ExecutionContext::new(&mut witness, &private_data, &configs, expected_id);
 
         // Retrieve the operation ID from the context
