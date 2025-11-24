@@ -103,7 +103,7 @@ pub struct MmcsPathTrace<F> {
 /// Prover's private information demonstrating a valid leaf-to-root path.
 /// - It includes all intermediate hash states and sibling hashes.
 /// - Some layers have extra siblings for variable-sized trees.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MmcsPrivateData<F> {
     /// Hash states along the path: [leaf, state1, state2, ..., root].
     ///
@@ -232,7 +232,7 @@ impl<F: Field + Clone + Default> MmcsPrivateData<F> {
             ));
         }
         // Finally, push the root
-        path_states.push((state.clone(), None));
+        path_states.push((state, None));
 
         Ok(private_data)
     }
@@ -260,18 +260,16 @@ impl<F: Field + Clone + Default> MmcsPrivateData<F> {
         let root_indices: Vec<u32> = root_wids.iter().map(|wid| wid.0).collect();
 
         debug_assert!(self.path_siblings.len() <= mmcs_config.max_tree_height);
-        debug_assert!(if let Ok(leaf) =
+        debug_assert!(
             leaves
                 .last()
-                .ok_or(CircuitError::IncorrectNonPrimitiveOpPrivateDataSize {
+                .ok_or_else(|| CircuitError::IncorrectNonPrimitiveOpPrivateDataSize {
                     op: NonPrimitiveOpType::MmcsVerify,
                     expected: "Non empty".to_string(),
                     got: leaves.len()
-                }) {
-            leaf.is_empty()
-        } else {
-            false
-        });
+                })
+                .is_ok_and(|leaf| leaf.is_empty())
+        );
 
         // Pad directions in case they start with 0s.
         let path_directions =
