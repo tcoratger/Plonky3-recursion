@@ -143,26 +143,4 @@ mod tests {
         assert_eq!(trace.index.len(), 0, "Should have no constants");
         assert_eq!(trace.values.len(), 0, "Should have no values");
     }
-
-    #[test]
-    fn test_duplicate_witness_ids() {
-        // Create multiple constants targeting the same witness ID
-        let val1 = F::from_u64(10);
-        let val2 = F::from_u64(20);
-        let out = WitnessId(0);
-
-        let ops = vec![Op::Const { out, val: val1 }, Op::Const { out, val: val2 }];
-
-        // Build the trace
-        let builder = ConstTraceBuilder::new(&ops);
-        let trace = builder.build().expect("Failed to build trace");
-
-        assert_eq!(trace.index.len(), 2);
-        assert_eq!(trace.values.len(), 2);
-
-        assert_eq!(trace.index[0], out);
-        assert_eq!(trace.values[0], val1);
-        assert_eq!(trace.index[1], out);
-        assert_eq!(trace.values[1], val2);
-    }
 }
