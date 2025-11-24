@@ -9,9 +9,6 @@ homepage.workspace = true
 keywords.workspace = true
 categories.workspace = true
 
-[lints]
-workspace = true
-
 [dependencies]
 itertools.workspace = true
 p3-air.workspace = true
@@ -30,3 +27,6 @@ p3-symmetric.workspace = true
 p3-uni-stark.workspace = true
 
 rand.workspace = true
+
+[lints]
+workspace = true
