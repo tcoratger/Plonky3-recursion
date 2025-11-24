@@ -7,6 +7,7 @@
 //! - edges represent dependencies between expressions.
 
 use alloc::boxed::Box;
+#[cfg(debug_assertions)]
 use alloc::vec;
 use alloc::vec::Vec;
 use core::hash::Hash;
@@ -171,7 +172,10 @@ where
         // Log the allocation in debug builds only.
         //
         // In release builds, this entire call compiles to nothing.
+        #[cfg(debug_assertions)]
         self.log_alloc(expr_id, label, || (AllocationType::Const, vec![]));
+        #[cfg(not(debug_assertions))]
+        self.log_alloc(expr_id, label, || ());
 
         expr_id
     }
@@ -203,7 +207,10 @@ where
         // Log the allocation in debug builds.
         //
         // Public inputs have no dependencies (they are leaf nodes in the expression DAG).
+        #[cfg(debug_assertions)]
         self.log_alloc(expr_id, label, || (AllocationType::Public, vec![]));
+        #[cfg(not(debug_assertions))]
+        self.log_alloc(expr_id, label, || ());
 
         expr_id
     }
@@ -242,7 +249,10 @@ where
         // Log the allocation in debug builds.
         //
         // Witness hints are leaf nodes with no dependencies.
+        #[cfg(debug_assertions)]
         self.log_alloc(expr_id, label, || (AllocationType::WitnessHint, vec![]));
+        #[cfg(not(debug_assertions))]
+        self.log_alloc(expr_id, label, || ());
 
         expr_id
     }
@@ -413,6 +423,7 @@ where
     ///
     /// An [`ExprId`] handle to the newly created expression.
     #[inline(always)]
+    #[allow(unused_variables)]
     fn add_bin_op(
         &mut self,
         expr: Expr<F>,
@@ -427,7 +438,10 @@ where
         // Log the allocation with dependencies.
         //
         // Binary operations have two dependencies: one for lhs, one for rhs.
+        #[cfg(debug_assertions)]
         self.log_alloc(expr_id, label, || (alloc_type, vec![vec![lhs], vec![rhs]]));
+        #[cfg(not(debug_assertions))]
+        self.log_alloc(expr_id, label, || ());
 
         expr_id
     }
@@ -503,28 +517,37 @@ where
     /// - `id`: The expression ID being logged
     /// - `label`: Human-readable label
     /// - `info_fn`: Closure that produces allocation metadata **only when needed**
+    #[cfg(debug_assertions)]
     #[inline(always)]
     fn log_alloc<Info>(&mut self, id: ExprId, label: &'static str, info_fn: Info)
     where
         Info: FnOnce() -> (AllocationType, Vec<Vec<ExprId>>),
     {
-        #[cfg(debug_assertions)]
-        {
-            // Execute the closure to get allocation metadata.
-            let (alloc_type, dependencies) = info_fn();
+        // Execute the closure to get allocation metadata.
+        let (alloc_type, dependencies) = info_fn();
 
-            // Capture the current scope from the stack.
-            let scope = self.scope_stack.last().copied();
+        // Capture the current scope from the stack.
+        let scope = self.scope_stack.last().copied();
 
-            // Add an entry to the allocation log.
-            self.allocation_log.push(AllocationEntry {
-                expr_id: id,
-                alloc_type,
-                label,
-                dependencies,
-                scope,
-            });
-        }
+        // Add an entry to the allocation log.
+        self.allocation_log.push(AllocationEntry {
+            expr_id: id,
+            alloc_type,
+            label,
+            dependencies,
+            scope,
+        });
+    }
+
+    /// No-op logging helper for release builds.
+    #[cfg(not(debug_assertions))]
+    #[inline(always)]
+    #[allow(clippy::needless_pass_by_ref_mut)]
+    fn log_alloc<Info>(&mut self, _id: ExprId, _label: &'static str, _info_fn: Info)
+    where
+        Info: FnOnce(),
+    {
+        // Intentionally empty - compiles to nothing in release builds.
     }
 
     /// Logs a non-primitive operation allocation (debug builds only).
@@ -570,6 +593,8 @@ where
     /// # Arguments
     ///
     /// - `scope`: Human-readable scope name
+    #[allow(unused_variables)]
+    #[allow(clippy::missing_const_for_fn)]
     pub fn push_scope(&mut self, scope: &'static str) {
         #[cfg(debug_assertions)]
         self.scope_stack.push(scope);
@@ -580,6 +605,7 @@ where
     /// # Panics
     ///
     /// Panics if the scope stack is empty (mismatched push/pop).
+    #[allow(clippy::missing_const_for_fn)]
     pub fn pop_scope(&mut self) {
         #[cfg(debug_assertions)]
         self.scope_stack.pop();
@@ -620,6 +646,7 @@ where
     ///
     /// In debug builds, outputs a detailed allocation report. In release builds,
     /// this method does nothing.
+    #[allow(clippy::missing_const_for_fn)]
     pub fn dump_allocation_log(&self) {
         #[cfg(debug_assertions)]
         crate::alloc_entry::dump_allocation_log(&self.allocation_log);
@@ -634,6 +661,7 @@ where
     ///
     /// - **Debug builds**: Vector of unique scope names
     /// - **Release builds**: Empty vector (no scopes tracked)
+    #[allow(clippy::missing_const_for_fn)]
     pub fn list_scopes(&self) -> Vec<&'static str> {
         #[cfg(debug_assertions)]
         {
