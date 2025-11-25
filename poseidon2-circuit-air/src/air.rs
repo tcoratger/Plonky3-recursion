@@ -111,9 +111,13 @@ impl<
         >();
 
         let ncols = self.width();
+        let circuit_ncols = ncols - p2_ncols;
 
         // We allocate the final vector immediately with uninitialized memory.
-        let mut trace_vec: Vec<F> = Vec::with_capacity((n * ncols) << extra_capacity_bits);
+        //
+        // The extra capacity bits only enlarges the Poseidon2 columns, not the circuit columns.
+        let mut trace_vec: Vec<F> =
+            Vec::with_capacity(n * ((p2_ncols << extra_capacity_bits) + circuit_ncols));
         let trace_slice = trace_vec.spare_capacity_mut();
 
         // We need a lightweight vector to store the state inputs for the parallel pass.
