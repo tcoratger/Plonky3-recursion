@@ -45,8 +45,8 @@ impl BuilderConfig {
     }
 
     /// Enables FRI verification operations.
-    pub const fn enable_fri(&mut self) {
-        // TODO: Add FRI ops when available.
+    pub fn enable_fri(&mut self) {
+        self.enable_op(NonPrimitiveOpType::FriVerify, NonPrimitiveOpConfig::None);
     }
 
     /// Checks whether an operation type is enabled.
@@ -103,5 +103,20 @@ mod tests {
 
         assert!(config.is_op_enabled(&NonPrimitiveOpType::MmcsVerify));
         assert!(config.is_op_enabled(&NonPrimitiveOpType::FriVerify));
+    }
+
+    #[test]
+    fn test_builder_config_enable_fri() {
+        let mut config = BuilderConfig::new();
+
+        assert!(!config.is_op_enabled(&NonPrimitiveOpType::FriVerify));
+
+        config.enable_fri();
+
+        assert!(config.is_op_enabled(&NonPrimitiveOpType::FriVerify));
+        assert_eq!(
+            config.get_op_config(&NonPrimitiveOpType::FriVerify),
+            Some(&NonPrimitiveOpConfig::None)
+        );
     }
 }

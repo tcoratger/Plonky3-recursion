@@ -115,7 +115,7 @@ where
     }
 
     /// Enables FRI verification operations.
-    pub const fn enable_fri(&mut self) {
+    pub fn enable_fri(&mut self) {
         self.config.enable_fri();
     }
 
