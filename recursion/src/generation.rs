@@ -3,8 +3,6 @@ use alloc::vec::Vec;
 
 use itertools::zip_eq;
 use p3_air::Air;
-use p3_batch_stark::BatchProof;
-use p3_batch_stark::config::observe_instance_binding;
 use p3_batch_stark::config::observe_instance_binding;
 use p3_batch_stark::{BatchProof, CommonData};
 use p3_challenger::{CanObserve, CanSample, CanSampleBits, FieldChallenger, GrindingChallenger};
