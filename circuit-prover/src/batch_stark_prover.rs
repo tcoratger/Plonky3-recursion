@@ -1248,9 +1248,10 @@ where
             })
             .collect();
 
-        let instances_len = instances.len();
-        let common = CommonData::empty(instances_len);
-        let proof = p3_batch_stark::prove_batch(&self.config, instances, &common);
+        let num_instances = instances.len();
+        // TODO: Retrieve common data.
+        let proof =
+            p3_batch_stark::prove_batch(&self.config, instances, &CommonData::empty(num_instances));
 
         // Ensure all primitive table row counts are at least 1
         // RowCounts::new requires non-zero counts, so pad zeros to 1
@@ -1344,9 +1345,16 @@ where
             pvs.push(entry.public_values.clone());
         }
 
-        let common = CommonData::empty(airs.len());
-        p3_batch_stark::verify_batch(&self.config, &airs, &proof.proof, &pvs, &common)
-            .map_err(|e| BatchStarkProverError::Verify(format!("{e:?}")))
+        let num_instances = airs.len();
+        // TODO: Take common data as input.
+        p3_batch_stark::verify_batch(
+            &self.config,
+            &airs,
+            &proof.proof,
+            &pvs,
+            &CommonData::empty(num_instances),
+        )
+        .map_err(|e| BatchStarkProverError::Verify(format!("{e:?}")))
     }
 }
 
