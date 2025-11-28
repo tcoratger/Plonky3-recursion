@@ -413,6 +413,7 @@ where
 /// # Parameters
 /// - `air_public_values`: For each instance, its AIR public values in `F`.
 /// - `proof_values`: Values extracted from the batch proof in `EF`.
+/// - `preprocessed`: Preprocessed values.
 /// - `challenges`: All challenges shared across the batch in `EF`.
 ///
 /// # Returns
@@ -437,10 +438,10 @@ where
 
     // Add proof values (already in extension field).
     builder.add_proof_values(proof_values.iter().copied());
-    
-    // Add
+
+    // Add preprocessed values.
     builder.add_proof_values(preprocessed.iter().copied());
-  
+
     // Add all shared challenges.
     builder.add_challenges(challenges.iter().copied());
 
@@ -719,7 +720,7 @@ where
         let common_data = PreprocessedVerifierDataTargets::<SC, Comm>::get_values(common);
         let proof_values = BatchProofTargets::<SC, Comm, OpeningProof>::get_values(proof);
 
-                // Combine AIR public values, proof values, and challenges into a single public input vector.
+        // Combine AIR public values, proof values, and challenges into a single public input vector.
         construct_batch_stark_verifier_inputs(
             air_public_values,
             &proof_values,
