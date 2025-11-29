@@ -1,15 +1,16 @@
-use alloc::vec;
 use alloc::vec::Vec;
 use core::array;
 use core::borrow::Borrow;
+use core::mem::MaybeUninit;
 
 use p3_air::{Air, AirBuilder, BaseAir};
 use p3_circuit::tables::{Poseidon2CircuitRow, Poseidon2CircuitTrace};
 use p3_field::{PrimeCharacteristicRing, PrimeField};
 use p3_matrix::Matrix;
-use p3_matrix::dense::{RowMajorMatrix, RowMajorMatrixViewMut};
+use p3_matrix::dense::RowMajorMatrix;
+use p3_maybe_rayon::prelude::*;
 use p3_poseidon2::GenericPoseidon2LinearLayers;
-use p3_poseidon2_air::{Poseidon2Air, Poseidon2Cols, RoundConstants, generate_trace_rows};
+use p3_poseidon2_air::{Poseidon2Air, Poseidon2Cols, RoundConstants, generate_trace_rows_for_perm};
 use p3_symmetric::CryptographicPermutation;
 
 use crate::sub_builder::SubAirBuilder;
@@ -101,13 +102,34 @@ impl<
             "Callers expected to pad inputs to a power of two"
         );
 
-        let num_circuit_cols = 3 + 2 * RATE_EXT + WIDTH_EXT;
-        let mut circuit_trace = vec![F::ZERO; n * num_circuit_cols];
-        let mut circuit_trace = RowMajorMatrixViewMut::new(&mut circuit_trace, num_circuit_cols);
+        let p2_ncols = p3_poseidon2_air::num_cols::<
+            WIDTH,
+            SBOX_DEGREE,
+            SBOX_REGISTERS,
+            HALF_FULL_ROUNDS,
+            PARTIAL_ROUNDS,
+        >();
 
-        let mut state = [F::ZERO; WIDTH];
+        let ncols = self.width();
+        let circuit_ncols = ncols - p2_ncols;
+
+        // We allocate the final vector immediately with uninitialized memory.
+        //
+        // The extra capacity bits only enlarges the Poseidon2 columns, not the circuit columns.
+        let mut trace_vec: Vec<F> =
+            Vec::with_capacity(n * ((p2_ncols << extra_capacity_bits) + circuit_ncols));
+        let trace_slice = trace_vec.spare_capacity_mut();
+
+        // We need a lightweight vector to store the state inputs for the parallel pass.
+        //
+        // This is much smaller than the full trace (WIDTH vs NUM_COLS).
         let mut inputs = Vec::with_capacity(n);
-        for (i, op) in sponge_ops.iter().enumerate() {
+        let mut state = [F::ZERO; WIDTH];
+
+        // Split slice into rows
+        let rows = trace_slice[..n * ncols].chunks_exact_mut(ncols);
+
+        for (op, row) in sponge_ops.iter().zip(rows) {
             let Poseidon2CircuitRow {
                 is_sponge,
                 reset,
@@ -117,31 +139,32 @@ impl<
                 output_indices,
             } = op;
 
-            let row = circuit_trace.row_mut(i);
+            // Split the row into [Poseidon Columns | Circuit Columns]
+            let (_p2_part, circuit_part) = row.split_at_mut(p2_ncols);
 
-            row[0] = F::from_bool(*is_sponge);
-            row[1] = F::from_bool(*reset);
-            row[2] = F::from_bool(*is_sponge && *reset);
+            // Write circuit columns
+            circuit_part[0].write(F::from_bool(*is_sponge));
+            circuit_part[1].write(F::from_bool(*reset));
+            circuit_part[2].write(F::from_bool(*is_sponge && *reset));
+
             for j in 0..RATE_EXT {
-                row[3 + j] = F::from_bool(absorb_flags[j]);
-            }
-            for j in 0..RATE_EXT {
-                row[3 + RATE_EXT + j] = F::from_u32(input_indices[j]);
-            }
-            for j in 0..RATE_EXT {
-                row[3 + RATE_EXT + WIDTH_EXT + j] = F::from_u32(output_indices[j]);
+                // Write absorb flags
+                circuit_part[3 + j].write(F::from_bool(absorb_flags[j]));
+                // Write input indices
+                circuit_part[3 + RATE_EXT + j].write(F::from_u32(input_indices[j]));
+                // Write output indices
+                circuit_part[3 + RATE_EXT + WIDTH_EXT + j].write(F::from_u32(output_indices[j]));
             }
 
+            // Sponge logic
             let mut index_absorb = [false; RATE_EXT];
             for (j, flag) in absorb_flags.iter().enumerate() {
                 if *flag {
-                    for absorb in index_absorb.iter_mut().take(j + 1) {
-                        *absorb = true;
-                    }
+                    index_absorb[..=j].fill(true);
                 }
             }
 
-            for (j, absorb) in index_absorb.iter_mut().enumerate() {
+            for (j, absorb) in index_absorb.iter().enumerate() {
                 if *absorb {
                     for d in 0..D {
                         let idx = j * D + d;
@@ -163,47 +186,60 @@ impl<
                 }
             }
 
+            // Save the state to be used as input for the heavy Poseidon trace generation
             inputs.push(state);
+
+            // Advance state
             state = perm.permute(state);
         }
 
-        let p2_trace = generate_trace_rows::<
-            F,
-            LinearLayers,
-            WIDTH,
-            SBOX_DEGREE,
-            SBOX_REGISTERS,
-            HALF_FULL_ROUNDS,
-            PARTIAL_ROUNDS,
-        >(inputs, constants, extra_capacity_bits);
+        // Poseidon trace generation
+        //
+        // Now that we have the inputs, we can generate the expensive Poseidon columns in parallel.
 
-        let ncols = self.width();
+        trace_slice[..n * ncols]
+            .par_chunks_exact_mut(ncols)
+            .zip(inputs.into_par_iter())
+            .for_each(|(row, input)| {
+                let (p2_part, _circuit_part) = row.split_at_mut(p2_ncols);
 
-        let p2_ncols = p3_poseidon2_air::num_cols::<
-            WIDTH,
-            SBOX_DEGREE,
-            SBOX_REGISTERS,
-            HALF_FULL_ROUNDS,
-            PARTIAL_ROUNDS,
-        >();
+                // Align the raw field elements to the Poseidon2Cols struct
+                let (prefix, p2_cols, suffix) = unsafe {
+                    p2_part.align_to_mut::<Poseidon2Cols<
+                        MaybeUninit<F>,
+                        WIDTH,
+                        SBOX_DEGREE,
+                        SBOX_REGISTERS,
+                        HALF_FULL_ROUNDS,
+                        PARTIAL_ROUNDS,
+                    >>()
+                };
 
-        debug_assert_eq!(ncols, num_circuit_cols + p2_ncols);
+                // Sanity checks to ensure memory layout is what we expect
+                debug_assert!(prefix.is_empty(), "Alignment mismatch");
+                debug_assert!(suffix.is_empty(), "Alignment mismatch");
+                debug_assert_eq!(p2_cols.len(), 1);
 
-        let mut vec = vec![F::ZERO; n * ncols];
+                // Generate the heavy trace
+                generate_trace_rows_for_perm::<
+                    F,
+                    LinearLayers,
+                    WIDTH,
+                    SBOX_DEGREE,
+                    SBOX_REGISTERS,
+                    HALF_FULL_ROUNDS,
+                    PARTIAL_ROUNDS,
+                >(&mut p2_cols[0], input, constants);
+            });
 
-        let circuit_trace_view = circuit_trace.as_view();
-
-        // TODO: Remove Poseidon2 air copy, possibly by making `generate_trace_rows_for_perm` public on P3 side
-        for ((row, left_part), right_part) in vec
-            .chunks_exact_mut(ncols)
-            .zip(p2_trace.row_slices())
-            .zip(circuit_trace_view.row_slices())
-        {
-            row[..p2_ncols].copy_from_slice(left_part);
-            row[p2_ncols..].copy_from_slice(right_part);
+        // SAFETY: We have written to all columns in the slice [0..n*ncols].
+        // 1. Circuit columns were written in the sequential loop.
+        // 2. Poseidon columns were written in the parallel loop.
+        unsafe {
+            trace_vec.set_len(n * ncols);
         }
 
-        RowMajorMatrix::new(vec, ncols)
+        RowMajorMatrix::new(trace_vec, ncols)
     }
 }
 
@@ -460,6 +496,8 @@ impl<
 
 #[cfg(test)]
 mod test {
+    use alloc::vec;
+
     use p3_baby_bear::{BabyBear, Poseidon2BabyBear};
     use p3_challenger::{HashChallenger, SerializingChallenger32};
     use p3_commit::ExtensionMmcs;
