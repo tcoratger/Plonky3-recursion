@@ -429,7 +429,7 @@ where
             )));
         }
 
-        let log_qd = A::get_log_quotient_degree(air, pre_w, public_vals.len(), config.is_zk());
+        let log_qd = A::get_log_num_quotient_chunks(air, pre_w, public_vals.len(), config.is_zk());
         let quotient_degree = 1 << (log_qd + config.is_zk());
 
         if instance.quotient_chunks.len() != quotient_degree {
