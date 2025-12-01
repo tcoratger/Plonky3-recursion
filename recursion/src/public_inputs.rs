@@ -620,6 +620,7 @@ where
 /// It manages:
 /// - per-instance AIR public input targets,
 /// - batch proof targets,
+///
 /// and later packs concrete values into a flat public input vector.
 pub struct BatchStarkVerifierInputsBuilder<SC, Comm, OpeningProof>
 where
