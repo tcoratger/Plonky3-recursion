@@ -268,7 +268,7 @@ impl<F: Field> FriVerifierInputs<F> {
         // 4. Add query index bits for each query.
         for bits in self.query_index_bits {
             // Verify that the bit length is <= MAX_QUERY_INDEX_BITS.
-            assert!(
+            debug_assert!(
                 bits.len() <= MAX_QUERY_INDEX_BITS,
                 "query index bit length exceeds limit"
             );
