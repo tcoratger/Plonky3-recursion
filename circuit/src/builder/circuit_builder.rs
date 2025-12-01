@@ -442,16 +442,16 @@ where
 {
     /// Builds the circuit into a Circuit with separate lowering and IR transformation stages.
     /// Returns an error if lowering fails due to an internal inconsistency.
-    pub fn build(self) -> Result<(Circuit<F>, Vec<Vec<F>>), CircuitBuilderError> {
-        let (circuit, preprocessed, _) = self.build_with_public_mapping()?;
-        Ok((circuit, preprocessed))
+    pub fn build(self) -> Result<Circuit<F>, CircuitBuilderError> {
+        let (circuit, _) = self.build_with_public_mapping()?;
+        Ok(circuit)
     }
 
     /// Builds the circuit and returns both the circuit and the ExprId→WitnessId mapping for public inputs.
     #[allow(clippy::type_complexity)]
     pub fn build_with_public_mapping(
         self,
-    ) -> Result<(Circuit<F>, Vec<Vec<F>>, HashMap<ExprId, WitnessId>), CircuitBuilderError> {
+    ) -> Result<(Circuit<F>, HashMap<ExprId, WitnessId>), CircuitBuilderError> {
         // Stage 1: Lower expressions to primitives
         let lowerer = ExpressionLowerer::new(
             self.expr_builder.graph(),
@@ -481,10 +481,7 @@ where
         circuit.enabled_ops = self.config.into_enabled_ops();
         circuit.non_primitive_trace_generators = self.non_primitive_trace_generators;
 
-        // Step 5: Generate preprocessed values for all ops except non-primitive ops.
-        let preprocessed = circuit.generate_preprocessed_columns()?;
-
-        Ok((circuit, preprocessed, public_mappings))
+        Ok((circuit, public_mappings))
     }
 }
 
@@ -612,7 +609,7 @@ mod tests {
     #[test]
     fn test_build_empty_circuit() {
         let builder = CircuitBuilder::<BabyBear>::new();
-        let (circuit, _) = builder
+        let circuit = builder
             .build()
             .expect("Empty circuit should build successfully");
 
@@ -637,7 +634,7 @@ mod tests {
         let mut builder = CircuitBuilder::<BabyBear>::new();
         builder.add_public_input();
         builder.add_public_input();
-        let (circuit, _) = builder
+        let circuit = builder
             .build()
             .expect("Circuit with public inputs should build");
 
@@ -679,7 +676,7 @@ mod tests {
         let mut builder = CircuitBuilder::<BabyBear>::new();
         builder.add_const(BabyBear::from_u64(1));
         builder.add_const(BabyBear::from_u64(2));
-        let (circuit, _) = builder
+        let circuit = builder
             .build()
             .expect("Circuit with constants should build");
 
@@ -719,7 +716,7 @@ mod tests {
         let a = builder.add_const(BabyBear::from_u64(2));
         let b = builder.add_const(BabyBear::from_u64(3));
         builder.add(a, b);
-        let (circuit, _) = builder
+        let circuit = builder
             .build()
             .expect("Circuit with operations should build");
 
@@ -741,7 +738,7 @@ mod tests {
         let mut builder = CircuitBuilder::<BabyBear>::new();
         let p0 = builder.add_public_input();
         let p1 = builder.add_public_input();
-        let (circuit, _, mapping) = builder
+        let (circuit, mapping) = builder
             .build_with_public_mapping()
             .expect("Circuit should build with public mapping");
 
@@ -757,7 +754,7 @@ mod tests {
         let a = builder.add_const(BabyBear::from_u64(5));
         let b = builder.add_const(BabyBear::from_u64(5));
         builder.connect(a, b);
-        let (circuit, _) = builder
+        let circuit = builder
             .build()
             .expect("Circuit with constraints should build");
 
@@ -771,7 +768,7 @@ mod tests {
         let default_hint = DefaultHint { n_outputs: 1 };
         let a = builder.alloc_witness_hints(default_hint, "a");
         assert_eq!(a.len(), 1);
-        let (circuit, _) = builder
+        let circuit = builder
             .build()
             .expect("Circuit with operations should build");
 
@@ -818,8 +815,8 @@ mod proptests {
             let cb2 = builder2.add_const(b);
             let sum2 = builder2.add(cb2, ca2);
 
-            let (circuit1, _) = builder1.build().unwrap();
-            let (circuit2, _) = builder2.build().unwrap();
+            let circuit1 = builder1.build().unwrap();
+            let circuit2 = builder2.build().unwrap();
 
             let  runner1 = circuit1.runner();
             let  runner2 = circuit2.runner();
@@ -846,8 +843,8 @@ mod proptests {
             let cb2 = builder2.add_const(b);
             let prod2 = builder2.mul(cb2, ca2);
 
-            let (circuit1, _) = builder1.build().unwrap();
-            let (circuit2, _) = builder2.build().unwrap();
+            let circuit1 = builder1.build().unwrap();
+            let circuit2 = builder2.build().unwrap();
 
             let  runner1 = circuit1.runner();
             let  runner2 = circuit2.runner();
@@ -869,7 +866,7 @@ mod proptests {
             let zero = builder.add_const(BabyBear::ZERO);
             let result = builder.add(ca, zero);
 
-            let (circuit, _) = builder.build().unwrap();
+            let circuit = builder.build().unwrap();
             let  runner = circuit.runner();
             let traces = runner.run().unwrap();
 
@@ -887,7 +884,7 @@ mod proptests {
             let one = builder.add_const(BabyBear::ONE);
             let result = builder.mul(ca, one);
 
-            let (circuit, _) = builder.build().unwrap();
+            let circuit = builder.build().unwrap();
             let  runner = circuit.runner();
             let traces = runner.run().unwrap();
 
@@ -906,7 +903,7 @@ mod proptests {
             let diff = builder.sub(ca, cb);
             let result = builder.add(diff, cb);
 
-            let (circuit, _) = builder.build().unwrap();
+            let circuit = builder.build().unwrap();
             let  runner = circuit.runner();
             let traces = runner.run().unwrap();
 
@@ -925,7 +922,7 @@ mod proptests {
             let quot = builder.div(ca, cb);
             let result = builder.mul(quot, cb);
 
-            let (circuit, _) = builder.build().unwrap();
+            let circuit = builder.build().unwrap();
             let  runner = circuit.runner();
             let traces = runner.run().unwrap();
 
@@ -947,7 +944,7 @@ mod proptests {
             let c = builder.add_const(BabyBear::from_u64(5));
             let result = builder.mul_add(a, b, c);
 
-            let (circuit, _) = builder.build().unwrap();
+            let circuit = builder.build().unwrap();
             let runner = circuit.runner();
             let traces = runner.run().unwrap();
 
@@ -965,7 +962,7 @@ mod proptests {
             let c = builder.add_const(BabyBear::from_u64(9));
             let result = builder.mul_add(zero, b, c);
 
-            let (circuit, _) = builder.build().unwrap();
+            let circuit = builder.build().unwrap();
             let runner = circuit.runner();
             let traces = runner.run().unwrap();
 
@@ -983,7 +980,7 @@ mod proptests {
             let mut builder = CircuitBuilder::<BabyBear>::new();
             let result = builder.mul_many(&[]);
 
-            let (circuit, _) = builder.build().unwrap();
+            let circuit = builder.build().unwrap();
             let runner = circuit.runner();
             let traces = runner.run().unwrap();
 
@@ -1002,7 +999,7 @@ mod proptests {
                 .collect();
             let result = builder.mul_many(&vals);
 
-            let (circuit, _) = builder.build().unwrap();
+            let circuit = builder.build().unwrap();
             let runner = circuit.runner();
             let traces = runner.run().unwrap();
 
@@ -1022,7 +1019,7 @@ mod proptests {
             ];
             let result = builder.mul_many(&with_zero);
 
-            let (circuit, _) = builder.build().unwrap();
+            let circuit = builder.build().unwrap();
             let runner = circuit.runner();
             let traces = runner.run().unwrap();
 
@@ -1048,7 +1045,7 @@ mod proptests {
                 .collect();
             let result = builder.inner_product(&a, &b);
 
-            let (circuit, _) = builder.build().unwrap();
+            let circuit = builder.build().unwrap();
             let runner = circuit.runner();
             let traces = runner.run().unwrap();
 
@@ -1065,7 +1062,7 @@ mod proptests {
             let empty_b: Vec<ExprId> = vec![];
             let result = builder.inner_product(&empty_a, &empty_b);
 
-            let (circuit, _) = builder.build().unwrap();
+            let circuit = builder.build().unwrap();
             let runner = circuit.runner();
             let traces = runner.run().unwrap();
 
@@ -1085,7 +1082,7 @@ mod proptests {
                 .collect();
             let result = builder.inner_product(&zeros, &vals);
 
-            let (circuit, _) = builder.build().unwrap();
+            let circuit = builder.build().unwrap();
             let runner = circuit.runner();
             let traces = runner.run().unwrap();
 
@@ -1131,7 +1128,7 @@ mod proptests {
             let result = builder.mul_add(ca, cb, cc);
 
             // Execute circuit
-            let (circuit, _) = builder.build().unwrap();
+            let circuit = builder.build().unwrap();
             let runner = circuit.runner();
             let traces = runner.run().unwrap();
 
@@ -1158,7 +1155,7 @@ mod proptests {
             let result = builder.mul_many(&expr_ids);
 
             // Execute circuit
-            let (circuit, _) = builder.build().unwrap();
+            let circuit = builder.build().unwrap();
             let runner = circuit.runner();
             let traces = runner.run().unwrap();
 
@@ -1191,7 +1188,7 @@ mod proptests {
             let result = builder.inner_product(&a, &b);
 
             // Execute circuit
-            let (circuit, _) = builder.build().unwrap();
+            let circuit = builder.build().unwrap();
             let runner = circuit.runner();
             let traces = runner.run().unwrap();
 
