@@ -114,24 +114,6 @@ impl<F: Field> Circuit<F> {
     /// | 2     | Public    | `[out_0, out_1, ...]`                     | 1     |
     /// | 3     | Add       | `[a_0, b_0, out_0, a_1, b_1, out_1, ...]` | 3     |
     /// | 4     | Mul       | `[a_0, b_0, out_0, a_1, b_1, out_1, ...]` | 3     |
-    ///
-    /// # Example
-    ///
-    /// For a circuit with:
-    /// - `Const { out: 0, val: 5 }`
-    /// - `Const { out: 1, val: 3 }`
-    /// - `Add { a: 0, b: 1, out: 2 }`
-    ///
-    /// Returns:
-    /// ```text
-    /// [
-    ///   [0, 1, 2],        // Witness: indices 0..=2
-    ///   [0, 1],           // Const: outputs [0, 1]
-    ///   [],               // Public: empty
-    ///   [0, 1, 2],        // Add: (a=0, b=1, out=2)
-    ///   [],               // Mul: empty
-    /// ]
-    /// ```
     pub fn generate_preprocessed_columns(&self) -> Result<Vec<Vec<F>>, CircuitError> {
         // Allocate one empty vector per primitive operation type (Witness, Const, Public, Add, Mul).
         let mut preprocessed = vec![vec![]; PrimitiveOpType::COUNT];
