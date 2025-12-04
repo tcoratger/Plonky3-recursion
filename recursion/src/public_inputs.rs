@@ -564,13 +564,14 @@ where
             .map_or_else(Vec::new, |prep_comm| Comm::get_values(prep_comm));
 
         // Combine all components into a single public input vector.
-        construct_stark_verifier_inputs(
-            air_public_values,
-            &proof_values,
-            &preprocessed,
-            challenges,
+        StarkVerifierInputs {
+            air_public_values: air_public_values.to_vec(),
+            proof_values: proof_values.to_vec(),
+            preprocessed: preprocessed.to_vec(),
+            challenges: challenges.to_vec(),
             num_queries,
-        )
+        }
+        .build()
     }
 }
 
