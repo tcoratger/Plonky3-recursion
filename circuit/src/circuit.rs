@@ -100,8 +100,7 @@ impl<F: Field> Circuit<F> {
     /// # Overview
     ///
     /// Preprocessed columns are fixed, circuit-dependent values computed once during setup
-    /// and committed before proof generation. They encode the circuit's structure (which
-    /// witness indices each operation reads/writes) rather than runtime values.
+    /// and committed before proof generation.
     ///
     /// # Output Structure
     ///
@@ -115,29 +114,6 @@ impl<F: Field> Circuit<F> {
     /// | 2     | Public    | `[out_0, out_1, ...]`                     | 1     |
     /// | 3     | Add       | `[a_0, b_0, out_0, a_1, b_1, out_1, ...]` | 3     |
     /// | 4     | Mul       | `[a_0, b_0, out_0, a_1, b_1, out_1, ...]` | 3     |
-    ///
-    /// # Algorithm
-    ///
-    /// 1. Initialize empty vectors for each primitive operation type
-    /// 2. Iterate through all primitive operations, populating type-specific columns:
-    ///    - `Const`: Append output witness index
-    ///    - `Public`: Append output witness index
-    ///    - `Add`/`Mul`: Append (input_a, input_b, output) witness indices
-    ///    - `Unconstrained`: Track max witness index (no column data)
-    /// 3. Track the maximum witness index seen across all operations
-    /// 4. Generate `Witness` column as sequential indices `[0, 1, ..., max_idx]`
-    ///
-    /// # Witness Column Generation
-    ///
-    /// The `Witness` table is special: it contains a row for every witness slot used
-    /// in the circuit. Its preprocessed column is the sequence `0..=max_idx` where
-    /// `max_idx` is the largest witness index referenced by any operation. This
-    /// enables the AIR to perform lookups into the central witness bus.
-    ///
-    /// # Panics
-    ///
-    /// Panics if a `NonPrimitiveOpWithExecutor` operation is encountered in the
-    /// primitive ops list (indicates a circuit construction error).
     ///
     /// # Example
     ///
