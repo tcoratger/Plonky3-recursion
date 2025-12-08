@@ -11,15 +11,11 @@ use p3_air::{Air, AirBuilder, BaseAir};
 use p3_baby_bear::{BabyBear, default_babybear_poseidon2_16, default_babybear_poseidon2_24};
 use p3_batch_stark::{BatchProof, CommonData, StarkGenericConfig, StarkInstance, Val};
 use p3_circuit::op::PrimitiveOpType;
-use p3_circuit::ops::MmcsVerifyConfig;
-use p3_circuit::tables::{
-    MmcsTrace, Poseidon2CircuitRow, Poseidon2CircuitTrace, Poseidon2Trace, Traces,
-};
-use p3_field::extension::BinomialExtensionField;
-use p3_field::{BasedVectorSpace, Field, PrimeCharacteristicRing, PrimeField};
+use p3_circuit::tables::{Poseidon2CircuitRow, Poseidon2CircuitTrace, Poseidon2Trace, Traces};
+use p3_field::extension::{BinomialExtensionField, BinomiallyExtendable};
+use p3_field::{BasedVectorSpace, ExtensionField, Field, PrimeCharacteristicRing, PrimeField};
 use p3_koala_bear::{KoalaBear, default_koalabear_poseidon2_16, default_koalabear_poseidon2_24};
 use p3_matrix::dense::RowMajorMatrix;
-use p3_mmcs_air::air::{MmcsTableConfig, MmcsVerifyAir};
 use p3_poseidon2_air::RoundConstants;
 use p3_poseidon2_circuit_air::{
     Poseidon2CircuitAirBabyBearD4Width16, Poseidon2CircuitAirBabyBearD4Width24,
@@ -332,13 +328,6 @@ macro_rules! impl_table_prover_batch_instances_from_base {
     };
 }
 
-impl<SC> BatchAir<SC> for MmcsVerifyAir<Val<SC>>
-where
-    SC: StarkGenericConfig,
-    Val<SC>: StarkField,
-{
-}
-
 /// Poseidon2 configuration that can be selected at runtime.
 /// This enum represents different Poseidon2 configurations (field type, width, etc.).
 #[derive(Debug, Clone)]
@@ -493,15 +482,16 @@ impl Poseidon2Prover {
         Self { config }
     }
 
-    fn batch_instance_base<SC>(
+    fn batch_instance_from_traces<SC, CF>(
         &self,
         _config: &SC,
         _packing: TablePacking,
-        traces: &Traces<Val<SC>>,
+        traces: &Traces<CF>,
     ) -> Option<BatchTableInstance<SC>>
     where
         SC: StarkGenericConfig + 'static + Send + Sync,
         Val<SC>: StarkField,
+        CF: Field + ExtensionField<Val<SC>>,
     {
         let t = traces.non_primitive_trace::<Poseidon2Trace<Val<SC>>>("poseidon2")?;
 
@@ -683,13 +673,64 @@ impl Poseidon2Prover {
 impl<SC> TableProver<SC> for Poseidon2Prover
 where
     SC: StarkGenericConfig + 'static + Send + Sync,
-    Val<SC>: StarkField,
+    Val<SC>: StarkField + BinomiallyExtendable<4>,
 {
     fn id(&self) -> &'static str {
         "poseidon2"
     }
 
-    impl_table_prover_batch_instances_from_base!(batch_instance_base);
+    fn batch_instance_d1(
+        &self,
+        config: &SC,
+        packing: TablePacking,
+        traces: &Traces<Val<SC>>,
+    ) -> Option<BatchTableInstance<SC>> {
+        self.batch_instance_from_traces::<SC, Val<SC>>(config, packing, traces)
+    }
+
+    fn batch_instance_d2(
+        &self,
+        config: &SC,
+        packing: TablePacking,
+        traces: &Traces<BinomialExtensionField<Val<SC>, 2>>,
+    ) -> Option<BatchTableInstance<SC>> {
+        // Not supported for Poseidon2 table; extension circuits use D=4.
+        let _ = (config, packing, traces);
+        None
+    }
+
+    fn batch_instance_d4(
+        &self,
+        config: &SC,
+        packing: TablePacking,
+        traces: &Traces<BinomialExtensionField<Val<SC>, 4>>,
+    ) -> Option<BatchTableInstance<SC>> {
+        self.batch_instance_from_traces::<SC, BinomialExtensionField<Val<SC>, 4>>(
+            config, packing, traces,
+        )
+    }
+
+    fn batch_instance_d6(
+        &self,
+        config: &SC,
+        packing: TablePacking,
+        traces: &Traces<BinomialExtensionField<Val<SC>, 6>>,
+    ) -> Option<BatchTableInstance<SC>> {
+        // Not supported for Poseidon2 table; extension circuits use D=4.
+        let _ = (config, packing, traces);
+        None
+    }
+
+    fn batch_instance_d8(
+        &self,
+        config: &SC,
+        packing: TablePacking,
+        traces: &Traces<BinomialExtensionField<Val<SC>, 8>>,
+    ) -> Option<BatchTableInstance<SC>> {
+        // Not supported for Poseidon2 table; extension circuits use D=4.
+        let _ = (config, packing, traces);
+        None
+    }
 
     fn batch_air_from_table_entry(
         &self,
@@ -736,65 +777,6 @@ where
                 Ok(DynamicAirEntry::new(Box::new(wrapper)))
             }
         }
-    }
-}
-
-/// MMCS prover plugin
-pub struct MmcsProver {
-    pub config: MmcsTableConfig,
-}
-
-impl MmcsProver {
-    fn batch_instance_base<SC>(
-        &self,
-        _config: &SC,
-        _packing: TablePacking,
-        traces: &Traces<Val<SC>>,
-    ) -> Option<BatchTableInstance<SC>>
-    where
-        SC: StarkGenericConfig + 'static,
-        Val<SC>: StarkField,
-    {
-        let t = traces
-            .non_primitive_trace::<MmcsTrace<Val<SC>>>("mmcs_verify")
-            .filter(|trace| !trace.mmcs_paths.is_empty())?;
-        let rows = t.total_rows();
-        if rows == 0 {
-            return None;
-        }
-        let matrix = MmcsVerifyAir::trace_to_matrix(&self.config, t);
-        let air = DynamicAirEntry::new(Box::new(MmcsVerifyAir::<Val<SC>>::new(self.config)));
-
-        Some(BatchTableInstance {
-            id: "mmcs_verify",
-            air,
-            trace: matrix,
-            public_values: Vec::new(),
-            rows,
-        })
-    }
-}
-
-impl<SC> TableProver<SC> for MmcsProver
-where
-    SC: StarkGenericConfig + 'static,
-    Val<SC>: StarkField,
-{
-    fn id(&self) -> &'static str {
-        "mmcs_verify"
-    }
-
-    impl_table_prover_batch_instances_from_base!(batch_instance_base);
-
-    fn batch_air_from_table_entry(
-        &self,
-        _config: &SC,
-        _degree: usize,
-        _table_entry: &NonPrimitiveTableEntry<SC>,
-    ) -> Result<DynamicAirEntry<SC>, String> {
-        Ok(DynamicAirEntry::new(Box::new(
-            MmcsVerifyAir::<Val<SC>>::new(self.config),
-        )))
     }
 }
 
@@ -1014,17 +996,11 @@ where
         self
     }
 
-    /// Register the non-primitive MMCS prover plugin.
-    pub fn register_mmcs_table(&mut self, config: MmcsVerifyConfig) {
-        self.register_table_prover(Box::new(MmcsProver {
-            config: MmcsTableConfig::from(config),
-        }));
-    }
-
     /// Register the non-primitive Poseidon2 prover plugin with the given configuration.
     pub fn register_poseidon2_table(&mut self, config: Poseidon2Config)
     where
         SC: Send + Sync,
+        Val<SC>: BinomiallyExtendable<4>,
     {
         self.register_table_prover(Box::new(Poseidon2Prover::new(config)));
     }
@@ -1348,8 +1324,6 @@ where
 mod tests {
     use p3_baby_bear::BabyBear;
     use p3_circuit::builder::CircuitBuilder;
-    use p3_circuit::tables::MmcsPrivateData;
-    use p3_circuit::{MmcsOps, NonPrimitiveOpPrivateData};
     use p3_field::PrimeCharacteristicRing;
     use p3_goldilocks::Goldilocks;
     use p3_koala_bear::KoalaBear;
@@ -1632,107 +1606,5 @@ mod tests {
         let expected_w = <Ext2 as ExtractBinomialW<Goldilocks>>::extract_w().unwrap();
         assert_eq!(proof.w_binomial, Some(expected_w));
         prover.verify_all_tables(&proof, &common).unwrap();
-    }
-
-    #[test]
-    fn prove_fails_without_mmcs_table_prover() {
-        const D: usize = 4;
-        type F = BinomialExtensionField<BabyBear, D>;
-        let mmcs_config = MmcsVerifyConfig::babybear_quartic_extension_default();
-        let compress = config::baby_bear_compression();
-
-        let depth = 3;
-        let mut builder = CircuitBuilder::<F>::new();
-        builder.enable_mmcs(&mmcs_config);
-
-        let leaves_expr: Vec<Vec<_>> = (0..depth)
-            .map(|i| {
-                (0..if i % 2 == 0 && i != depth - 1 {
-                    mmcs_config.ext_field_digest_elems
-                } else {
-                    0
-                })
-                    .map(|_| builder.alloc_public_input("leaf_hash"))
-                    .collect()
-            })
-            .collect();
-        let directions_expr: Vec<_> = (0..depth)
-            .map(|_| builder.alloc_public_input("direction"))
-            .collect();
-        let expected_root_expr: Vec<_> = (0..mmcs_config.ext_field_digest_elems)
-            .map(|_| builder.alloc_public_input("expected_root"))
-            .collect();
-
-        let mmcs_op_id = builder
-            .add_mmcs_verify(&leaves_expr, &directions_expr, &expected_root_expr)
-            .expect("mmcs op");
-
-        let circuit = builder.build().unwrap();
-        let airs_degrees =
-            get_airs_and_degrees_with_prep::<_, _, D>(&circuit, TablePacking::default()).unwrap();
-        let (airs, log_degrees): (Vec<_>, Vec<usize>) = airs_degrees.into_iter().unzip();
-
-        let mut runner = circuit.runner();
-
-        let leaves_value: Vec<Vec<F>> = (0..depth)
-            .map(|i| {
-                if i % 2 == 0 && i != depth - 1 {
-                    (0..mmcs_config.ext_field_digest_elems)
-                        .map(|j| F::from_u64(((i + 1) * (j + 1)) as u64))
-                        .collect()
-                } else {
-                    Vec::new()
-                }
-            })
-            .collect();
-        let siblings: Vec<Vec<F>> = (0..depth)
-            .map(|i| {
-                (0..mmcs_config.ext_field_digest_elems)
-                    .map(|j| F::from_u64(((i + 2) * (j + 3)) as u64))
-                    .collect()
-            })
-            .collect();
-        let directions: Vec<bool> = (0..depth).map(|i| i % 2 == 0).collect();
-
-        let private_data = MmcsPrivateData::new(
-            &compress,
-            &mmcs_config,
-            &leaves_value,
-            &siblings,
-            &directions,
-        )
-        .expect("mmcs private data");
-        let expected_root_value = private_data
-            .path_states
-            .last()
-            .expect("final state")
-            .0
-            .clone();
-
-        let mut public_inputs = Vec::new();
-        for leaf in &leaves_value {
-            public_inputs.extend(leaf);
-        }
-        public_inputs.extend(directions.iter().map(|&dir| F::from_bool(dir)));
-        public_inputs.extend(&expected_root_value);
-
-        runner.set_public_inputs(&public_inputs).unwrap();
-        runner
-            .set_non_primitive_op_private_data(
-                mmcs_op_id,
-                NonPrimitiveOpPrivateData::MmcsVerify(private_data),
-            )
-            .unwrap();
-
-        let traces = runner.run().unwrap();
-
-        let cfg = config::baby_bear().build();
-        let common = CommonData::from_airs_and_degrees(&cfg, &airs, &log_degrees);
-        let prover = BatchStarkProver::new(cfg);
-        let result = prover.prove_all_tables(&traces, &common);
-        assert!(matches!(
-            result,
-            Err(BatchStarkProverError::MissingTableProver("mmcs_verify"))
-        ));
     }
 }
