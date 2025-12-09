@@ -1333,18 +1333,23 @@ mod proptests {
         let bits = vec![bit0, bit1, bit2];
         let result = builder.reconstruct_index_from_bits(&bits);
 
+        // Connect result to a public input so we can verify its value
         let output = builder.add_public_input();
         builder.connect(result, output);
 
+        // Build and run the circuit
         let circuit = builder.build().expect("Failed to build circuit");
         let mut runner = circuit.runner();
 
+        // Set public inputs: the expected result value 5
         let expected_result = BabyBear::from_u64(5); // 1*1 + 0*2 + 1*4 = 5
         runner
             .set_public_inputs(&[expected_result])
             .expect("Failed to set public inputs");
 
         let traces = runner.run().expect("Failed to run circuit");
+
+        // Just verify the calculation is correct - reconstruct gives us 5
         assert_eq!(traces.public_trace.values[0], BabyBear::from_u64(5));
     }
 
@@ -1352,9 +1357,13 @@ mod proptests {
     fn test_decompose_to_bits() {
         let mut builder = CircuitBuilder::<BabyBear>::new();
 
+        // Create a target representing the value we want to decompose
         let value = builder.add_const(BabyBear::from_u64(6)); // Binary: 110
+
+        // Decompose into 3 bits - this creates its own public inputs for the bits
         let bits = builder.decompose_to_bits::<BabyBear>(value, 3).unwrap();
 
+        // Build and run the circuit
         let circuit = builder.build().expect("Failed to build circuit");
         let runner = circuit.runner();
         let traces = runner.run().expect("Failed to run circuit");
