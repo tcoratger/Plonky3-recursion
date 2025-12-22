@@ -203,39 +203,35 @@ impl<
             // NOTE: For rows with new_start = false:
             // - Sponge mode (merkle_path = 0): all limbs come from the previous output unless
             //   a limb is exposed via in_ctl, in which case the provided input overrides it.
-            // - Merkle mode (merkle_path = 1): limbs 0-1 are chained from the previous output
-            //   (left/right selected by mmcs_bit); limbs 2-3 come from the provided inputs.
+            // - Merkle mode (merkle_path = 1): the previous digest is always the previous output limbs 0-1.
+            //   If mmcs_bit = 0 (previous digest is left child), chain into input limbs 0-1; input limbs 2-3 come from inputs.
+            //   If mmcs_bit = 1 (previous digest is right child), chain into input limbs 2-3; input limbs 0-1 come from inputs.
             // - If in_ctl[i] = 1, that limb is NOT chained and comes from CTL/witness instead.
             //   The AIR constraints will enforce this (chaining is gated by 1 - in_ctl[i]).
             let mut state = padded_inputs;
             let i = inputs.len();
             if i > 0 && !*new_start {
                 if *merkle_path {
-                    // Merkle-path mode: chain based on previous row's mmcs_bit
-                    // Only chain limbs 0-1 if in_ctl[0/1] = 0 (handled by AIR constraints)
+                    // Merkle-path mode: the previous digest is always the previous row's out[0..1].
+                    // `mmcs_bit` selects whether that digest is the left (0) or right (1) child:
+                    // - bit=0: chain into input limbs 0..1
+                    // - bit=1: chain into input limbs 2..3
                     if let Some(prev_out) = prev_output {
-                        let cur_bit = *mmcs_bit;
-                        if !in_ctl[0] {
-                            if cur_bit {
-                                // Case B: mmcs_bit = 1 (right = previous hash)
-                                // in_{r}[0] = out_{r-1}[2]
-                                state[0..D].copy_from_slice(&prev_out[2 * D..3 * D]);
-                            } else {
-                                // Case A: mmcs_bit = 0 (left = previous hash)
-                                // in_{r}[0] = out_{r-1}[0]
+                        if !*mmcs_bit {
+                            if !in_ctl[0] {
                                 state[0..D].copy_from_slice(&prev_out[0..D]);
                             }
-                        }
-                        if !in_ctl[1] {
-                            if cur_bit {
-                                // in_{r}[1] = out_{r-1}[3]
-                                state[D..2 * D].copy_from_slice(&prev_out[3 * D..4 * D]);
-                            } else {
-                                // in_{r}[1] = out_{r-1}[1]
+                            if !in_ctl[1] {
                                 state[D..2 * D].copy_from_slice(&prev_out[D..2 * D]);
                             }
+                        } else {
+                            if !in_ctl[2] {
+                                state[2 * D..3 * D].copy_from_slice(&prev_out[0..D]);
+                            }
+                            if !in_ctl[3] {
+                                state[3 * D..4 * D].copy_from_slice(&prev_out[D..2 * D]);
+                            }
                         }
-                        // in_{r}[2], in_{r}[3] remain free/private (from padded_inputs)
                     }
                 } else {
                     // Normal sponge mode: in_{r+1}[i] = out_r[i] for i = 0..3
@@ -530,9 +526,9 @@ fn eval<
     // Merkle-path chaining.
     // If new_start_{r+1} = 0 and merkle_path_{r+1} = 1:
     //   - If mmcs_bit_{r+1} = 0 (left = previous hash): in_{r+1}[0] = out_r[0], in_{r+1}[1] = out_r[1].
-    //     Limbs 2-3 are free/private.
+    //     Input limbs 2-3 are free/private.
     //   - If mmcs_bit_{r+1} = 1 (right = previous hash): in_{r+1}[2] = out_r[0], in_{r+1}[3] = out_r[1].
-    //     Limbs 0-1 are free/private.
+    //     Input limbs 0-1 are free/private.
     // BUT: If in_ctl[i] = 1, CTL overrides chaining (limb is not chained).
     // Chaining only applies when in_ctl[limb] = 0.
     let is_left = AB::Expr::ONE - next_bit.clone();
