@@ -413,6 +413,9 @@ pub fn extract_preprocessed_from_operations<F: Field, OF: Field>(
 
                 preprocessed.push(normal_chain_sel);
 
+                // In merkle mode:
+                // - When mmcs_bit = 0: limbs 0-1 are chained, limbs 2-3 are private (sibling)
+                // - When mmcs_bit = 1: limbs 2-3 are chained, limbs 0-1 are private (sibling)
                 let merkle_chain_sel = if !new_start && *merkle_path && !ctl {
                     F::ONE
                 } else {
@@ -434,7 +437,7 @@ pub fn extract_preprocessed_from_operations<F: Field, OF: Field>(
     preprocessed
 }
 
-fn eval<
+pub(crate) fn eval<
     AB: PairBuilder,
     LinearLayers: GenericPoseidon2LinearLayers<WIDTH>,
     const D: usize,
@@ -533,7 +536,8 @@ fn eval<
     // Chaining only applies when in_ctl[limb] = 0.
     let is_left = AB::Expr::ONE - next_bit.clone();
 
-    // Limb 0: chain from out_r[0] (left), unless in_ctl[0] = 1. Not chained if Right.
+    // Limb 0: chain from out_r[0] when mmcs_bit = 0 (left), unless in_ctl[0] = 1.
+    // When mmcs_bit = 1 (right), limb 0 is private (sibling).
     for d in 0..D {
         let gate_left_0 = next_preprocessed[merkle_chain_idx].clone() * is_left.clone();
         builder
@@ -542,7 +546,8 @@ fn eval<
             .assert_zero(next_in[d].clone() - local_out[d].clone());
     }
 
-    // Limb 1: chain from out_r[1] (left), unless in_ctl[1] = 1. Not chained if Right.
+    // Limb 1: chain from out_r[1] when mmcs_bit = 0 (left), unless in_ctl[1] = 1.
+    // When mmcs_bit = 1 (right), limb 1 is private (sibling).
     for d in 0..D {
         let gate_left_1 = next_preprocessed[preprocessing_limb_data_size + merkle_chain_idx]
             .clone()
@@ -553,7 +558,8 @@ fn eval<
             .assert_zero(next_in[D + d].clone() - local_out[D + d].clone());
     }
 
-    // Limb 2: chain from out_r[0] (right), unless in_ctl[2] = 1. Not chained if Left.
+    // Limb 2: chain from out_r[0] when mmcs_bit = 1 (right), unless in_ctl[2] = 1.
+    // When mmcs_bit = 0 (left), limb 2 is private (sibling).
     for d in 0..D {
         let gate_right_2 = next_preprocessed[preprocessing_limb_data_size * 2 + merkle_chain_idx]
             .clone()
@@ -564,7 +570,8 @@ fn eval<
             .assert_zero(next_in[2 * D + d].clone() - local_out[d].clone());
     }
 
-    // Limb 3: chain from out_r[1] (right), unless in_ctl[3] = 1. Not chained if Left.
+    // Limb 3: chain from out_r[1] when mmcs_bit = 1 (right), unless in_ctl[3] = 1.
+    // When mmcs_bit = 0 (left), limb 3 is private (sibling).
     for d in 0..D {
         let gate_right_3 = next_preprocessed[preprocessing_limb_data_size * 3 + merkle_chain_idx]
             .clone()
@@ -614,6 +621,99 @@ fn eval<
     // out[0..3] = Poseidon2(in[0..3])
     // This holds regardless of merkle_path, new_start, CTL flags, chaining, or MMCS accumulator.
     air.p3_poseidon2.eval(&mut sub_builder);
+}
+
+/// Unsafe version of `eval` that allows calling with a builder whose field type
+/// doesn't match the AIR's field type at compile time, but matches at runtime.
+///
+/// # Safety
+/// The caller must ensure that `F == AB::F` at runtime. Violating this will cause
+/// undefined behavior.
+pub unsafe fn eval_unchecked<
+    F: PrimeField,
+    AB: PairBuilder,
+    LinearLayers: GenericPoseidon2LinearLayers<WIDTH>,
+    const D: usize,
+    const WIDTH: usize,
+    const WIDTH_EXT: usize,
+    const RATE_EXT: usize,
+    const CAPACITY_EXT: usize,
+    const SBOX_DEGREE: u64,
+    const SBOX_REGISTERS: usize,
+    const HALF_FULL_ROUNDS: usize,
+    const PARTIAL_ROUNDS: usize,
+>(
+    air: &Poseidon2CircuitAir<
+        F,
+        LinearLayers,
+        D,
+        WIDTH,
+        WIDTH_EXT,
+        RATE_EXT,
+        CAPACITY_EXT,
+        SBOX_DEGREE,
+        SBOX_REGISTERS,
+        HALF_FULL_ROUNDS,
+        PARTIAL_ROUNDS,
+    >,
+    builder: &mut AB,
+    local: &Poseidon2CircuitCols<
+        AB::Var,
+        Poseidon2Cols<
+            AB::Var,
+            WIDTH,
+            SBOX_DEGREE,
+            SBOX_REGISTERS,
+            HALF_FULL_ROUNDS,
+            PARTIAL_ROUNDS,
+        >,
+    >,
+    next: &Poseidon2CircuitCols<
+        AB::Var,
+        Poseidon2Cols<
+            AB::Var,
+            WIDTH,
+            SBOX_DEGREE,
+            SBOX_REGISTERS,
+            HALF_FULL_ROUNDS,
+            PARTIAL_ROUNDS,
+        >,
+    >,
+    next_preprocessed: &[AB::Var],
+) where
+    AB::F: PrimeField,
+{
+    // SAFETY: Transmute the AIR to match builder's field type
+    // Caller guarantees F == AB::F at runtime.
+    unsafe {
+        let air_transmuted: &Poseidon2CircuitAir<
+            AB::F,
+            LinearLayers,
+            D,
+            WIDTH,
+            WIDTH_EXT,
+            RATE_EXT,
+            CAPACITY_EXT,
+            SBOX_DEGREE,
+            SBOX_REGISTERS,
+            HALF_FULL_ROUNDS,
+            PARTIAL_ROUNDS,
+        > = core::mem::transmute(air);
+
+        eval::<
+            AB,
+            LinearLayers,
+            D,
+            WIDTH,
+            WIDTH_EXT,
+            RATE_EXT,
+            CAPACITY_EXT,
+            SBOX_DEGREE,
+            SBOX_REGISTERS,
+            HALF_FULL_ROUNDS,
+            PARTIAL_ROUNDS,
+        >(air_transmuted, builder, local, next, next_preprocessed);
+    }
 }
 
 impl<
