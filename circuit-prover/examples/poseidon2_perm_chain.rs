@@ -11,9 +11,11 @@ use p3_circuit::op::NonPrimitiveOpType;
 use p3_circuit::ops::{Poseidon2PermCall, Poseidon2PermOps, generate_poseidon2_trace};
 use p3_circuit::{CircuitBuilder, ExprId};
 use p3_circuit_prover::common::{NonPrimitiveConfig, get_airs_and_degrees_with_prep};
+use p3_circuit_prover::config::BabyBearConfig;
 use p3_circuit_prover::{BatchStarkProver, Poseidon2Config, TablePacking, config};
 use p3_field::extension::BinomialExtensionField;
 use p3_field::{BasedVectorSpace, PrimeCharacteristicRing};
+use p3_lookup::logup::LogUpGadget;
 use p3_poseidon2_circuit_air::BabyBearD4Width16;
 use p3_symmetric::Permutation;
 use tracing_forest::ForestLayer;
@@ -121,14 +123,16 @@ fn main() -> Result<(), Box<dyn Error>> {
     let circuit = builder.build()?;
     let expr_to_widx = circuit.expr_to_widx.clone();
 
+    let stark_config = config::baby_bear().build();
     let table_packing = TablePacking::new(1, 1, 1);
     let poseidon2_config = Poseidon2Config::BabyBearD4Width16;
-    let airs_degrees = get_airs_and_degrees_with_prep::<_, _, 1>(
-        &circuit,
-        table_packing,
-        Some(&[NonPrimitiveConfig::Poseidon2(poseidon2_config)]),
-    )
-    .unwrap();
+    let (airs_degrees, witness_multiplicities) =
+        get_airs_and_degrees_with_prep::<BabyBearConfig, _, 4>(
+            &circuit,
+            table_packing,
+            Some(&[NonPrimitiveConfig::Poseidon2(poseidon2_config)]),
+        )
+        .unwrap();
 
     let runner = circuit.runner();
     let traces = runner.run()?;
@@ -183,15 +187,20 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
 
     // Prove and verify the circuit.
-    let stark_config = config::baby_bear().build();
-
-    let (airs, degrees): (Vec<_>, Vec<usize>) = airs_degrees.into_iter().unzip();
-    let common = CommonData::from_airs_and_degrees(&stark_config, &airs, &degrees);
+    let (mut airs, degrees): (Vec<_>, Vec<usize>) = airs_degrees.into_iter().unzip();
+    let common = CommonData::from_airs_and_degrees(&stark_config, &mut airs, &degrees);
+    assert!(
+        !common.lookups[5].is_empty(),
+        "Poseidon2 table should have lookups"
+    );
 
     let mut prover = BatchStarkProver::new(stark_config).with_table_packing(table_packing);
     prover.register_poseidon2_table(poseidon2_config);
-    let proof = prover.prove_all_tables(&traces, &common)?;
-    prover.verify_all_tables(&proof, &common)?;
+
+    let lookup_gadget = LogUpGadget::new();
+    let proof =
+        prover.prove_all_tables(&traces, &common, witness_multiplicities, &lookup_gadget)?;
+    prover.verify_all_tables(&proof, &common, &lookup_gadget)?;
 
     Ok(())
 }

@@ -22,6 +22,10 @@ pub struct ColumnsTargets<'a> {
     pub challenges: &'a [ExprId],
     /// Public values added to the circuit.
     pub public_values: &'a [ExprId],
+    /// Targets for the permutation values used in the circuit.
+    pub permutation_local_values: &'a [ExprId],
+    /// Targets for the permutation values evaluated at the next row.
+    pub permutation_next_values: &'a [ExprId],
     /// Targets for the preprocessed values used in the circuit.
     pub local_prep_values: &'a [ExprId],
     /// Targets for the preprocessed values evaluated at the next row.
@@ -72,6 +76,8 @@ pub fn symbolic_to_circuit<F: Field>(
     let ColumnsTargets {
         challenges,
         public_values,
+        permutation_local_values,
+        permutation_next_values,
         local_prep_values,
         next_prep_values,
         local_values,
@@ -112,12 +118,17 @@ pub fn symbolic_to_circuit<F: Field>(
                             Entry::Preprocessed { offset } => {
                                 get_val(offset, v.index, local_prep_values, next_prep_values)
                             }
+                            Entry::Permutation { offset } => get_val(
+                                offset,
+                                v.index,
+                                permutation_local_values,
+                                permutation_next_values,
+                            ),
                             Entry::Main { offset } => {
                                 get_val(offset, v.index, local_values, next_values)
                             }
                             Entry::Public => public_values[v.index],
                             Entry::Challenge => challenges[v.index],
-                            _ => unimplemented!(),
                         };
                         cache.insert(key, id);
                         stack.push(id);
@@ -169,25 +180,6 @@ pub fn symbolic_to_circuit<F: Field>(
     }
 
     stack.pop().expect("final target")
-}
-
-/// Helper to pad trace values to power-of-two height with zeros
-pub fn pad_to_power_of_two<F: Field>(values: &mut Vec<F>, width: usize, original_height: usize) {
-    if original_height == 0 {
-        // Empty trace - just ensure we have at least one row of zeros
-        values.resize(width, F::ZERO);
-        return;
-    }
-
-    let target_height = original_height.next_power_of_two();
-    if target_height == original_height {
-        return; // Already power of two
-    }
-
-    // Pad with zeroes
-    for _ in original_height..target_height {
-        values.extend_from_slice(&vec![F::ZERO; width]);
-    }
 }
 
 #[cfg(test)]
@@ -324,6 +316,8 @@ mod tests {
         let columns = ColumnsTargets {
             challenges: &[],
             public_values: &circuit_public_values,
+            permutation_local_values: &[],
+            permutation_next_values: &[],
             local_prep_values: &[],
             next_prep_values: &[],
             local_values: &circuit_local_values,
@@ -355,61 +349,5 @@ mod tests {
         let _ = builder.run()?;
 
         Ok(())
-    }
-
-    #[test]
-    fn test_pad_to_power_of_two_basic() {
-        // Test with 3 rows -> should pad to 4
-        let mut values = vec![
-            F::from_u64(1),
-            F::from_u64(10), // row 0: [value=1, index=10]
-            F::from_u64(2),
-            F::from_u64(11), // row 1: [value=2, index=11]
-            F::from_u64(3),
-            F::from_u64(12), // row 2: [value=3, index=12]
-        ];
-        let width = 2;
-        let original_height = 3;
-
-        pad_to_power_of_two(&mut values, width, original_height);
-
-        // Should be padded to 4 rows
-        assert_eq!(values.len(), 4 * width);
-
-        // Original rows should be unchanged
-        assert_eq!(values[0], F::from_u64(1));
-        assert_eq!(values[1], F::from_u64(10));
-        assert_eq!(values[2], F::from_u64(2));
-        assert_eq!(values[3], F::from_u64(11));
-        assert_eq!(values[4], F::from_u64(3));
-        assert_eq!(values[5], F::from_u64(12));
-
-        // Padded row should be zero
-        assert_eq!(values[6], F::ZERO); // same as row 2
-        assert_eq!(values[7], F::ZERO); // same as row 2
-    }
-
-    #[test]
-    fn test_pad_to_power_of_two_already_power_of_two() {
-        // Test with 4 rows (already power of two) -> should not change
-        let mut values = vec![
-            F::from_u64(1),
-            F::from_u64(2),
-            F::from_u64(3),
-            F::from_u64(4),
-            F::from_u64(5),
-            F::from_u64(6),
-            F::from_u64(7),
-            F::from_u64(8),
-        ];
-        let original = values.clone();
-        let width = 2;
-        let original_height = 4;
-
-        pad_to_power_of_two(&mut values, width, original_height);
-
-        // Should remain unchanged
-        assert_eq!(values, original);
-        assert_eq!(values.len(), 4 * width);
     }
 }

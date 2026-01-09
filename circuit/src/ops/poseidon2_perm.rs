@@ -582,11 +582,11 @@ impl<F: Field + Send + Sync + 'static> NonPrimitiveExecutor<F> for Poseidon2Perm
             }
         }
 
-        // mmcs_index_sum
+        // Index of mmcs_index_sum
         if inputs[4].is_empty() {
             entry.push(F::ZERO);
         } else {
-            entry.push(F::ONE);
+            entry.push(F::from_u32(inputs[4][0].0));
             // In this case, we are reading the MMCS index sum from the witness table,
             // so we need to update the associated witness table multiplicities.
             update_witness_table(&inputs[4], primitive_preprocessed);

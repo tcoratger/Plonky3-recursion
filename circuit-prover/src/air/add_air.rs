@@ -90,7 +90,6 @@ use p3_air::{
     Air, AirBuilder, AirBuilderWithPublicValues, BaseAir, PairBuilder, PermutationAirBuilder,
 };
 use p3_circuit::tables::AddTrace;
-use p3_circuit::utils::pad_to_power_of_two;
 use p3_field::{BasedVectorSpace, Field, PrimeCharacteristicRing};
 use p3_lookup::lookup_traits::{AirLookupHandler, Direction, Kind, Lookup};
 use p3_matrix::Matrix;
@@ -306,18 +305,15 @@ impl<F: Field + PrimeCharacteristicRing, const D: usize> AddAir<F, D> {
             values[cursor..cursor + D].copy_from_slice(res_coeffs);
         }
 
-        // Pad the matrix to a power-of-two height.
-        pad_to_power_of_two(&mut values, width, row_count);
+        // Build the row-major matrix with the computed width and pad it to a power-of-two height.
+        let mut mat = RowMajorMatrix::new(values, width);
+        mat.pad_to_power_of_two_height(F::ZERO);
 
-        // Build the row-major matrix with the computed width.
-        RowMajorMatrix::new(values, width)
+        mat
     }
 
-    pub fn trace_to_preprocessed<ExtF: BasedVectorSpace<F>>(
-        trace: &AddTrace<ExtF>,
-        lanes: usize,
-    ) -> Vec<F> {
-        let total_len = trace.lhs_index.len() * Self::preprocessed_lane_width() * lanes;
+    pub fn trace_to_preprocessed<ExtF: BasedVectorSpace<F>>(trace: &AddTrace<ExtF>) -> Vec<F> {
+        let total_len = trace.lhs_index.len() * (Self::preprocessed_lane_width() - 1);
         let mut preprocessed_values = Vec::with_capacity(total_len);
         for (lhs_idx, rhs_idx, res_idx) in trace
             .lhs_index
@@ -344,9 +340,7 @@ impl<F: Field, const D: usize> BaseAir<F> for AddAir<F, D> {
 
     fn preprocessed_trace(&self) -> Option<RowMajorMatrix<F>> {
         // At this point, the preprocessed trace should be set.
-        let original_height = self.num_ops.div_ceil(self.lanes);
-
-        if original_height > 0 {
+        if self.num_ops > 0 {
             assert!(!self.preprocessed.is_empty());
         }
 
@@ -371,15 +365,11 @@ impl<F: Field, const D: usize> BaseAir<F> for AddAir<F, D> {
         if padding_len != self.preprocessed_width() {
             preprocessed_values.extend(vec![F::ZERO; padding_len]);
         }
-        pad_to_power_of_two(
-            &mut preprocessed_values,
-            self.preprocessed_width(),
-            original_height,
-        );
-        Some(RowMajorMatrix::new(
-            preprocessed_values,
-            self.preprocessed_width(),
-        ))
+
+        let mut mat = RowMajorMatrix::new(preprocessed_values, self.preprocessed_width());
+        mat.pad_to_power_of_two_height(F::ZERO);
+
+        Some(mat)
     }
 }
 
@@ -476,7 +466,7 @@ impl<AB: PermutationAirBuilder + PairBuilder + AirBuilderWithPublicValues, const
                 AirLookupHandler::<AB>::register_lookup(
                     self,
                     Kind::Global("WitnessChecks".to_string()),
-                    &inps,
+                    &[inps],
                 )
             }));
         }

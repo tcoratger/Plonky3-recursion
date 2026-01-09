@@ -1,10 +1,11 @@
 use alloc::collections::btree_map::BTreeMap;
+use alloc::vec;
 use alloc::vec::Vec;
 
 use p3_circuit::op::{NonPrimitiveOpType, Poseidon2Config, PrimitiveOpType};
 use p3_circuit::{Circuit, CircuitError};
 use p3_field::ExtensionField;
-use p3_uni_stark::{StarkGenericConfig, Val};
+use p3_uni_stark::{StarkGenericConfig, SymbolicExpression, Val};
 use p3_util::log2_ceil_usize;
 
 use crate::air::{AddAir, ConstAir, MulAir, PublicAir, WitnessAir};
@@ -19,6 +20,7 @@ use crate::{DynamicAirEntry, Poseidon2Prover, TablePacking};
 pub enum CircuitTableAir<SC, const D: usize>
 where
     SC: StarkGenericConfig,
+    SymbolicExpression<SC::Challenge>: From<SymbolicExpression<Val<SC>>>,
 {
     Witness(WitnessAir<Val<SC>, D>),
     Const(ConstAir<Val<SC>, D>),
@@ -35,6 +37,26 @@ pub enum NonPrimitiveConfig {
     Poseidon2(Poseidon2Config),
 }
 
+impl<SC, const D: usize> Clone for CircuitTableAir<SC, D>
+where
+    SC: StarkGenericConfig,
+    SymbolicExpression<SC::Challenge>: From<SymbolicExpression<Val<SC>>>,
+{
+    fn clone(&self) -> Self {
+        match self {
+            Self::Witness(air) => Self::Witness(air.clone()),
+            Self::Const(air) => Self::Const(air.clone()),
+            Self::Public(air) => Self::Public(air.clone()),
+            Self::Add(air) => Self::Add(air.clone()),
+            Self::Mul(air) => Self::Mul(air.clone()),
+            Self::Dynamic(air) => Self::Dynamic(air.clone()),
+        }
+    }
+}
+
+/// Type alias for a vector of circuit table AIRs paired with their respective degrees (log of their trace height).
+type CircuitAirsWithDegrees<SC, const D: usize> = Vec<(CircuitTableAir<SC, D>, usize)>;
+
 pub fn get_airs_and_degrees_with_prep<
     SC: StarkGenericConfig + 'static + Send + Sync,
     ExtF: ExtensionField<Val<SC>> + ExtractBinomialW<Val<SC>>,
@@ -43,11 +65,38 @@ pub fn get_airs_and_degrees_with_prep<
     circuit: &Circuit<ExtF>,
     packing: TablePacking,
     non_primitive_configs: Option<&[NonPrimitiveConfig]>,
-) -> Result<Vec<(CircuitTableAir<SC, D>, usize)>, CircuitError>
+) -> Result<(CircuitAirsWithDegrees<SC, D>, Vec<Val<SC>>), CircuitError>
 where
+    SymbolicExpression<SC::Challenge>: From<SymbolicExpression<Val<SC>>>,
     Val<SC>: StarkField,
 {
-    let preprocessed = circuit.generate_preprocessed_columns()?;
+    let mut preprocessed = circuit.generate_preprocessed_columns()?;
+
+    // If Add or Mul tables are empty, we add a dummy row to avoid issues in the AIRs.
+    // That means we need to update the witness multiplicities accordingly.
+    let witness_idx = PrimitiveOpType::Witness as usize;
+    let add_idx = PrimitiveOpType::Add as usize;
+    if preprocessed.primitive[add_idx].is_empty() {
+        let num_extra = AddAir::<Val<SC>, D>::lane_width() / D;
+
+        preprocessed.primitive[witness_idx][0] += ExtF::from_usize(num_extra);
+        preprocessed.primitive[add_idx].extend(vec![
+            ExtF::ZERO;
+            AddAir::<Val<SC>, D>::preprocessed_lane_width()
+                - 1
+        ]);
+    }
+    let mul_idx = PrimitiveOpType::Mul as usize;
+    if preprocessed.primitive[mul_idx].is_empty() {
+        let num_extra = MulAir::<Val<SC>, D>::lane_width() / D;
+        preprocessed.primitive[witness_idx][0] += ExtF::from_usize(num_extra);
+        preprocessed.primitive[mul_idx].extend(vec![
+            ExtF::ZERO;
+            MulAir::<Val<SC>, D>::preprocessed_lane_width()
+                - 1
+        ]);
+    }
+
     let w_binomial = ExtF::extract_w();
     // First, get base field elements for the preprocessed values.
     let base_prep: Vec<Vec<Val<SC>>> = preprocessed
@@ -174,5 +223,5 @@ where
         }
     }
 
-    Ok(table_preps)
+    Ok((table_preps, base_prep[0].clone()))
 }
