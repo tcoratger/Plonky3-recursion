@@ -12,7 +12,8 @@ use p3_air::{Air, AirBuilder, BaseAir};
 use p3_baby_bear::{BabyBear, GenericPoseidon2LinearLayersBabyBear};
 #[cfg(debug_assertions)]
 use p3_batch_stark::DebugConstraintBuilderWithLookups;
-use p3_batch_stark::{BatchProof, CommonData, StarkGenericConfig, StarkInstance, Val};
+use p3_batch_stark::{BatchProof, CommonData, ProverData, StarkGenericConfig, StarkInstance, Val};
+use p3_circuit::PreprocessedColumns;
 use p3_circuit::op::{NonPrimitiveOpType, Poseidon2Config, PrimitiveOpType};
 use p3_circuit::ops::{Poseidon2CircuitRow, Poseidon2Params, Poseidon2Trace};
 use p3_circuit::tables::Traces;
@@ -157,6 +158,40 @@ where
     pub rows: usize,
     /// Public values exposed by this table (if any).
     pub public_values: Vec<Val<SC>>,
+}
+
+/// Combined data for circuit proving, including STARK prover data and preprocessed columns.
+///
+/// This struct bundles the upstream [`ProverData`] with circuit-specific [`PreprocessedColumns`],
+/// providing a cleaner API for `prove_all_tables`.
+pub struct CircuitProverData<SC: StarkGenericConfig> {
+    /// STARK prover data from p3_batch_stark.
+    pub prover_data: ProverData<SC>,
+    /// Preprocessed columns for all primitive and non-primitive operations.
+    pub preprocessed_columns: PreprocessedColumns<Val<SC>>,
+}
+
+impl<SC: StarkGenericConfig> CircuitProverData<SC> {
+    /// Create new circuit prover data from components.
+    pub const fn new(
+        prover_data: ProverData<SC>,
+        preprocessed_columns: PreprocessedColumns<Val<SC>>,
+    ) -> Self {
+        Self {
+            prover_data,
+            preprocessed_columns,
+        }
+    }
+
+    /// Get a reference to the common data.
+    pub const fn common_data(&self) -> &CommonData<SC> {
+        &self.prover_data.common
+    }
+
+    /// Get a reference to the preprocessed columns.
+    pub const fn preprocessed_columns(&self) -> &PreprocessedColumns<Val<SC>> {
+        &self.preprocessed_columns
+    }
 }
 
 /// Type-erased AIR implementation for dynamically registered non-primitive tables.
@@ -2711,21 +2746,19 @@ where
     pub fn prove_all_tables<EF>(
         &self,
         traces: &Traces<EF>,
-        common: &CommonData<SC>,
-        witness_multiplicities: Vec<Val<SC>>,
+        circuit_prover_data: &CircuitProverData<SC>,
     ) -> Result<BatchStarkProof<SC>, BatchStarkProverError>
     where
-        // EF: Field + BasedVectorSpace<Val<SC>> + ExtractBinomialW<Val<SC>>,
         EF: Field + BasedVectorSpace<Val<SC>> + ExtractBinomialW<Val<SC>>,
         SymbolicExpression<SC::Challenge>: From<SymbolicExpression<Val<SC>>>,
     {
         let w_opt = EF::extract_w();
         match EF::DIMENSION {
-            1 => self.prove::<EF, 1>(traces, None, common, witness_multiplicities),
-            2 => self.prove::<EF, 2>(traces, w_opt, common, witness_multiplicities),
-            4 => self.prove::<EF, 4>(traces, w_opt, common, witness_multiplicities),
-            6 => self.prove::<EF, 6>(traces, w_opt, common, witness_multiplicities),
-            8 => self.prove::<EF, 8>(traces, w_opt, common, witness_multiplicities),
+            1 => self.prove::<EF, 1>(traces, None, circuit_prover_data),
+            2 => self.prove::<EF, 2>(traces, w_opt, circuit_prover_data),
+            4 => self.prove::<EF, 4>(traces, w_opt, circuit_prover_data),
+            6 => self.prove::<EF, 6>(traces, w_opt, circuit_prover_data),
+            8 => self.prove::<EF, 8>(traces, w_opt, circuit_prover_data),
             d => Err(BatchStarkProverError::UnsupportedDegree(d)),
         }
     }
@@ -2755,13 +2788,17 @@ where
         &self,
         traces: &Traces<EF>,
         w_binomial: Option<Val<SC>>,
-        common: &CommonData<SC>,
-        witness_multiplicities: Vec<Val<SC>>,
+        circuit_prover_data: &CircuitProverData<SC>,
     ) -> Result<BatchStarkProof<SC>, BatchStarkProverError>
     where
         EF: Field + BasedVectorSpace<Val<SC>>,
     {
-        // TODO: Consider parallelizing AIR construction and trace-to-matrix conversions.
+        let PreprocessedColumns {
+            primitive,
+            non_primitive: _,
+        } = &circuit_prover_data.preprocessed_columns;
+        let prover_data = &circuit_prover_data.prover_data;
+
         // Build matrices and AIRs per table.
         let packing = self.table_packing;
         let witness_lanes = packing.witness_lanes();
@@ -2805,6 +2842,7 @@ where
 
         // Witness
         let witness_rows = traces.witness_trace.num_rows();
+        let witness_multiplicities = primitive[PrimitiveOpType::Witness as usize].clone();
         let witness_air = WitnessAir::<Val<SC>, D>::new_with_preprocessed(
             witness_rows,
             witness_lanes,
@@ -2815,7 +2853,7 @@ where
 
         // Const
         let const_rows = traces.const_trace.values.len();
-        let const_prep = ConstAir::<Val<SC>, D>::trace_to_preprocessed(&traces.const_trace);
+        let const_prep = primitive[PrimitiveOpType::Const as usize].clone();
         let const_air = ConstAir::<Val<SC>, D>::new_with_preprocessed(const_rows, const_prep);
         let const_matrix: RowMajorMatrix<Val<SC>> =
             ConstAir::<Val<SC>, D>::trace_to_matrix(&traces.const_trace);
@@ -2836,7 +2874,7 @@ where
         };
 
         let public_rows = traces.public_trace.values.len();
-        let public_prep = PublicAir::<Val<SC>, D>::trace_to_preprocessed(&traces.public_trace);
+        let public_prep = primitive[PrimitiveOpType::Public as usize].clone();
         let public_air =
             PublicAir::<Val<SC>, D>::new_with_preprocessed(public_rows, public_lanes, public_prep);
         let public_matrix: RowMajorMatrix<Val<SC>> =
@@ -2853,10 +2891,7 @@ where
                 vec![Val::<SC>::ZERO; AddAir::<Val<SC>, D>::preprocessed_lane_width() - 1];
             (1, dummy_prep)
         } else {
-            (
-                add_rows,
-                AddAir::<Val<SC>, D>::trace_to_preprocessed(&traces.add_trace),
-            )
+            (add_rows, primitive[PrimitiveOpType::Add as usize].clone())
         };
         let add_air = AddAir::<Val<SC>, D>::new_with_preprocessed(add_rows, add_lanes, add_prep);
         let add_matrix: RowMajorMatrix<Val<SC>> =
@@ -2873,10 +2908,7 @@ where
                 vec![Val::<SC>::ZERO; MulAir::<Val<SC>, D>::preprocessed_lane_width() - 1];
             (1, dummy_prep)
         } else {
-            (
-                mul_rows,
-                MulAir::<Val<SC>, D>::trace_to_preprocessed(&traces.mul_trace),
-            )
+            (mul_rows, primitive[PrimitiveOpType::Mul as usize].clone())
         };
         let mul_air: MulAir<Val<SC>, D> = if D == 1 {
             MulAir::<Val<SC>, D>::new_with_preprocessed(mul_rows, mul_lanes, mul_prep)
@@ -3011,7 +3043,7 @@ where
             })
             .collect();
 
-        let proof = p3_batch_stark::prove_batch(&self.config, &instances, common);
+        let proof = p3_batch_stark::prove_batch(&self.config, &instances, prover_data);
 
         // Ensure all primitive table row counts are at least 1
         // RowCounts::new requires non-zero counts, so pad zeros to 1
@@ -3152,7 +3184,7 @@ mod tests {
 
         let circuit = builder.build().unwrap();
         let cfg = config::baby_bear().build();
-        let (airs_degrees, witness_multiplicities) =
+        let (airs_degrees, preprocessed_columns) =
             get_airs_and_degrees_with_prep::<BabyBearConfig, _, 1>(
                 &circuit,
                 TablePacking::default(),
@@ -3160,7 +3192,8 @@ mod tests {
             )
             .unwrap();
         let (mut airs, log_degrees): (Vec<_>, Vec<usize>) = airs_degrees.into_iter().unzip();
-        let common = CommonData::from_airs_and_degrees(&cfg, &mut airs, &log_degrees);
+        let prover_data = ProverData::from_airs_and_degrees(&cfg, &mut airs, &log_degrees);
+        let circuit_prover_data = CircuitProverData::new(prover_data, preprocessed_columns);
 
         let mut runner = circuit.runner();
 
@@ -3172,12 +3205,16 @@ mod tests {
         let prover = BatchStarkProver::new(cfg);
 
         let proof = prover
-            .prove_all_tables(&traces, &common, witness_multiplicities)
+            .prove_all_tables(&traces, &circuit_prover_data)
             .unwrap();
         assert_eq!(proof.ext_degree, 1);
         assert!(proof.w_binomial.is_none());
 
-        assert!(prover.verify_all_tables(&proof, &common).is_ok());
+        assert!(
+            prover
+                .verify_all_tables(&proof, circuit_prover_data.common_data())
+                .is_ok()
+        );
     }
 
     #[test]
@@ -3203,7 +3240,7 @@ mod tests {
 
         let circuit = builder.build().unwrap();
         let default_packing = TablePacking::default();
-        let (airs_degrees, witness_multiplicities) =
+        let (airs_degrees, preprocessed_columns) =
             get_airs_and_degrees_with_prep::<BabyBearConfig, _, 1>(&circuit, default_packing, None)
                 .unwrap();
         let (mut airs, log_degrees): (Vec<_>, Vec<usize>) = airs_degrees.into_iter().unzip();
@@ -3244,17 +3281,22 @@ mod tests {
         let expected_val = BabyBear::from_u64(13); // 7 + 10 - 3 - 1 = 13
         runner.set_public_inputs(&[x_val, expected_val]).unwrap();
         let traces = runner.run().unwrap();
-        let common = CommonData::from_airs_and_degrees(&cfg, &mut airs, &log_degrees);
+        let prover_data = ProverData::from_airs_and_degrees(&cfg, &mut airs, &log_degrees);
+        let circuit_prover_data = CircuitProverData::new(prover_data, preprocessed_columns);
 
         let prover = BatchStarkProver::new(cfg);
 
         let proof = prover
-            .prove_all_tables(&traces, &common, witness_multiplicities)
+            .prove_all_tables(&traces, &circuit_prover_data)
             .unwrap();
         assert_eq!(proof.ext_degree, 1);
         assert!(proof.w_binomial.is_none());
 
-        assert!(prover.verify_all_tables(&proof, &common).is_ok());
+        assert!(
+            prover
+                .verify_all_tables(&proof, circuit_prover_data.common_data())
+                .is_ok()
+        );
 
         // Check that the generated lookups are correct and consistent across tables.
         for air in airs.iter_mut() {
@@ -3327,7 +3369,7 @@ mod tests {
         builder.assert_zero(diff);
 
         let circuit = builder.build().unwrap();
-        let (airs_degrees, witness_multiplicities) =
+        let (airs_degrees, preprocessed_columns) =
             get_airs_and_degrees_with_prep::<BabyBearConfig, _, D>(
                 &circuit,
                 TablePacking::default(),
@@ -3362,17 +3404,20 @@ mod tests {
         runner.set_public_inputs(&[xv, yv, zv, expected_v]).unwrap();
         let traces = runner.run().unwrap();
 
-        let common = CommonData::from_airs_and_degrees(&cfg, &mut airs, &degrees);
+        let prover_data = ProverData::from_airs_and_degrees(&cfg, &mut airs, &degrees);
+        let circuit_prover_data = CircuitProverData::new(prover_data, preprocessed_columns);
         let prover = BatchStarkProver::new(cfg);
 
         let proof = prover
-            .prove_all_tables(&traces, &common, witness_multiplicities)
+            .prove_all_tables(&traces, &circuit_prover_data)
             .unwrap();
         assert_eq!(proof.ext_degree, 4);
         // Ensure W was captured
         let expected_w = <Ext4 as ExtractBinomialW<BabyBear>>::extract_w().unwrap();
         assert_eq!(proof.w_binomial, Some(expected_w));
-        prover.verify_all_tables(&proof, &common).unwrap();
+        prover
+            .verify_all_tables(&proof, circuit_prover_data.common_data())
+            .unwrap();
     }
 
     #[test]
@@ -3393,7 +3438,7 @@ mod tests {
 
         let circuit = builder.build().unwrap();
         let default_packing = TablePacking::default();
-        let (airs_degrees, witness_multiplicities) =
+        let (airs_degrees, preprocessed_columns) =
             get_airs_and_degrees_with_prep::<BabyBearConfig, _, D>(&circuit, default_packing, None)
                 .unwrap();
         let (mut airs, log_degrees): (Vec<_>, Vec<usize>) = airs_degrees.into_iter().unzip();
@@ -3456,19 +3501,24 @@ mod tests {
         runner.set_public_inputs(&[xv, yv, zv, expected_v]).unwrap();
         let traces = runner.run().unwrap();
 
-        let common = CommonData::from_airs_and_degrees(&cfg, &mut airs, &log_degrees);
+        let prover_data = ProverData::from_airs_and_degrees(&cfg, &mut airs, &log_degrees);
+        let circuit_prover_data = CircuitProverData::new(prover_data, preprocessed_columns);
 
         let prover = BatchStarkProver::new(cfg);
 
         let proof = prover
-            .prove_all_tables(&traces, &common, witness_multiplicities)
+            .prove_all_tables(&traces, &circuit_prover_data)
             .unwrap();
         assert_eq!(proof.ext_degree, 4);
         // Ensure W was captured
         let expected_w = <Ext4 as ExtractBinomialW<BabyBear>>::extract_w().unwrap();
         assert_eq!(proof.w_binomial, Some(expected_w));
 
-        assert!(prover.verify_all_tables(&proof, &common).is_ok());
+        assert!(
+            prover
+                .verify_all_tables(&proof, circuit_prover_data.common_data())
+                .is_ok()
+        );
 
         // Check that the generated lookups are correct and consistent across tables.
         for air in airs.iter_mut() {
@@ -3543,7 +3593,7 @@ mod tests {
         builder.assert_zero(diff);
 
         let circuit = builder.build().unwrap();
-        let (airs_degrees, witness_multiplicities) =
+        let (airs_degrees, preprocessed_columns) =
             get_airs_and_degrees_with_prep::<KoalaBearConfig, _, 1>(
                 &circuit,
                 TablePacking::default(),
@@ -3561,15 +3611,18 @@ mod tests {
             .unwrap();
         let traces = runner.run().unwrap();
 
-        let common = CommonData::from_airs_and_degrees(&cfg, &mut airs, &degrees);
+        let prover_data = ProverData::from_airs_and_degrees(&cfg, &mut airs, &degrees);
+        let circuit_prover_data = CircuitProverData::new(prover_data, preprocessed_columns);
         let prover = BatchStarkProver::new(cfg);
 
         let proof = prover
-            .prove_all_tables(&traces, &common, witness_multiplicities)
+            .prove_all_tables(&traces, &circuit_prover_data)
             .unwrap();
         assert_eq!(proof.ext_degree, 1);
         assert!(proof.w_binomial.is_none());
-        prover.verify_all_tables(&proof, &common).unwrap();
+        prover
+            .verify_all_tables(&proof, circuit_prover_data.common_data())
+            .unwrap();
     }
 
     #[test]
@@ -3603,7 +3656,7 @@ mod tests {
         builder.assert_zero(diff);
 
         let circuit = builder.build().unwrap();
-        let (airs_degrees, witness_multiplicities) =
+        let (airs_degrees, preprocessed_columns) =
             get_airs_and_degrees_with_prep::<KoalaBearConfig, _, D>(
                 &circuit,
                 TablePacking::default(),
@@ -3653,16 +3706,19 @@ mod tests {
             .unwrap();
         let traces = runner.run().unwrap();
 
-        let common = CommonData::from_airs_and_degrees(&cfg, &mut airs, &degrees);
+        let prover_data = ProverData::from_airs_and_degrees(&cfg, &mut airs, &degrees);
+        let circuit_prover_data = CircuitProverData::new(prover_data, preprocessed_columns);
         let prover = BatchStarkProver::new(cfg);
 
         let proof = prover
-            .prove_all_tables(&traces, &common, witness_multiplicities)
+            .prove_all_tables(&traces, &circuit_prover_data)
             .unwrap();
         assert_eq!(proof.ext_degree, 8);
         let expected_w = <KBExtField as ExtractBinomialW<KoalaBear>>::extract_w().unwrap();
         assert_eq!(proof.w_binomial, Some(expected_w));
-        prover.verify_all_tables(&proof, &common).unwrap();
+        prover
+            .verify_all_tables(&proof, circuit_prover_data.common_data())
+            .unwrap();
     }
 
     #[test]
@@ -3684,7 +3740,7 @@ mod tests {
         builder.assert_zero(diff);
 
         let circuit = builder.build().unwrap();
-        let (airs_degrees, witness_multiplicities) =
+        let (airs_degrees, preprocessed_columns) =
             get_airs_and_degrees_with_prep::<GoldilocksConfig, _, D>(
                 &circuit,
                 TablePacking::default(),
@@ -3714,16 +3770,19 @@ mod tests {
             .unwrap();
         let traces = runner.run().unwrap();
 
-        let common = CommonData::from_airs_and_degrees(&cfg, &mut airs, &degrees);
+        let prover_data = ProverData::from_airs_and_degrees(&cfg, &mut airs, &degrees);
+        let circuit_prover_data = CircuitProverData::new(prover_data, preprocessed_columns);
         let prover = BatchStarkProver::new(cfg);
 
         let proof = prover
-            .prove_all_tables(&traces, &common, witness_multiplicities)
+            .prove_all_tables(&traces, &circuit_prover_data)
             .unwrap();
         assert_eq!(proof.ext_degree, 2);
         let expected_w = <Ext2 as ExtractBinomialW<Goldilocks>>::extract_w().unwrap();
         assert_eq!(proof.w_binomial, Some(expected_w));
-        prover.verify_all_tables(&proof, &common).unwrap();
+        prover
+            .verify_all_tables(&proof, circuit_prover_data.common_data())
+            .unwrap();
     }
 
     #[test]
@@ -3788,7 +3847,7 @@ mod tests {
         builder.mul(x, y);
 
         let circuit = builder.build().unwrap();
-        let (airs_degrees, witness_multiplicities) =
+        let (airs_degrees, preprocessed_columns) =
             get_airs_and_degrees_with_prep::<BabyBearConfig, _, 1>(
                 &circuit,
                 TablePacking::default(),
@@ -3803,13 +3862,17 @@ mod tests {
         runner.set_public_inputs(&[x_val, y_val]).unwrap();
         let traces = runner.run().unwrap();
 
-        let common = CommonData::from_airs_and_degrees(&cfg, &mut airs, &degrees);
+        let prover_data = ProverData::from_airs_and_degrees(&cfg, &mut airs, &degrees);
+        let circuit_prover_data = CircuitProverData::new(prover_data, preprocessed_columns);
+
+        let common = circuit_prover_data.common_data();
+
         let prover = BatchStarkProver::new(cfg);
 
         let proof = prover
-            .prove_all_tables(&traces, &common, witness_multiplicities)
+            .prove_all_tables(&traces, &circuit_prover_data)
             .unwrap();
-        prover.verify_all_tables(&proof, &common).unwrap();
+        prover.verify_all_tables(&proof, common).unwrap();
     }
 
     #[test]
@@ -3828,7 +3891,7 @@ mod tests {
         builder.assert_zero(diff);
 
         let circuit = builder.build().unwrap();
-        let (airs_degrees, witness_multiplicities) =
+        let (airs_degrees, preprocessed_columns) =
             get_airs_and_degrees_with_prep::<BabyBearConfig, _, 1>(
                 &circuit,
                 TablePacking::default(),
@@ -3846,12 +3909,16 @@ mod tests {
             .unwrap();
         let traces = runner.run().unwrap();
 
-        let common = CommonData::from_airs_and_degrees(&cfg, &mut airs, &degrees);
+        let prover_data = ProverData::from_airs_and_degrees(&cfg, &mut airs, &degrees);
+        let circuit_prover_data = CircuitProverData::new(prover_data, preprocessed_columns);
+
+        let common = circuit_prover_data.common_data();
+
         let prover = BatchStarkProver::new(cfg);
 
         let proof = prover
-            .prove_all_tables(&traces, &common, witness_multiplicities)
+            .prove_all_tables(&traces, &circuit_prover_data)
             .unwrap();
-        prover.verify_all_tables(&proof, &common).unwrap();
+        prover.verify_all_tables(&proof, common).unwrap();
     }
 }
