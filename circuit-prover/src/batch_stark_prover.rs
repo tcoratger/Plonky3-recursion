@@ -2109,6 +2109,7 @@ impl Poseidon2Prover {
                         out_ctl: [false; 2],
                         output_indices: [0; 2],
                         mmcs_index_sum_idx: 0,
+                        mmcs_ctl_enabled: false,
                     }),
             );
         }

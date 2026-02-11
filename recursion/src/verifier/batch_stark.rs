@@ -8,8 +8,8 @@ use p3_air::{
     PermutationAirBuilder,
 };
 use p3_batch_stark::CommonData;
-use p3_circuit::CircuitBuilder;
 use p3_circuit::utils::ColumnsTargets;
+use p3_circuit::{CircuitBuilder, NonPrimitiveOpId};
 use p3_circuit_prover::air::{AddAir, ConstAir, MulAir, PublicAir, WitnessAir};
 use p3_circuit_prover::batch_stark_prover::{PrimitiveTable, RowCounts};
 use p3_commit::{Pcs, PolynomialSpace};
@@ -105,6 +105,7 @@ where
 /// This reconstructs the circuit table AIRs from the proof metadata (rows + packing) so callers
 /// don't need to pass `circuit_airs` explicitly. Returns the allocated input builder to pack
 /// public inputs afterwards.
+#[allow(clippy::type_complexity)]
 pub fn verify_p3_recursion_proof_circuit<
     SC: StarkGenericConfig,
     Comm: Recursive<
@@ -126,7 +127,13 @@ pub fn verify_p3_recursion_proof_circuit<
     common_data: &CommonData<SC>,
     lookup_gadget: &LG,
     poseidon2_config: Poseidon2Config,
-) -> Result<BatchStarkVerifierInputsBuilder<SC, Comm, OpeningProof>, VerificationError>
+) -> Result<
+    (
+        BatchStarkVerifierInputsBuilder<SC, Comm, OpeningProof>,
+        Vec<NonPrimitiveOpId>,
+    ),
+    VerificationError,
+>
 where
     <SC as StarkGenericConfig>::Pcs: RecursivePcs<
             SC,
@@ -181,7 +188,7 @@ where
 
     let common = &verifier_inputs.common_data;
 
-    verify_batch_circuit::<
+    let mmcs_op_ids = verify_batch_circuit::<
         CircuitTablesAir<Val<SC>, TRACE_D>,
         SC,
         Comm,
@@ -202,10 +209,16 @@ where
         poseidon2_config,
     )?;
 
-    Ok(verifier_inputs)
+    Ok((verifier_inputs, mmcs_op_ids))
 }
 
 /// Verify a batch-STARK proof inside a recursive circuit.
+///
+/// # Returns
+/// `Ok(Vec<NonPrimitiveOpId>)` containing operation IDs that require private data
+/// (e.g., Merkle sibling values for MMCS verification). The caller must set
+/// private data for these operations before running the circuit.
+/// `Err` if there was a structural error.
 #[allow(clippy::too_many_arguments)]
 pub fn verify_batch_circuit<
     A,
@@ -230,7 +243,7 @@ pub fn verify_batch_circuit<
     common: &CommonDataTargets<SC, Comm>,
     lookup_gadget: &LG,
     poseidon2_config: crate::ops::Poseidon2Config,
-) -> Result<(), VerificationError>
+) -> Result<Vec<NonPrimitiveOpId>, VerificationError>
 where
     A: RecursiveAir<Val<SC>, SC::Challenge, LG>,
     <SC as StarkGenericConfig>::Pcs: RecursivePcs<
@@ -583,12 +596,15 @@ where
                 ));
             }
 
-            let ext_dom = &ext_trace_domains[inst_idx];
+            // Compute base preprocessed domain (matching prover in generation.rs)
+            let pre_domain = pcs.natural_domain_for_degree(1 << meta.degree_bits);
 
+            // Use extended trace domain for zeta_next computation (same generator)
+            let ext_dom = &ext_trace_domains[inst_idx];
             let first_point = pcs.first_point(ext_dom);
             let next_point = ext_dom.next_point(first_point).ok_or_else(|| {
                 VerificationError::InvalidProofShape(
-                    "Trace domain does not provide next point".to_string(),
+                    "Preprocessed domain does not provide next point".to_string(),
                 )
             })?;
             let generator = next_point * first_point.inverse();
@@ -596,7 +612,7 @@ where
             let zeta_next = circuit.mul(zeta, generator_const);
 
             pre_round.push((
-                *ext_dom,
+                pre_domain,
                 vec![(zeta, local.clone()), (zeta_next, next.clone())],
             ));
         }
@@ -667,7 +683,7 @@ where
         pcs_params,
     )?;
 
-    pcs.verify_circuit(
+    let mmcs_op_ids = pcs.verify_circuit(
         circuit,
         &pcs_challenges,
         &coms_to_verify,
@@ -800,7 +816,7 @@ where
         }
     }
 
-    Ok(())
+    Ok(mmcs_op_ids)
 }
 
 pub(crate) fn get_perm_challenges<

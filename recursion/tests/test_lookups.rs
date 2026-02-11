@@ -741,7 +741,8 @@ fn get_verifier_inputs_and_challenges(
         common,
         lookup_gadget,
         Poseidon2Config::BabyBearD4Width16,
-    );
+    )
+    .map(|(inputs, _mmcs_op_ids)| inputs);
 
     // If provided, override the global lookups in the proof used for challenge generation
     if let Some(global_lookups) = optional_global_lookups {
@@ -817,6 +818,7 @@ fn test_poseidon2_ctl_lookups() {
             mmcs_bit: None,
             inputs: [Some(input0), Some(input1), None, None],
             out_ctl: [true, true], // Enable output CTL
+            return_all_outputs: false,
             mmcs_index_sum: None,
         })
         .unwrap();
@@ -834,6 +836,7 @@ fn test_poseidon2_ctl_lookups() {
             mmcs_bit: None,
             inputs: [Some(output0), Some(output1), None, None],
             out_ctl: [false, false],
+            return_all_outputs: false,
             mmcs_index_sum: None,
         })
         .unwrap();
@@ -911,6 +914,7 @@ fn test_poseidon2_chained_ctl_lookups() {
             mmcs_bit: None,
             inputs: [Some(input0), Some(input1), None, None],
             out_ctl: [false, false], // Not exposing outputs yet
+            return_all_outputs: false,
             mmcs_index_sum: None,
         })
         .unwrap();
@@ -924,6 +928,7 @@ fn test_poseidon2_chained_ctl_lookups() {
             mmcs_bit: None,
             inputs: [None, None, None, None], // Chained from previous output
             out_ctl: [false, false],
+            return_all_outputs: false,
             mmcs_index_sum: None,
         })
         .unwrap();
@@ -937,6 +942,7 @@ fn test_poseidon2_chained_ctl_lookups() {
             mmcs_bit: None,
             inputs: [None, None, None, None],
             out_ctl: [true, true], // Expose outputs via CTL
+            return_all_outputs: false,
             mmcs_index_sum: None,
         })
         .unwrap();
@@ -951,6 +957,7 @@ fn test_poseidon2_chained_ctl_lookups() {
             mmcs_bit: None,
             inputs: [outputs3[0], outputs3[1], None, None],
             out_ctl: [false, false],
+            return_all_outputs: false,
             mmcs_index_sum: None,
         })
         .unwrap();

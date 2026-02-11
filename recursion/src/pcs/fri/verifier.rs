@@ -4,15 +4,66 @@ use alloc::vec::Vec;
 use alloc::{format, vec};
 use core::iter;
 
-use p3_circuit::CircuitBuilder;
+use p3_circuit::op::Poseidon2Config;
+use p3_circuit::{CircuitBuilder, NonPrimitiveOpId};
 use p3_field::coset::TwoAdicMultiplicativeCoset;
-use p3_field::{ExtensionField, Field, TwoAdicField};
+use p3_field::{BasedVectorSpace, ExtensionField, Field, PrimeField64, TwoAdicField};
+use p3_matrix::Dimensions;
 use p3_util::zip_eq::zip_eq;
 
 use super::{FriProofTargets, InputProofTargets};
 use crate::Target;
+use crate::pcs::verify_batch_circuit;
 use crate::traits::{ComsWithOpeningsTargets, Recursive, RecursiveExtensionMmcs, RecursiveMmcs};
-use crate::verifier::VerificationError;
+use crate::verifier::{ObservableCommitment, VerificationError};
+
+/// Pack lifted base field targets into packed extension field targets for MMCS verification.
+///
+/// Converts N targets (each representing a lifted base field element `EF([v, 0, 0, 0])`)
+/// into ceil(N / EF::DIMENSION) targets (each representing a packed extension element).
+///
+/// For `BinomialExtensionField<F, D>`, the packing is:
+/// `packed[i] = lifted[i*D] + lifted[i*D+1]*X + lifted[i*D+2]*X^2 + ...`
+/// where `X` is the extension basis element.
+fn pack_lifted_to_ext<F, EF>(builder: &mut CircuitBuilder<EF>, lifted: &[Target]) -> Vec<Target>
+where
+    F: Field,
+    EF: ExtensionField<F> + BasedVectorSpace<F>,
+{
+    if lifted.is_empty() {
+        return Vec::new();
+    }
+
+    let d = EF::DIMENSION;
+
+    // Get the extension basis elements: {1, X, X^2, ..., X^(D-1)}
+    let basis: Vec<EF> = (0..d)
+        .map(|i| {
+            let mut coeffs = vec![F::ZERO; d];
+            coeffs[i] = F::ONE;
+            EF::from_basis_coefficients_slice(&coeffs).expect("valid basis element")
+        })
+        .collect();
+
+    // Add a zero constant for padding partial chunks
+    let zero = builder.add_const(EF::ZERO);
+
+    lifted
+        .chunks(d)
+        .map(|chunk| {
+            // packed = chunk[0]*basis[0] + chunk[1]*basis[1] + ... + chunk[D-1]*basis[D-1]
+            // Since basis[0] = 1, start with chunk[0]
+            let mut packed = chunk[0];
+            for j in 1..d {
+                let val = if j < chunk.len() { chunk[j] } else { zero };
+                let basis_const = builder.add_const(basis[j]);
+                let term = builder.mul(val, basis_const);
+                packed = builder.add(packed, term);
+            }
+            packed
+        })
+        .collect()
+}
 
 /// Inputs for one FRI fold phase (matches the values used by the verifier per round).
 #[derive(Clone, Debug)]
@@ -60,9 +111,6 @@ fn fold_row_chain<EF: Field>(
         roll_in,
     } in phases.iter().cloned()
     {
-        // TODO: Add recursive MMCS batch verification for this commit phase:
-        // Verify the sibling value against the commitment at the parent index.
-
         // e0 = select(bit, folded, e_sibling)
         let e0 = builder.select(sibling_is_right, folded, e_sibling);
 
@@ -343,10 +391,11 @@ fn compute_single_reduced_opening<EF: Field>(
 }
 
 /// Compute reduced openings grouped **by height** with **per-height alpha powers**,
-/// Returns a vector of (log_height, ro) sorted by descending height.
+/// Returns a vector of (log_height, ro) sorted by descending height, plus the MMCS op IDs.
 ///
 /// Reference (Plonky3): `p3_fri::verifier::open_input`
 #[allow(clippy::too_many_arguments)]
+#[allow(clippy::type_complexity)]
 fn open_input<F, EF, Comm>(
     builder: &mut CircuitBuilder<EF>,
     log_global_max_height: usize,
@@ -355,10 +404,12 @@ fn open_input<F, EF, Comm>(
     log_blowup: usize,
     commitments_with_opening_points: &ComsWithOpeningsTargets<Comm, TwoAdicMultiplicativeCoset<F>>,
     batch_opened_values: &[Vec<Vec<Target>>], // Per batch -> per matrix -> per column
-) -> Result<Vec<(usize, Target)>, VerificationError>
+    permutation_config: Option<Poseidon2Config>,
+) -> Result<(Vec<(usize, Target)>, Vec<NonPrimitiveOpId>), VerificationError>
 where
-    F: Field + TwoAdicField,
+    F: Field + TwoAdicField + PrimeField64,
     EF: ExtensionField<F>,
+    Comm: ObservableCommitment,
 {
     builder.push_scope("open_input");
 
@@ -374,9 +425,10 @@ where
 
     // height -> (alpha_pow_for_this_height, ro_sum_for_this_height)
     let mut reduced_openings = BTreeMap::<usize, (Target, Target)>::new();
+    let mut mmcs_op_ids = Vec::new();
 
     // Process each batch
-    for (batch_idx, ((_batch_commit, mats), batch_openings)) in zip_eq(
+    for (batch_idx, ((batch_commit, mats), batch_openings)) in zip_eq(
         commitments_with_opening_points.iter(),
         batch_opened_values.iter(),
         VerificationError::InvalidProofShape(
@@ -385,8 +437,46 @@ where
     )?
     .enumerate()
     {
-        // TODO: Add recursive MMCS verification here for this batch:
-        // Verify batch_openings against _batch_commit at the computed reduced_index.
+        // Recursive MMCS verification for this batch
+        if let Some(perm_config) = permutation_config {
+            // Pack commitment from lifted to packed representation
+            let lifted_commitment = batch_commit.to_observation_targets();
+            let packed_commitment = pack_lifted_to_ext::<F, EF>(builder, &lifted_commitment);
+
+            // Pack opened values from lifted to packed representation
+            let packed_openings: Vec<Vec<Target>> = batch_openings
+                .iter()
+                .map(|mat_row| pack_lifted_to_ext::<F, EF>(builder, mat_row))
+                .collect();
+
+            // Compute actual base field widths (number of base field values per matrix)
+            // This is needed to properly truncate zero-padding from extension packing
+            let base_widths: Vec<usize> = batch_openings.iter().map(|v| v.len()).collect();
+
+            let dimensions: Vec<Dimensions> = mats
+                .iter()
+                .map(|(domain, _)| Dimensions {
+                    height: 1 << (domain.log_size() + log_blowup),
+                    width: 0, // Width is derived from opened_values
+                })
+                .collect();
+
+            let op_ids = verify_batch_circuit::<F, EF>(
+                builder,
+                perm_config,
+                &packed_commitment,
+                &dimensions,
+                &base_widths,
+                index_bits,
+                &packed_openings,
+            )
+            .map_err(|e| {
+                VerificationError::InvalidProofShape(format!(
+                    "MMCS verification failed for batch {batch_idx}: {e:?}"
+                ))
+            })?;
+            mmcs_op_ids.extend(op_ids);
+        }
 
         // For each matrix in the batch
         for (mat_idx, ((mat_domain, mat_points_and_values), mat_opening)) in zip_eq(
@@ -450,21 +540,22 @@ where
     builder.pop_scope(); // close `open_input` scope
 
     // Into descending (height, ro) list
-    Ok(reduced_openings
+    let reduced_list: Vec<_> = reduced_openings
         .into_iter()
         .rev()
         .map(|(h, (_ap, ro))| (h, ro))
-        .collect())
+        .collect();
+    Ok((reduced_list, mmcs_op_ids))
 }
 
-/// Verify FRI arithmetic in-circuit.
+/// Verify FRI arithmetic in-circuit with optional MMCS verification.
 ///
-/// TODO:
-/// - Challenge/indices generation lives in the outer verifier. Keep this
-///   function purely arithmetic and take `alpha`, `betas`, and
-///   `index_bits_per_query` as inputs.
-/// - Add recursive MMCS verification for both input openings (`open_input`) and
-///   per-phase commitments.
+/// When `permutation_config` is `Some`, this function performs full recursive MMCS
+/// verification for both input batch openings and commit-phase openings.
+/// When `None`, only arithmetic verification is performed (for testing).
+///
+/// Returns the list of non-primitive operation IDs that require private data
+/// (Merkle sibling values) to be set by the runner.
 ///
 /// Reference (Plonky3): `p3_fri::verifier::verify_fri`
 #[allow(clippy::too_many_arguments)]
@@ -476,13 +567,16 @@ pub fn verify_fri_circuit<F, EF, RecMmcs, Inner, Witness, Comm>(
     index_bits_per_query: &[Vec<Target>],
     commitments_with_opening_points: &ComsWithOpeningsTargets<Comm, TwoAdicMultiplicativeCoset<F>>,
     log_blowup: usize,
-) -> Result<(), VerificationError>
+    permutation_config: Option<Poseidon2Config>,
+) -> Result<Vec<NonPrimitiveOpId>, VerificationError>
 where
-    F: Field + TwoAdicField,
+    F: Field + TwoAdicField + PrimeField64,
     EF: ExtensionField<F>,
     RecMmcs: RecursiveExtensionMmcs<F, EF>,
+    RecMmcs::Commitment: ObservableCommitment,
     Inner: RecursiveMmcs<F, EF>,
     Witness: Recursive<EF>,
+    Comm: ObservableCommitment,
 {
     builder.push_scope("verify_fri");
 
@@ -572,6 +666,9 @@ where
         })
         .collect();
 
+    // Collect all MMCS operation IDs for private data setting
+    let mut all_mmcs_op_ids = Vec::new();
+
     // For each query, extract opened values from proof and compute reduced openings and fold.
     for (q, query_proof) in fri_proof_targets.query_proofs.iter().enumerate() {
         // Extract opened values from the input_proof (batch openings)
@@ -582,8 +679,8 @@ where
             .map(|batch| batch.opened_values.clone())
             .collect();
 
-        // Arithmetic `open_input` to get (height, ro) descending
-        let reduced_by_height = open_input::<F, EF, Comm>(
+        // Arithmetic `open_input` to get (height, ro) descending, plus MMCS op IDs
+        let (reduced_by_height, input_mmcs_ops) = open_input::<F, EF, Comm>(
             builder,
             log_max_height,
             &index_bits_per_query[q],
@@ -591,7 +688,9 @@ where
             log_blowup,
             commitments_with_opening_points,
             &batch_opened_values,
+            permutation_config,
         )?;
+        all_mmcs_op_ids.extend(input_mmcs_ops);
 
         // Must have the max-height entry at the front
 
@@ -609,10 +708,12 @@ where
         let initial_folded_eval = reduced_by_height[0].1;
 
         // Sibling values for this query (one per phase)
+        // The sibling coefficients are stored as lifted base field values.
+        // We pack them back to extension elements for FRI folding arithmetic.
         let sibling_values: Vec<Target> = query_proof
             .commit_phase_openings
             .iter()
-            .map(|opening| opening.sibling_value)
+            .map(|opening| opening.sibling_value_packed(builder))
             .collect();
 
         if sibling_values.len() != num_phases {
@@ -624,6 +725,7 @@ where
         }
 
         // Build height-aligned roll-ins for each phase (desc heights -> phases)
+        // Need this before MMCS verification since the fold computation uses roll-ins
         let mut roll_ins: Vec<Option<Target>> = vec![None; num_phases];
         for &(h, ro) in reduced_by_height.iter().skip(1) {
             // height -> phase index mapping
@@ -632,10 +734,6 @@ where
                 .and_then(|x| x.checked_sub(h))
                 .expect("height->phase mapping underflow");
             if i < num_phases {
-                // There should be at most one roll-in per phase since `reduced_by_height`
-                // aggregates all matrices at the same height already (and we only support a
-                // single input batch). Multiple entries mapping to the same phase indicate an
-                // invariant violation.
                 if roll_ins[i].is_some() {
                     return Err(VerificationError::InvalidProofShape(format!(
                         "duplicate roll-in for phase {i} (height {h})",
@@ -643,9 +741,154 @@ where
                 }
                 roll_ins[i] = Some(ro);
             } else {
-                // If a height is below final folded height, it should be unused; connect to zero.
                 let zero = builder.add_const(EF::ZERO);
                 builder.connect(ro, zero);
+            }
+        }
+
+        // Commit-phase MMCS verification: verify (folded_eval, sibling_value) pairs
+        //
+        // Native FRI verifies PAIRS of values at each commit-phase step. The Merkle tree
+        // commits to pairs with dimensions = { width: 2, height: 2^(log_folded_height) }.
+        // Each leaf is the hash of 2 extension elements (8 base coefficients = full rate).
+        //
+        // The pair index = query_index >> (phase_idx + 1), and we verify both folded_eval
+        // and sibling_value together.
+        //
+        // Commit-phase MMCS verification: verify (folded_eval, sibling_value) pairs
+        if let Some(perm_config) = permutation_config {
+            let one = builder.add_const(EF::ONE);
+
+            // Track folded_eval as we go through phases
+            let mut current_folded = initial_folded_eval;
+            let neg_half = builder.add_const(EF::NEG_ONE * EF::ONE.halve());
+
+            for (phase_idx, (commit, _opening)) in fri_proof_targets
+                .commit_phase_commits
+                .iter()
+                .zip(query_proof.commit_phase_openings.iter())
+                .enumerate()
+            {
+                let sibling_value = sibling_values[phase_idx];
+
+                // log_folded_height = log_max_height - phase_idx - 1
+                let log_folded_height = log_max_height.saturating_sub(phase_idx + 1);
+
+                // Skip MMCS verification for height < 2 (no tree structure for pairs)
+                if log_folded_height == 0 {
+                    // Still need to compute the fold for subsequent phases
+                    let index_bit = index_bits_per_query[q][phase_idx];
+                    let sibling_is_right = builder.sub(one, index_bit);
+                    let e0 = builder.select(sibling_is_right, current_folded, sibling_value);
+                    let x0 = compute_x0_from_index_bits(
+                        builder,
+                        &index_bits_per_query[q],
+                        phase_idx,
+                        &pows_per_phase[phase_idx],
+                    );
+                    let inv = builder.div(neg_half, x0);
+                    let d = builder.sub(sibling_value, current_folded);
+                    let two_b = builder.add(sibling_is_right, sibling_is_right);
+                    let two_b_minus_one = builder.sub(two_b, one);
+                    let e1_minus_e0 = builder.mul(two_b_minus_one, d);
+                    let beta = betas[phase_idx];
+                    let beta_minus_x0 = builder.sub(beta, x0);
+                    let t = builder.mul(beta_minus_x0, e1_minus_e0);
+                    let t_inv = builder.mul(t, inv);
+                    current_folded = builder.add(e0, t_inv);
+                    if let Some(ro) = roll_ins[phase_idx] {
+                        let beta_sq = builder.mul(beta, beta);
+                        let add_term = builder.mul(beta_sq, ro);
+                        current_folded = builder.add(current_folded, add_term);
+                    }
+                    continue;
+                }
+
+                // Pack commitment from lifted to packed representation
+                let lifted_commitment = commit.to_observation_targets();
+                let packed_commitment = pack_lifted_to_ext::<F, EF>(builder, &lifted_commitment);
+
+                // Dimensions: width=2 (pair of extension elements), height = 2^log_folded_height
+                let folded_height = 1usize << log_folded_height;
+                let dimensions = vec![Dimensions {
+                    height: folded_height,
+                    width: 2,
+                }];
+
+                // Build the pair (lo, hi) based on index bit ordering
+                // If index_bit[phase_idx] == 0: lo = current_folded, hi = sibling_value
+                // If index_bit[phase_idx] == 1: lo = sibling_value, hi = current_folded
+                let index_bit = index_bits_per_query[q][phase_idx];
+                let lo = builder.select(index_bit, sibling_value, current_folded);
+                let hi = builder.select(index_bit, current_folded, sibling_value);
+
+                // Pack the pair for verification
+                let pair_values = vec![lo, hi];
+
+                // Pair index = query_index >> (phase_idx + 1)
+                // The commit-phase Merkle tree is in NATURAL order (not bit-reversed like FFT).
+                // Native passes `start_index >> 1` directly to verify_batch, which extracts
+                // bits in little-endian order: (index >> i) & 1 for i = 0, 1, 2, ...
+                // So pair_index_bits should be the little-endian bits of pair_index.
+                let start_bit = phase_idx + 1;
+                let end_bit = (start_bit + log_folded_height).min(log_max_height);
+                let zero = builder.add_const(EF::ZERO);
+
+                let mut pair_index_bits: Vec<Target> =
+                    index_bits_per_query[q][start_bit..end_bit].to_vec();
+                // Pad to log_folded_height if needed
+                while pair_index_bits.len() < log_folded_height {
+                    pair_index_bits.push(zero);
+                }
+
+                // For commit-phase, pair_values contains 2 full extension elements
+                // (no zero-padding since these are not packed from base field)
+                // base_width = 2 extension elements × 4 base coefficients = 8
+                let base_widths = vec![pair_values.len() * <EF as BasedVectorSpace<F>>::DIMENSION];
+                let pair_values_slice = vec![pair_values];
+
+                let commit_phase_ops = verify_batch_circuit::<F, EF>(
+                    builder,
+                    perm_config,
+                    &packed_commitment,
+                    &dimensions,
+                    &base_widths,
+                    &pair_index_bits,
+                    &pair_values_slice,
+                )
+                .map_err(|e| {
+                    VerificationError::InvalidProofShape(format!(
+                        "Commit-phase MMCS verification failed for query {q}, phase {phase_idx}: {e:?}"
+                    ))
+                })?;
+                all_mmcs_op_ids.extend(commit_phase_ops);
+
+                // Compute next folded_eval (same as fold_row_chain)
+                let sibling_is_right = builder.sub(one, index_bit);
+                let e0 = builder.select(sibling_is_right, current_folded, sibling_value);
+                let x0 = compute_x0_from_index_bits(
+                    builder,
+                    &index_bits_per_query[q],
+                    phase_idx,
+                    &pows_per_phase[phase_idx],
+                );
+                let inv = builder.div(neg_half, x0);
+                let d = builder.sub(sibling_value, current_folded);
+                let two_b = builder.add(sibling_is_right, sibling_is_right);
+                let two_b_minus_one = builder.sub(two_b, one);
+                let e1_minus_e0 = builder.mul(two_b_minus_one, d);
+                let beta = betas[phase_idx];
+                let beta_minus_x0 = builder.sub(beta, x0);
+                let t = builder.mul(beta_minus_x0, e1_minus_e0);
+                let t_inv = builder.mul(t, inv);
+                current_folded = builder.add(e0, t_inv);
+
+                // Apply roll-in if present
+                if let Some(ro) = roll_ins[phase_idx] {
+                    let beta_sq = builder.mul(beta, beta);
+                    let add_term = builder.mul(beta_sq, ro);
+                    current_folded = builder.add(current_folded, add_term);
+                }
             }
         }
 
@@ -671,9 +914,9 @@ where
             &pows_per_phase,
             final_poly_eval,
         );
-
-        builder.pop_scope(); // close `verify_fri` scope
     }
 
-    Ok(())
+    builder.pop_scope(); // close `verify_fri` scope
+
+    Ok(all_mmcs_op_ids)
 }
