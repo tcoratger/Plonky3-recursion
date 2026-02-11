@@ -247,7 +247,7 @@ macro_rules! define_field_module {
 
                 info!("Verification circuit built with {num_ops_1} operations");
 
-                let table_packing_1 = TablePacking::new(17, 3, 6, 7);
+                let table_packing_1 = TablePacking::new(17, 3, 8);
 
                 let (airs_degrees_1, preprocessed_columns_1) =
                     get_airs_and_degrees_with_prep::<MyConfig, _, D>(
@@ -348,7 +348,7 @@ macro_rules! define_field_module {
                 info!("Verification circuit built with {num_ops_2} operations");
 
                 let table_packing_2 =
-                    TablePacking::new(6, 2, 3, 3).with_fri_params(LOG_FINAL_POLY_LEN, LOG_BLOWUP);
+                    TablePacking::new(6, 2, 3).with_fri_params(LOG_FINAL_POLY_LEN, LOG_BLOWUP);
 
                 let (airs_degrees_2, preprocessed_columns_2) =
                     get_airs_and_degrees_with_prep::<MyConfig, _, D>(
@@ -448,7 +448,7 @@ macro_rules! define_field_module {
                 info!("Verification circuit built with {num_ops_3} operations");
 
                 let table_packing_3 =
-                    TablePacking::new(6, 2, 3, 3).with_fri_params(LOG_FINAL_POLY_LEN, LOG_BLOWUP);
+                    TablePacking::new(6, 2, 3).with_fri_params(LOG_FINAL_POLY_LEN, LOG_BLOWUP);
 
                 let (airs_degrees_3, preprocessed_columns_3) =
                     get_airs_and_degrees_with_prep::<MyConfig, _, D>(

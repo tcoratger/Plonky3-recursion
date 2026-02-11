@@ -59,7 +59,7 @@ fn test_fibonacci_batch_verifier() {
 
     builder.dump_allocation_log();
 
-    let table_packing = TablePacking::new(1, 1, 4, 1);
+    let table_packing = TablePacking::new(1, 2, 4);
 
     // Use the default permutation for proving to match circuit's Fiat-Shamir challenger
     let perm = default_babybear_poseidon2_16();
@@ -130,7 +130,7 @@ fn test_fibonacci_batch_verifier() {
 
     const TRACE_D: usize = 1; // Proof traces are in base field
 
-    // Public values (empty for all 5 circuit tables, using base field)
+    // Public values (empty for all 5 circuit tables: Witness, Const, Public, Alu, Poseidon2)
     let pis: Vec<Vec<F>> = vec![vec![]; 5];
 
     // Build the recursive verification circuit
@@ -172,7 +172,7 @@ fn test_fibonacci_batch_verifier() {
     assert_eq!(public_inputs.len(), expected_public_input_len);
     assert!(!public_inputs.is_empty());
 
-    let verification_table_packing = TablePacking::new(16, 1, 8, 8);
+    let verification_table_packing = TablePacking::new(16, 1, 8);
     let poseidon2_config = Poseidon2Config::BabyBearD4Width16;
     let (verification_airs_degrees, verification_preprocessed_columns) =
         get_airs_and_degrees_with_prep::<MyConfig, _, 4>(

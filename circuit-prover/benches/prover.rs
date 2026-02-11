@@ -7,7 +7,7 @@ use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_ma
 use p3_baby_bear::BabyBear;
 use p3_batch_stark::ProverData;
 use p3_circuit::CircuitBuilder;
-use p3_circuit_prover::air::{AddAir, ConstAir, MulAir, PublicAir, WitnessAir};
+use p3_circuit_prover::air::{AluAir, ConstAir, PublicAir, WitnessAir};
 use p3_circuit_prover::common::get_airs_and_degrees_with_prep;
 use p3_circuit_prover::config::BabyBearConfig;
 use p3_circuit_prover::{BatchStarkProver, CircuitProverData, TablePacking, config};
@@ -49,11 +49,10 @@ fn fib_classical(n: usize) -> F {
 }
 
 fn bench_trace_to_matrix(c: &mut Criterion) {
-    let table_packing = TablePacking::new(4, 1, 4, 1);
+    let table_packing = TablePacking::new(4, 1, 4);
     let lanes_w = table_packing.witness_lanes();
     let lanes_p = table_packing.public_lanes();
-    let lanes_a = table_packing.add_lanes();
-    let lanes_m = table_packing.mul_lanes();
+    let lanes_a = table_packing.alu_lanes();
 
     let mut group = c.benchmark_group("trace_to_matrix");
     for n in [100, 500, 2000] {
@@ -72,8 +71,7 @@ fn bench_trace_to_matrix(c: &mut Criterion) {
                     &traces.public_trace,
                     lanes_p,
                 ));
-                let _ = black_box(AddAir::<F, 1>::trace_to_matrix(&traces.add_trace, lanes_a));
-                let _ = black_box(MulAir::<F, 1>::trace_to_matrix(&traces.mul_trace, lanes_m));
+                let _ = black_box(AluAir::<F, 1>::trace_to_matrix(&traces.alu_trace, lanes_a));
             });
         });
     }
@@ -81,7 +79,7 @@ fn bench_trace_to_matrix(c: &mut Criterion) {
 }
 
 fn bench_prove_all_tables(c: &mut Criterion) {
-    let table_packing = TablePacking::new(4, 1, 4, 1);
+    let table_packing = TablePacking::new(4, 1, 4);
 
     let mut group = c.benchmark_group("prove_all_tables");
     for n in [100, 500, 2000] {

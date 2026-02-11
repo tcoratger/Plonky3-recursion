@@ -5,7 +5,7 @@ use p3_batch_stark::{CommonData, ProverData};
 use p3_circuit::op::PrimitiveOpType;
 use p3_circuit::ops::{Poseidon2PermCall, generate_poseidon2_trace};
 use p3_circuit::{CircuitBuilder, Poseidon2PermOps};
-use p3_circuit_prover::air::{AddAir, ConstAir, MulAir, PublicAir, WitnessAir};
+use p3_circuit_prover::air::{AluAir, ConstAir, PublicAir, WitnessAir};
 use p3_circuit_prover::batch_stark_prover::PrimitiveTable;
 use p3_circuit_prover::common::{NonPrimitiveConfig, get_airs_and_degrees_with_prep};
 use p3_circuit_prover::{
@@ -101,7 +101,7 @@ fn test_wrong_multiplicities() {
     // Get a circuit that computes arithmetic operations.
     let builder = get_circuit(n);
 
-    let table_packing = TablePacking::new(1, 1, 4, 6);
+    let table_packing = TablePacking::new(1, 4, 4);
 
     let config_proving = get_proving_config();
 
@@ -111,7 +111,7 @@ fn test_wrong_multiplicities() {
 
     // Introduce an error in the witness multiplicities.
     preprocessed_columns.primitive[PrimitiveOpType::Witness as usize]
-        [PrimitiveTable::Add as usize] += F::ONE;
+        [PrimitiveTable::Alu as usize] += F::ONE;
     let (mut airs, degrees): (Vec<_>, Vec<usize>) = airs_degrees.into_iter().unzip();
     let mut runner = circuit.runner();
 
@@ -150,8 +150,8 @@ fn test_wrong_multiplicities() {
     // Build the recursive verification circuit
     let mut circuit_builder = setup_circuit_builder();
 
-    // Public values (empty for all 5 circuit tables, using base field)
-    let pis: Vec<Vec<F>> = vec![vec![]; 5];
+    // Public values (empty for all 4 circuit tables, using base field)
+    let pis: Vec<Vec<F>> = vec![vec![]; 4];
 
     // Attach verifier without manually building circuit_airs
     let params = Parameters {
@@ -211,7 +211,7 @@ fn test_wrong_expected_cumulated() {
     // which causes a WitnessConflict during recursive verification.
     batch_stark_proof.proof.global_lookup_data[0][0].expected_cumulated += F::ONE;
     // Introduce an error in the expected cumulated values for the first lookup.
-    assert!(batch_stark_proof.proof.global_lookup_data.len() == 5);
+    assert!(batch_stark_proof.proof.global_lookup_data.len() == 4);
 
     // Build the recursive verification circuit
     let mut circuit_builder = setup_circuit_builder();
@@ -266,7 +266,7 @@ fn test_inconsistent_lookup_name() {
 
     let real_lookup_data = batch_stark_proof.proof.global_lookup_data.clone();
     // First, modify the first global lookup data's name.
-    assert!(real_lookup_data.len() == 5);
+    assert!(real_lookup_data.len() == 4);
     let mut fake_global_lookup_data = real_lookup_data.clone();
     fake_global_lookup_data[0][0].name = "ModifiedLookup".to_string();
 
@@ -576,7 +576,7 @@ fn get_test_circuit_proof() -> TestCircuitProofData {
     // Get a circuit that computes arithmetic operations.
     let builder = get_circuit(n);
 
-    let table_packing = TablePacking::new(1, 1, 4, 6);
+    let table_packing = TablePacking::new(1, 4, 4);
 
     let config_proving = get_proving_config();
 
@@ -619,7 +619,7 @@ fn get_test_circuit_proof() -> TestCircuitProofData {
         pow_bits,
         log_height_max,
     };
-    let pis = vec![vec![]; 5];
+    let pis = vec![vec![]; 4];
 
     TestCircuitProofData {
         batch_stark_proof,
@@ -713,13 +713,9 @@ fn get_verifier_inputs_and_challenges(
             rows[PrimitiveTable::Public],
             packing.public_lanes(),
         )),
-        CircuitTablesAir::Add(AddAir::<F, TRACE_D>::new(
-            rows[PrimitiveTable::Add],
-            packing.add_lanes(),
-        )),
-        CircuitTablesAir::Mul(MulAir::<F, TRACE_D>::new(
-            rows[PrimitiveTable::Mul],
-            packing.mul_lanes(),
+        CircuitTablesAir::Alu(AluAir::<F, TRACE_D>::new(
+            rows[PrimitiveTable::Alu],
+            packing.alu_lanes(),
         )),
     ];
 
@@ -841,7 +837,7 @@ fn test_poseidon2_ctl_lookups() {
         })
         .unwrap();
 
-    let table_packing = TablePacking::new(1, 1, 4, 6);
+    let table_packing = TablePacking::new(1, 1, 4);
     let config_proving = get_proving_config();
 
     let circuit = builder.build().unwrap();
@@ -960,7 +956,7 @@ fn test_poseidon2_chained_ctl_lookups() {
         })
         .unwrap();
 
-    let table_packing = TablePacking::new(1, 1, 4, 6);
+    let table_packing = TablePacking::new(1, 1, 4);
     let config_proving = get_proving_config();
 
     let circuit = builder.build().unwrap();

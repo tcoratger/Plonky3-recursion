@@ -126,7 +126,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let expr_to_widx = circuit.expr_to_widx.clone();
 
     let stark_config = config::baby_bear().build();
-    let table_packing = TablePacking::new(1, 1, 1, 1);
+    let table_packing = TablePacking::new(2, 2, 2);
     let poseidon2_config = Poseidon2Config::BabyBearD4Width16;
     let (airs_degrees, preprocessed_columns) =
         get_airs_and_degrees_with_prep::<BabyBearConfig, _, 4>(
@@ -180,7 +180,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let circuit_prover_data = CircuitProverData::new(prover_data, preprocessed_columns);
 
     assert!(
-        !circuit_prover_data.common_data().lookups[5].is_empty(),
+        !circuit_prover_data.common_data().lookups[4].is_empty(),
         "Poseidon2 table should have lookups"
     );
 

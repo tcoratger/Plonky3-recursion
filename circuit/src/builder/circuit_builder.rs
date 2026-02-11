@@ -298,42 +298,42 @@ where
 
     /// Adds two expressions.
     ///
-    /// Cost: 1 row in Add table + 1 row in witness table.
+    /// Cost: 1 row in the ALU table (add selector) + 1 row in the witness table.
     pub fn add(&mut self, lhs: ExprId, rhs: ExprId) -> ExprId {
         self.alloc_add(lhs, rhs, "")
     }
 
     /// Adds two expressions with a descriptive label.
     ///
-    /// Cost: 1 row in Add table + 1 row in witness table.
+    /// Cost: 1 row in the ALU table (add selector) + 1 row in the witness table.
     pub fn alloc_add(&mut self, lhs: ExprId, rhs: ExprId, label: &'static str) -> ExprId {
         self.expr_builder.add_add(lhs, rhs, label)
     }
 
     /// Subtracts two expressions.
     ///
-    /// Cost: 1 row in Add table + 1 row in witness table (encoded as result + rhs = lhs).
+    /// Cost: 1 row in the ALU table (add selector) + 1 row in the witness table (encoded as result + rhs = lhs).
     pub fn sub(&mut self, lhs: ExprId, rhs: ExprId) -> ExprId {
         self.alloc_sub(lhs, rhs, "")
     }
 
     /// Subtracts two expressions with a descriptive label.
     ///
-    /// Cost: 1 row in Add table + 1 row in witness table.
+    /// Cost: 1 row in the ALU table (add selector) + 1 row in the witness table.
     pub fn alloc_sub(&mut self, lhs: ExprId, rhs: ExprId, label: &'static str) -> ExprId {
         self.expr_builder.add_sub(lhs, rhs, label)
     }
 
     /// Multiplies two expressions.
     ///
-    /// Cost: 1 row in Mul table + 1 row in witness table.
+    /// Cost: 1 row in the ALU table (mul selector) + 1 row in the witness table.
     pub fn mul(&mut self, lhs: ExprId, rhs: ExprId) -> ExprId {
         self.alloc_mul(lhs, rhs, "")
     }
 
     /// Multiplies two expressions with a descriptive label.
     ///
-    /// Cost: 1 row in Mul table + 1 row in witness table.
+    /// Cost: 1 row in the ALU table (mul selector) + 1 row in the witness table.
     pub fn alloc_mul(&mut self, lhs: ExprId, rhs: ExprId, label: &'static str) -> ExprId {
         self.expr_builder.add_mul(lhs, rhs, label)
     }
@@ -406,14 +406,14 @@ where
 
     /// Divides two expressions.
     ///
-    /// Cost: 1 row in Mul table + 1 row in witness table (encoded as rhs * out = lhs).
+    /// Cost: 1 row in the ALU table (mul selector) + 1 row in the witness table (encoded as rhs * out = lhs).
     pub fn div(&mut self, lhs: ExprId, rhs: ExprId) -> ExprId {
         self.alloc_div(lhs, rhs, "")
     }
 
     /// Divides two expressions with a descriptive label.
     ///
-    /// Cost: 1 row in Mul table + 1 row in witness table.
+    /// Cost: 1 row in the ALU table (mul selector) + 1 row in the witness table.
     pub fn alloc_div(&mut self, lhs: ExprId, rhs: ExprId, label: &'static str) -> ExprId {
         self.expr_builder.add_div(lhs, rhs, label)
     }
@@ -1418,12 +1418,18 @@ mod tests {
         assert_eq!(circuit.ops.len(), 4);
 
         match &circuit.ops[3] {
-            crate::op::Op::Add { out, a, b } => {
+            crate::op::Op::Alu {
+                kind: crate::op::AluOpKind::Add,
+                a,
+                b,
+                out,
+                ..
+            } => {
                 assert_eq!(*out, WitnessId(3));
                 assert_eq!(*a, WitnessId(1));
                 assert_eq!(*b, WitnessId(2));
             }
-            _ => panic!("Expected Add at index 3"),
+            _ => panic!("Expected ALU Add at index 3"),
         }
     }
 
@@ -1519,7 +1525,13 @@ mod tests {
             .ops
             .iter()
             .position(|op| match op {
-                crate::op::Op::Add { a, b, out } => {
+                crate::op::Op::Alu {
+                    kind: crate::op::AluOpKind::Add,
+                    a,
+                    b,
+                    out,
+                    ..
+                } => {
                     *out == w_sum0
                         && ((*a == w_out0 && *b == w_one) || (*a == w_one && *b == w_out0))
                 }
@@ -1531,7 +1543,13 @@ mod tests {
             .ops
             .iter()
             .position(|op| match op {
-                crate::op::Op::Add { a, b, out } => {
+                crate::op::Op::Alu {
+                    kind: crate::op::AluOpKind::Add,
+                    a,
+                    b,
+                    out,
+                    ..
+                } => {
                     *out == w_sum1
                         && ((*a == w_out1 && *b == w_one) || (*a == w_one && *b == w_out1))
                 }
@@ -2277,7 +2295,6 @@ mod proptests {
 
         let mut builder = CircuitBuilder::<Ext4>::new();
 
-        // Create base field coefficients embedded in extension field
         let c0 = builder.add_const(Ext4::from(BabyBear::from_u64(1)));
         let c1 = builder.add_const(Ext4::from(BabyBear::from_u64(2)));
         let c2 = builder.add_const(Ext4::from(BabyBear::from_u64(3)));
@@ -2288,17 +2305,14 @@ mod proptests {
             .recompose_base_coeffs_to_ext::<BabyBear>(&coeffs)
             .unwrap();
 
-        // Build and run
         let circuit = builder.build().expect("Failed to build circuit");
         let expr_to_widx = circuit.expr_to_widx.clone();
         let runner = circuit.runner();
         let traces = runner.run().expect("Failed to run circuit");
 
-        // Get the recomposed value
         let w = expr_to_widx.get(&recomposed).expect("recomposed mapped");
         let result = *traces.witness_trace.get_value(*w).unwrap();
 
-        // Expected: 1 + 2*w + 3*w^2 + 4*w^3
         let expected = Ext4::from_basis_coefficients_slice(&[
             BabyBear::from_u64(1),
             BabyBear::from_u64(2),
@@ -2316,7 +2330,6 @@ mod proptests {
 
         let mut builder = CircuitBuilder::<Ext4>::new();
 
-        // Create an extension field element with known coefficients
         let ext_val = Ext4::from_basis_coefficients_slice(&[
             BabyBear::from_u64(5),
             BabyBear::from_u64(6),
@@ -2330,19 +2343,15 @@ mod proptests {
 
         assert_eq!(coeffs.len(), 4);
 
-        // Build and run
         let circuit = builder.build().expect("Failed to build circuit");
         let expr_to_widx = circuit.expr_to_widx.clone();
         let runner = circuit.runner();
         let traces = runner.run().expect("Failed to run circuit");
 
-        // Verify each coefficient
         for (i, coeff_expr) in coeffs.iter().enumerate() {
             let w = expr_to_widx.get(coeff_expr).expect("coeff mapped");
             let coeff_val = *traces.witness_trace.get_value(*w).unwrap();
 
-            // Each coefficient should be a base field element embedded in extension
-            // i.e., only the first basis component is non-zero
             let expected_coeffs: &[BabyBear] = coeff_val.as_basis_coefficients_slice();
             assert_eq!(
                 expected_coeffs[0],
@@ -2368,7 +2377,6 @@ mod proptests {
 
         let mut builder = CircuitBuilder::<Ext4>::new();
 
-        // Create a random-ish extension field element
         let original = Ext4::from_basis_coefficients_slice(&[
             BabyBear::from_u64(123),
             BabyBear::from_u64(456),
@@ -2378,22 +2386,16 @@ mod proptests {
         .unwrap();
         let x = builder.add_const(original);
 
-        // Decompose then recompose
         let coeffs = builder.decompose_ext_to_base_coeffs::<BabyBear>(x).unwrap();
         let recomposed = builder
             .recompose_base_coeffs_to_ext::<BabyBear>(&coeffs)
             .unwrap();
 
-        // The original and recomposed should be connected (same value)
-        // Note: decompose_ext_to_base_coeffs already does this internally via connect
-
-        // Build and run
         let circuit = builder.build().expect("Failed to build circuit");
         let expr_to_widx = circuit.expr_to_widx.clone();
         let runner = circuit.runner();
         let traces = runner.run().expect("Failed to run circuit");
 
-        // Verify both have the same value
         let w_orig = expr_to_widx.get(&x).expect("original mapped");
         let w_recomp = expr_to_widx.get(&recomposed).expect("recomposed mapped");
 
@@ -2411,7 +2413,6 @@ mod proptests {
 
         let mut builder = CircuitBuilder::<Ext4>::new();
 
-        // Only 3 coefficients instead of 4
         let c0 = builder.add_const(Ext4::ONE);
         let c1 = builder.add_const(Ext4::ONE);
         let c2 = builder.add_const(Ext4::ONE);
@@ -2426,5 +2427,35 @@ mod proptests {
             }
             _ => panic!("Expected InvalidDimension error"),
         }
+    }
+
+    #[test]
+    fn test_bool_check_fusion() {
+        let mut builder = CircuitBuilder::<BabyBear>::new();
+
+        let b = builder.add_public_input();
+        builder.assert_bool(b);
+
+        let circuit = builder.build().unwrap();
+
+        let mut runner = circuit.runner();
+        runner.set_public_inputs(&[BabyBear::ZERO]).unwrap();
+        let traces = runner.run().unwrap();
+        assert!(
+            !traces.alu_trace.is_empty(),
+            "ALU trace should not be empty"
+        );
+
+        let mut builder2 = CircuitBuilder::<BabyBear>::new();
+        let b2 = builder2.add_public_input();
+        builder2.assert_bool(b2);
+        let circuit2 = builder2.build().unwrap();
+        let mut runner2 = circuit2.runner();
+        runner2.set_public_inputs(&[BabyBear::ONE]).unwrap();
+        let traces2 = runner2.run().unwrap();
+        assert!(
+            !traces2.alu_trace.is_empty(),
+            "ALU trace should not be empty"
+        );
     }
 }
