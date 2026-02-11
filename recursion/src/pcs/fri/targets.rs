@@ -469,21 +469,27 @@ where
     >;
 
     /// Observes all opened values and derives PCS-specific challenges.
-    fn get_challenges_circuit<const RATE: usize>(
+    fn get_challenges_circuit<const WIDTH: usize, const RATE: usize>(
         circuit: &mut CircuitBuilder<SC::Challenge>,
-        challenger: &mut CircuitChallenger<RATE>,
+        challenger: &mut CircuitChallenger<WIDTH, RATE>,
         fri_proof: &RecursiveFriProof<
             SC,
             RecursiveFriMmcs,
             InputProofTargets<Val<SC>, SC::Challenge, RecursiveInputMmcs>,
         >,
-        opened_values: &OpenedValuesTargetsWithLookups<SC>,
+        _opened_values: &OpenedValuesTargetsWithLookups<SC>,
         params: &Self::VerifierParams,
-    ) -> Result<Vec<Target>, CircuitBuilderError> {
-        opened_values.observe(circuit, challenger);
+    ) -> Result<Vec<Target>, CircuitBuilderError>
+    where
+        Val<SC>: PrimeField64,
+        SC::Challenge: ExtensionField<Val<SC>>,
+    {
+        // NOTE: Opened values must be observed by the caller BEFORE calling this function.
+        // For batch-STARK, the caller must observe in per-instance order to match native.
+        // For single-STARK, the caller can use opened_values.observe() directly.
 
-        // Sample FRI alpha (for batch opening reduction)
-        let fri_alpha = challenger.sample(circuit);
+        // Sample FRI alpha (for batch opening reduction) - extension field
+        let fri_alpha = challenger.sample_ext(circuit);
 
         // Sample FRI betas: one per commit phase
         // For each FRI commitment, observe it and sample beta
@@ -496,18 +502,14 @@ where
             let commit_targets = commit.to_observation_targets();
             challenger.observe_slice(circuit, &commit_targets);
             // Check commit-phase PoW witness.
-            challenger.check_witness(
-                circuit,
-                params.commit_pow_bits,
-                pow.witness,
-                Val::<SC>::bits(),
-            )?;
-            let beta = challenger.sample(circuit);
+            challenger.check_pow_witness(circuit, params.commit_pow_bits, pow.witness)?;
+            // Sample beta - extension field
+            let beta = challenger.sample_ext(circuit);
             betas.push(beta);
         }
 
-        // Observe final polynomial coefficients
-        challenger.observe_slice(circuit, &fri_proof.final_poly);
+        // Observe final polynomial coefficients (extension field values)
+        challenger.observe_ext_slice(circuit, &fri_proof.final_poly);
 
         // Bind the variable-arity schedule into the transcript before query grinding,
         // matching the native FRI verifier in Plonky3.
@@ -518,14 +520,13 @@ where
         }
 
         // Check query PoW witness.
-        challenger.check_witness(
+        challenger.check_pow_witness(
             circuit,
             params.query_pow_bits,
             fri_proof.pow_witness.witness,
-            Val::<SC>::bits(),
         )?;
 
-        // Sample query indices
+        // Sample query indices - base field elements used as indices
         let num_queries = fri_proof.query_proofs.len();
         let mut query_indices = Vec::with_capacity(num_queries);
         for _ in 0..num_queries {

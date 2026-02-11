@@ -1,25 +1,27 @@
 mod common;
 
+use p3_baby_bear::default_babybear_poseidon2_16;
 use p3_circuit::CircuitBuilder;
+use p3_circuit::ops::generate_poseidon2_trace;
 use p3_circuit::test_utils::{FibonacciAir, generate_trace_rows};
 use p3_field::PrimeCharacteristicRing;
 use p3_fri::create_test_fri_params;
+use p3_poseidon2_circuit_air::BabyBearD4Width16;
 use p3_recursion::pcs::fri::{FriVerifierParams, HashTargets, InputProofTargets, RecValMmcs};
 use p3_recursion::public_inputs::StarkVerifierInputsBuilder;
-use p3_recursion::{VerificationError, generate_challenges, verify_circuit};
+use p3_recursion::{Poseidon2Config, VerificationError, verify_circuit};
 use p3_uni_stark::{prove, verify};
-use rand::SeedableRng;
-use rand::rngs::SmallRng;
 
 use crate::common::baby_bear_params::*;
 
 #[test]
 fn test_fibonacci_verifier() -> Result<(), VerificationError> {
-    let mut rng = SmallRng::seed_from_u64(1);
     let n = 1 << 3;
     let x = 21;
 
-    let perm = Perm::new_from_rng_128(&mut rng);
+    // Use the default permutation for both proving and circuit verification
+    // to ensure the Fiat-Shamir challengers match
+    let perm = default_babybear_poseidon2_16();
     let hash = MyHash::new(perm.clone());
     let compress = MyCompress::new(perm.clone());
     let val_mmcs = ValMmcs::new(hash, compress);
@@ -29,10 +31,10 @@ fn test_fibonacci_verifier() -> Result<(), VerificationError> {
     let log_final_poly_len = 0;
     let fri_params = create_test_fri_params(challenge_mmcs, log_final_poly_len);
     let fri_verifier_params = FriVerifierParams::from(&fri_params);
-    let log_height_max = fri_params.log_final_poly_len + fri_params.log_blowup;
-    let pow_bits = fri_params.query_proof_of_work_bits;
+    let _log_height_max = fri_params.log_final_poly_len + fri_params.log_blowup;
+    let _pow_bits = fri_params.query_proof_of_work_bits;
     let pcs = MyPcs::new(dft, val_mmcs, fri_params);
-    let challenger = Challenger::new(perm);
+    let challenger = Challenger::new(perm.clone());
 
     let config = MyConfig::new(pcs, challenger);
     let pis = vec![BabyBear::ZERO, BabyBear::ONE, BabyBear::from_u64(x)];
@@ -42,6 +44,10 @@ fn test_fibonacci_verifier() -> Result<(), VerificationError> {
     assert!(verify(&config, &air, &proof, &pis).is_ok());
 
     let mut circuit_builder = CircuitBuilder::new();
+    circuit_builder.enable_poseidon2_perm::<BabyBearD4Width16, _>(
+        generate_poseidon2_trace::<Challenge, BabyBearD4Width16>,
+        perm, // Use the same permutation as the prover
+    );
 
     // Allocate all targets
     let verifier_inputs = StarkVerifierInputsBuilder::<
@@ -57,6 +63,7 @@ fn test_fibonacci_verifier() -> Result<(), VerificationError> {
         HashTargets<F, DIGEST_ELEMS>,
         InputProofTargets<F, Challenge, RecValMmcs<F, DIGEST_ELEMS, MyHash, MyCompress>>,
         InnerFri,
+        WIDTH,
         RATE,
     >(
         &config,
@@ -66,6 +73,7 @@ fn test_fibonacci_verifier() -> Result<(), VerificationError> {
         &verifier_inputs.air_public_targets,
         &None,
         &fri_verifier_params,
+        Poseidon2Config::BabyBearD4Width16,
     )?;
 
     // Build the circuit.
@@ -73,19 +81,8 @@ fn test_fibonacci_verifier() -> Result<(), VerificationError> {
 
     let mut runner = circuit.runner();
 
-    // Generate all the challenge values.
-    let all_challenges = generate_challenges(
-        &air,
-        &config,
-        &proof,
-        &pis,
-        Some(&[pow_bits, log_height_max]),
-    )?;
-
     // Pack values using the same builder
-    let num_queries = proof.opening_proof.query_proofs.len();
-    let public_inputs =
-        verifier_inputs.pack_values(&pis, &proof, &None, &all_challenges, num_queries);
+    let public_inputs = verifier_inputs.pack_values(&pis, &proof, &None);
 
     runner
         .set_public_inputs(&public_inputs)
