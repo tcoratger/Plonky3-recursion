@@ -401,6 +401,7 @@ impl<'a, F: PrimeCharacteristicRing + Eq + Clone> ExecutionContext<'a, F> {
         // Check for conflicting reassignment
         if let Some(existing_value) = slot.as_ref() {
             if *existing_value == value {
+                // Same value - this is fine (duplicate set via connect)
                 return Ok(());
             }
             return Err(CircuitError::WitnessConflict {

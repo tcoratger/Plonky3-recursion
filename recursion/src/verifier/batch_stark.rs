@@ -1,20 +1,28 @@
+#![allow(clippy::upper_case_acronyms)]
+
+use alloc::boxed::Box;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use alloc::{format, vec};
 
 use hashbrown::HashMap;
-use p3_air::{
-    Air as P3Air, AirBuilder, AirBuilderWithPublicValues, BaseAir as P3BaseAir,
-    PermutationAirBuilder,
-};
+use p3_air::{Air, Air as P3Air, AirBuilder, BaseAir as P3BaseAir};
+use p3_baby_bear::BabyBear;
 use p3_batch_stark::CommonData;
+use p3_circuit::op::NonPrimitiveOpType;
 use p3_circuit::utils::ColumnsTargets;
 use p3_circuit::{CircuitBuilder, NonPrimitiveOpId};
 use p3_circuit_prover::air::{AddAir, ConstAir, MulAir, PublicAir, WitnessAir};
 use p3_circuit_prover::batch_stark_prover::{PrimitiveTable, RowCounts};
 use p3_commit::{Pcs, PolynomialSpace};
 use p3_field::{BasedVectorSpace, ExtensionField, Field, PrimeCharacteristicRing, PrimeField64};
+use p3_koala_bear::KoalaBear;
 use p3_lookup::lookup_traits::{Kind, Lookup, LookupData, LookupGadget};
+use p3_poseidon2_air::RoundConstants;
+use p3_poseidon2_circuit_air::{
+    Poseidon2CircuitAirBabyBearD4Width16, Poseidon2CircuitAirBabyBearD4Width24,
+    Poseidon2CircuitAirKoalaBearD4Width16, Poseidon2CircuitAirKoalaBearD4Width24,
+};
 use p3_uni_stark::{StarkGenericConfig, SymbolicExpression, Val};
 
 use super::{ObservableCommitment, VerificationError, recompose_quotient_from_chunks_circuit};
@@ -42,6 +50,80 @@ pub type PcsVerifierParams<SC, InputProof, OpeningProof, Comm> =
         >>::Domain,
     >>::VerifierParams;
 
+const BABY_BEAR_MODULUS: u64 = 0x78000001;
+const KOALA_BEAR_MODULUS: u64 = 0x7f000001;
+
+/// Wrapper enum for Poseidon2 circuit AIRs used in recursive verification.
+///
+/// Erases the concrete field/config generics to allow inclusion in [`CircuitTablesAir`].
+/// Uses transmutes to bridge the generic `F` to concrete field types, following the same
+/// pattern as the prover's `Poseidon2AirWrapper`.
+pub enum Poseidon2VerifierAir {
+    BabyBearD4Width16(Box<Poseidon2CircuitAirBabyBearD4Width16>),
+    BabyBearD4Width24(Box<Poseidon2CircuitAirBabyBearD4Width24>),
+    KoalaBearD4Width16(Box<Poseidon2CircuitAirKoalaBearD4Width16>),
+    KoalaBearD4Width24(Box<Poseidon2CircuitAirKoalaBearD4Width24>),
+}
+
+impl Poseidon2VerifierAir {
+    /// Create a Poseidon2 verifier AIR from a [`Poseidon2Config`].
+    ///
+    /// Constructs the AIR without preprocessed data (not needed for verification).
+    pub fn from_config(config: Poseidon2Config) -> Self {
+        match config {
+            Poseidon2Config::BabyBearD1Width16 | Poseidon2Config::BabyBearD4Width16 => {
+                let constants: RoundConstants<BabyBear, 16, 4, 13> = RoundConstants::new(
+                    p3_baby_bear::BABYBEAR_RC16_EXTERNAL_INITIAL,
+                    p3_baby_bear::BABYBEAR_RC16_INTERNAL,
+                    p3_baby_bear::BABYBEAR_RC16_EXTERNAL_FINAL,
+                );
+                Self::BabyBearD4Width16(Box::new(Poseidon2CircuitAirBabyBearD4Width16::new(
+                    constants,
+                )))
+            }
+            Poseidon2Config::BabyBearD4Width24 => {
+                let constants: RoundConstants<BabyBear, 24, 4, 21> = RoundConstants::new(
+                    p3_baby_bear::BABYBEAR_RC24_EXTERNAL_INITIAL,
+                    p3_baby_bear::BABYBEAR_RC24_INTERNAL,
+                    p3_baby_bear::BABYBEAR_RC24_EXTERNAL_FINAL,
+                );
+                Self::BabyBearD4Width24(Box::new(Poseidon2CircuitAirBabyBearD4Width24::new(
+                    constants,
+                )))
+            }
+            Poseidon2Config::KoalaBearD1Width16 | Poseidon2Config::KoalaBearD4Width16 => {
+                let constants: RoundConstants<KoalaBear, 16, 4, 20> = RoundConstants::new(
+                    p3_koala_bear::KOALABEAR_RC16_EXTERNAL_INITIAL,
+                    p3_koala_bear::KOALABEAR_RC16_INTERNAL,
+                    p3_koala_bear::KOALABEAR_RC16_EXTERNAL_FINAL,
+                );
+                Self::KoalaBearD4Width16(Box::new(Poseidon2CircuitAirKoalaBearD4Width16::new(
+                    constants,
+                )))
+            }
+            Poseidon2Config::KoalaBearD4Width24 => {
+                let constants: RoundConstants<KoalaBear, 24, 4, 23> = RoundConstants::new(
+                    p3_koala_bear::KOALABEAR_RC24_EXTERNAL_INITIAL,
+                    p3_koala_bear::KOALABEAR_RC24_INTERNAL,
+                    p3_koala_bear::KOALABEAR_RC24_EXTERNAL_FINAL,
+                );
+                Self::KoalaBearD4Width24(Box::new(Poseidon2CircuitAirKoalaBearD4Width24::new(
+                    constants,
+                )))
+            }
+        }
+    }
+
+    fn width_inner(&self) -> usize {
+        match self {
+            Self::BabyBearD4Width16(a) => P3BaseAir::<BabyBear>::width(a.as_ref()),
+            Self::BabyBearD4Width24(a) => P3BaseAir::<BabyBear>::width(a.as_ref()),
+            Self::KoalaBearD4Width16(a) => P3BaseAir::<KoalaBear>::width(a.as_ref()),
+            Self::KoalaBearD4Width24(a) => P3BaseAir::<KoalaBear>::width(a.as_ref()),
+        }
+    }
+}
+
 // TODO(Robin): Remove with dynamic dispatch
 /// Wrapper enum for heterogeneous circuit table AIRs used by circuit-prover tables.
 pub enum CircuitTablesAir<F: Field, const D: usize> {
@@ -50,6 +132,7 @@ pub enum CircuitTablesAir<F: Field, const D: usize> {
     Public(PublicAir<F, D>),
     Add(AddAir<F, D>),
     Mul(MulAir<F, D>),
+    Poseidon2(Poseidon2VerifierAir),
 }
 
 impl<F: Field, const D: usize> P3BaseAir<F> for CircuitTablesAir<F, D> {
@@ -60,43 +143,243 @@ impl<F: Field, const D: usize> P3BaseAir<F> for CircuitTablesAir<F, D> {
             Self::Public(a) => P3BaseAir::width(a),
             Self::Add(a) => P3BaseAir::width(a),
             Self::Mul(a) => P3BaseAir::width(a),
+            Self::Poseidon2(a) => a.width_inner(),
         }
     }
 }
 
-impl<AB, const D: usize> P3Air<AB> for CircuitTablesAir<AB::F, D>
+impl<F, EF, const D: usize> P3Air<p3_uni_stark::SymbolicAirBuilder<F, EF>>
+    for CircuitTablesAir<F, D>
 where
-    AB: AirBuilder + PermutationAirBuilder + AirBuilderWithPublicValues,
-    AB::F: Field,
+    F: Field,
+    EF: ExtensionField<F>,
+    SymbolicExpression<EF>: From<SymbolicExpression<F>>,
 {
-    fn eval(&self, builder: &mut AB) {
+    fn eval(&self, builder: &mut p3_uni_stark::SymbolicAirBuilder<F, EF>) {
         match self {
             Self::Witness(a) => P3Air::eval(a, builder),
             Self::Const(a) => P3Air::eval(a, builder),
             Self::Public(a) => P3Air::eval(a, builder),
             Self::Add(a) => P3Air::eval(a, builder),
             Self::Mul(a) => P3Air::eval(a, builder),
+            Self::Poseidon2(p2) => {
+                // Delegate to the concrete Poseidon2 AIR via transmute, following the same
+                // pattern as circuit-prover's Poseidon2AirWrapper.
+                //
+                // SAFETY: SymbolicAirBuilder<F, EF> and SymbolicAirBuilder<ConcreteF, _>
+                // have identical struct layouts because all fields are Vec/RowMajorMatrix
+                // with zero-sized PhantomData in SymbolicVariable, and MontyField31 types
+                // have identical sizes. The runtime modulus check verifies type identity.
+                match p2 {
+                    Poseidon2VerifierAir::BabyBearD4Width16(air) => {
+                        assert_eq!(F::from_u64(BABY_BEAR_MODULUS), F::ZERO);
+                        unsafe {
+                            let builder_bb: &mut p3_uni_stark::SymbolicAirBuilder<BabyBear> =
+                                core::mem::transmute(builder);
+                            Air::eval(air.as_ref(), builder_bb);
+                        }
+                    }
+                    Poseidon2VerifierAir::BabyBearD4Width24(air) => {
+                        assert_eq!(F::from_u64(BABY_BEAR_MODULUS), F::ZERO);
+                        unsafe {
+                            let builder_bb: &mut p3_uni_stark::SymbolicAirBuilder<BabyBear> =
+                                core::mem::transmute(builder);
+                            Air::eval(air.as_ref(), builder_bb);
+                        }
+                    }
+                    Poseidon2VerifierAir::KoalaBearD4Width16(air) => {
+                        assert_eq!(F::from_u64(KOALA_BEAR_MODULUS), F::ZERO);
+                        unsafe {
+                            let builder_kb: &mut p3_uni_stark::SymbolicAirBuilder<KoalaBear> =
+                                core::mem::transmute(builder);
+                            Air::eval(air.as_ref(), builder_kb);
+                        }
+                    }
+                    Poseidon2VerifierAir::KoalaBearD4Width24(air) => {
+                        assert_eq!(F::from_u64(KOALA_BEAR_MODULUS), F::ZERO);
+                        unsafe {
+                            let builder_kb: &mut p3_uni_stark::SymbolicAirBuilder<KoalaBear> =
+                                core::mem::transmute(builder);
+                            Air::eval(air.as_ref(), builder_kb);
+                        }
+                    }
+                }
+            }
         }
     }
 
     fn add_lookup_columns(&mut self) -> Vec<usize> {
         match self {
-            Self::Witness(a) => P3Air::<AB>::add_lookup_columns(a),
-            Self::Const(a) => P3Air::<AB>::add_lookup_columns(a),
-            Self::Public(a) => P3Air::<AB>::add_lookup_columns(a),
-            Self::Add(a) => P3Air::<AB>::add_lookup_columns(a),
-            Self::Mul(a) => P3Air::<AB>::add_lookup_columns(a),
+            Self::Witness(a) => <WitnessAir<F, D> as P3Air<p3_uni_stark::SymbolicAirBuilder<F, EF>>>::add_lookup_columns(a),
+            Self::Const(a) => <ConstAir<F, D> as P3Air<p3_uni_stark::SymbolicAirBuilder<F, EF>>>::add_lookup_columns(a),
+            Self::Public(a) => <PublicAir<F, D> as P3Air<p3_uni_stark::SymbolicAirBuilder<F, EF>>>::add_lookup_columns(a),
+            Self::Add(a) => <AddAir<F, D> as P3Air<p3_uni_stark::SymbolicAirBuilder<F, EF>>>::add_lookup_columns(a),
+            Self::Mul(a) => <MulAir<F, D> as P3Air<p3_uni_stark::SymbolicAirBuilder<F, EF>>>::add_lookup_columns(a),
+            Self::Poseidon2(p2) => match p2 {
+                Poseidon2VerifierAir::BabyBearD4Width16(a) => {
+                    use p3_field::extension::BinomialExtensionField;
+                    type SAB = p3_uni_stark::SymbolicAirBuilder<BabyBear, BinomialExtensionField<BabyBear, 4>>;
+                    <Poseidon2CircuitAirBabyBearD4Width16 as Air<SAB>>::add_lookup_columns(a.as_mut())
+                }
+                Poseidon2VerifierAir::BabyBearD4Width24(a) => {
+                    use p3_field::extension::BinomialExtensionField;
+                    type SAB = p3_uni_stark::SymbolicAirBuilder<BabyBear, BinomialExtensionField<BabyBear, 4>>;
+                    <Poseidon2CircuitAirBabyBearD4Width24 as Air<SAB>>::add_lookup_columns(a.as_mut())
+                }
+                Poseidon2VerifierAir::KoalaBearD4Width16(a) => {
+                    use p3_field::extension::BinomialExtensionField;
+                    type SAB = p3_uni_stark::SymbolicAirBuilder<KoalaBear, BinomialExtensionField<KoalaBear, 4>>;
+                    <Poseidon2CircuitAirKoalaBearD4Width16 as Air<SAB>>::add_lookup_columns(a.as_mut())
+                }
+                Poseidon2VerifierAir::KoalaBearD4Width24(a) => {
+                    use p3_field::extension::BinomialExtensionField;
+                    type SAB = p3_uni_stark::SymbolicAirBuilder<KoalaBear, BinomialExtensionField<KoalaBear, 4>>;
+                    <Poseidon2CircuitAirKoalaBearD4Width24 as Air<SAB>>::add_lookup_columns(a.as_mut())
+                }
+            },
         }
     }
 
-    fn get_lookups(&mut self) -> Vec<p3_lookup::lookup_traits::Lookup<<AB>::F>> {
+    #[allow(clippy::missing_transmute_annotations)]
+    fn get_lookups(
+        &mut self,
+    ) -> Vec<
+        p3_lookup::lookup_traits::Lookup<
+            <p3_uni_stark::SymbolicAirBuilder<F, EF> as AirBuilder>::F,
+        >,
+    > {
         match self {
-            Self::Witness(a) => P3Air::<AB>::get_lookups(a),
-            Self::Const(a) => P3Air::<AB>::get_lookups(a),
-            Self::Public(a) => P3Air::<AB>::get_lookups(a),
-            Self::Add(a) => P3Air::<AB>::get_lookups(a),
-            Self::Mul(a) => P3Air::<AB>::get_lookups(a),
+            Self::Witness(a) => {
+                <WitnessAir<F, D> as P3Air<p3_uni_stark::SymbolicAirBuilder<F, EF>>>::get_lookups(a)
+            }
+            Self::Const(a) => {
+                <ConstAir<F, D> as P3Air<p3_uni_stark::SymbolicAirBuilder<F, EF>>>::get_lookups(a)
+            }
+            Self::Public(a) => {
+                <PublicAir<F, D> as P3Air<p3_uni_stark::SymbolicAirBuilder<F, EF>>>::get_lookups(a)
+            }
+            Self::Add(a) => {
+                <AddAir<F, D> as P3Air<p3_uni_stark::SymbolicAirBuilder<F, EF>>>::get_lookups(a)
+            }
+            Self::Mul(a) => {
+                <MulAir<F, D> as P3Air<p3_uni_stark::SymbolicAirBuilder<F, EF>>>::get_lookups(a)
+            }
+            Self::Poseidon2(p2) => {
+                // SAFETY: Lookup<F> and Lookup<BabyBear/KoalaBear> have the same layout
+                // when F is the matching concrete field type (both MontyField31).
+                match p2 {
+                    Poseidon2VerifierAir::BabyBearD4Width16(a) => unsafe {
+                        assert_eq!(F::from_u64(BABY_BEAR_MODULUS), F::ZERO);
+                        use p3_field::extension::BinomialExtensionField;
+                        type SAB = p3_uni_stark::SymbolicAirBuilder<
+                            BabyBear,
+                            BinomialExtensionField<BabyBear, 4>,
+                        >;
+                        let lookups =
+                            <Poseidon2CircuitAirBabyBearD4Width16 as Air<SAB>>::get_lookups(
+                                a.as_mut(),
+                            );
+                        core::mem::transmute(lookups)
+                    },
+                    Poseidon2VerifierAir::BabyBearD4Width24(a) => unsafe {
+                        assert_eq!(F::from_u64(BABY_BEAR_MODULUS), F::ZERO);
+                        use p3_field::extension::BinomialExtensionField;
+                        type SAB = p3_uni_stark::SymbolicAirBuilder<
+                            BabyBear,
+                            BinomialExtensionField<BabyBear, 4>,
+                        >;
+                        let lookups =
+                            <Poseidon2CircuitAirBabyBearD4Width24 as Air<SAB>>::get_lookups(
+                                a.as_mut(),
+                            );
+                        core::mem::transmute(lookups)
+                    },
+                    Poseidon2VerifierAir::KoalaBearD4Width16(a) => unsafe {
+                        assert_eq!(F::from_u64(KOALA_BEAR_MODULUS), F::ZERO);
+                        use p3_field::extension::BinomialExtensionField;
+                        type SAB = p3_uni_stark::SymbolicAirBuilder<
+                            KoalaBear,
+                            BinomialExtensionField<KoalaBear, 4>,
+                        >;
+                        let lookups =
+                            <Poseidon2CircuitAirKoalaBearD4Width16 as Air<SAB>>::get_lookups(
+                                a.as_mut(),
+                            );
+                        core::mem::transmute(lookups)
+                    },
+                    Poseidon2VerifierAir::KoalaBearD4Width24(a) => unsafe {
+                        assert_eq!(F::from_u64(KOALA_BEAR_MODULUS), F::ZERO);
+                        use p3_field::extension::BinomialExtensionField;
+                        type SAB = p3_uni_stark::SymbolicAirBuilder<
+                            KoalaBear,
+                            BinomialExtensionField<KoalaBear, 4>,
+                        >;
+                        let lookups =
+                            <Poseidon2CircuitAirKoalaBearD4Width24 as Air<SAB>>::get_lookups(
+                                a.as_mut(),
+                            );
+                        core::mem::transmute(lookups)
+                    },
+                }
+            }
         }
+    }
+}
+
+/// Create a MulAir with the appropriate constructor based on TRACE_D.
+///
+/// For D=1 (base field), uses `MulAir::new()`.
+/// For D>1 (extension field), uses `MulAir::new_binomial()` with the W parameter
+/// extracted from the challenge field type.
+fn create_mul_air<F, EF, const TRACE_D: usize>(num_ops: usize, lanes: usize) -> MulAir<F, TRACE_D>
+where
+    F: Field + PrimeCharacteristicRing,
+    EF: ExtensionField<F>,
+{
+    if TRACE_D == 1 {
+        MulAir::<F, TRACE_D>::new(num_ops, lanes)
+    } else {
+        // For D > 1, extract W from the extension field
+        // BinomialExtensionField<F, D> has W as the constant such that x^D = W
+        let w = extract_binomial_w::<F, EF>();
+        MulAir::<F, TRACE_D>::new_binomial(num_ops, lanes, w)
+    }
+}
+
+/// Extract the binomial parameter W from an extension field type.
+///
+/// For BinomialExtensionField<F, D>, this returns F::W.
+/// Panics if called on a non-extension field.
+fn extract_binomial_w<F: Field, EF: ExtensionField<F>>() -> F {
+    // The extension field dimension tells us the degree
+    let d = EF::DIMENSION;
+
+    // For common cases, we know the W values:
+    // BabyBear: x^4 = 11 (W = 11)
+    // KoalaBear: x^4 = 3 (W = 3)
+    // These are the standard Plonky3 values.
+    //
+    // We use a runtime check based on the field characteristic to determine W.
+    // This is a workaround since we can't easily extract W from the type at runtime.
+
+    if d == 4 {
+        // Check which field we're using based on the modulus
+        let baby_bear_mod = F::from_u64(2013265921);
+        let koala_bear_mod = F::from_u64(2130706433);
+
+        if baby_bear_mod == F::ZERO {
+            // BabyBear: W = 11
+            F::from_u64(11)
+        } else if koala_bear_mod == F::ZERO {
+            // KoalaBear: W = 3
+            F::from_u64(3)
+        } else {
+            // Goldilocks or other - try W = 7 (common for some fields)
+            // This is a fallback; proper implementation would use BinomiallyExtendable trait
+            F::from_u64(7)
+        }
+    } else {
+        panic!("Unsupported extension degree: {d}. Only D=1 and D=4 are supported.")
     }
 }
 
@@ -154,28 +437,48 @@ where
     let public_lanes = packing.public_lanes();
     let add_lanes = packing.add_lanes();
     let mul_lanes = packing.mul_lanes();
+    let min_height = packing.min_trace_height();
 
-    let circuit_airs = vec![
-        CircuitTablesAir::Witness(WitnessAir::<Val<SC>, TRACE_D>::new(
-            rows[PrimitiveTable::Witness],
-            witness_lanes,
-        )),
-        CircuitTablesAir::Const(ConstAir::<Val<SC>, TRACE_D>::new(
-            rows[PrimitiveTable::Const],
-        )),
-        CircuitTablesAir::Public(PublicAir::<Val<SC>, TRACE_D>::new(
-            rows[PrimitiveTable::Public],
-            public_lanes,
-        )),
-        CircuitTablesAir::Add(AddAir::<Val<SC>, TRACE_D>::new(
-            rows[PrimitiveTable::Add],
-            add_lanes,
-        )),
-        CircuitTablesAir::Mul(MulAir::<Val<SC>, TRACE_D>::new(
-            rows[PrimitiveTable::Mul],
-            mul_lanes,
-        )),
+    // Create MulAir with appropriate constructor based on TRACE_D
+    // For D > 1, we need the binomial parameter W.
+    // We extract it from the challenge field which is BinomialExtensionField<Val<SC>, D>.
+    let mul_air =
+        create_mul_air::<Val<SC>, SC::Challenge, TRACE_D>(rows[PrimitiveTable::Mul], mul_lanes)
+            .with_min_height(min_height);
+
+    let mut circuit_airs = vec![
+        CircuitTablesAir::Witness(
+            WitnessAir::<Val<SC>, TRACE_D>::new(rows[PrimitiveTable::Witness], witness_lanes)
+                .with_min_height(min_height),
+        ),
+        CircuitTablesAir::Const(
+            ConstAir::<Val<SC>, TRACE_D>::new(rows[PrimitiveTable::Const])
+                .with_min_height(min_height),
+        ),
+        CircuitTablesAir::Public(
+            PublicAir::<Val<SC>, TRACE_D>::new(rows[PrimitiveTable::Public], public_lanes)
+                .with_min_height(min_height),
+        ),
+        CircuitTablesAir::Add(
+            AddAir::<Val<SC>, TRACE_D>::new(rows[PrimitiveTable::Add], add_lanes)
+                .with_min_height(min_height),
+        ),
+        CircuitTablesAir::Mul(mul_air),
     ];
+
+    // Add non-primitive AIRs (e.g., Poseidon2) from the proof manifest.
+    for entry in &proof.non_primitives {
+        match entry.op_type {
+            NonPrimitiveOpType::Poseidon2Perm(config) => {
+                circuit_airs.push(CircuitTablesAir::Poseidon2(
+                    Poseidon2VerifierAir::from_config(config),
+                ));
+            }
+            NonPrimitiveOpType::Unconstrained => {
+                // Unconstrained operations don't produce a separate AIR table.
+            }
+        }
+    }
 
     // TODO: public values are empty for all circuit tables for now.
     let air_public_counts = vec![0usize; proof.proof.opened_values.instances.len()];

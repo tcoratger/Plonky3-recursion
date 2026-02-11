@@ -172,7 +172,7 @@ fn test_fibonacci_batch_verifier() {
     assert_eq!(public_inputs.len(), expected_public_input_len);
     assert!(!public_inputs.is_empty());
 
-    let verification_table_packing = TablePacking::new(16, 8, 8, 8);
+    let verification_table_packing = TablePacking::new(16, 1, 8, 8);
     let poseidon2_config = Poseidon2Config::BabyBearD4Width16;
     let (verification_airs_degrees, verification_preprocessed_columns) =
         get_airs_and_degrees_with_prep::<MyConfig, _, 4>(
@@ -219,12 +219,10 @@ fn test_fibonacci_batch_verifier() {
     let challenger3 = Challenger::new(perm3);
     let config3 = MyConfig::new(pcs3, challenger3);
 
-    // Create common data for the verification circuit
     let verification_prover_data =
         ProverData::from_airs_and_degrees(&config3, &mut verification_airs, &verification_degrees);
     let verification_circuit_prover_data =
         CircuitProverData::new(verification_prover_data, verification_preprocessed_columns);
-    let verification_common = verification_circuit_prover_data.common_data();
 
     let mut verification_prover =
         BatchStarkProver::new(config3).with_table_packing(verification_table_packing);
@@ -237,7 +235,10 @@ fn test_fibonacci_batch_verifier() {
 
     // Verify the proof of the verification circuit
     verification_prover
-        .verify_all_tables(&verification_proof, verification_common)
+        .verify_all_tables(
+            &verification_proof,
+            verification_circuit_prover_data.common_data(),
+        )
         .expect("Failed to verify proof of verification circuit");
 }
 

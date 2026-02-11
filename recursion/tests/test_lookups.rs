@@ -849,9 +849,7 @@ fn test_poseidon2_ctl_lookups() {
     let (airs_degrees, preprocessed_columns) = get_airs_and_degrees_with_prep::<MyConfig, _, 4>(
         &circuit,
         table_packing,
-        Some(&[p3_circuit_prover::common::NonPrimitiveConfig::Poseidon2(
-            Poseidon2Config::BabyBearD4Width16,
-        )]),
+        Some(&[NonPrimitiveConfig::Poseidon2(poseidon2_config)]),
     )
     .unwrap();
 
@@ -870,7 +868,7 @@ fn test_poseidon2_ctl_lookups() {
 
     let common = circuit_prover_data.common_data();
 
-    let mut prover = BatchStarkProver::new(config_proving);
+    let mut prover = BatchStarkProver::new(config_proving).with_table_packing(table_packing);
     prover.register_poseidon2_table(poseidon2_config);
 
     let proof = prover
@@ -989,7 +987,7 @@ fn test_poseidon2_chained_ctl_lookups() {
 
     let common = circuit_prover_data.common_data();
 
-    let mut prover = BatchStarkProver::new(config_proving);
+    let mut prover = BatchStarkProver::new(config_proving).with_table_packing(table_packing);
     prover.register_poseidon2_table(poseidon2_config);
 
     let proof = prover
