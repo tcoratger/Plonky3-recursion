@@ -6,7 +6,8 @@
 //! - nodes represent field operations,
 //! - edges represent dependencies between expressions.
 
-#[cfg(debug_assertions)]
+use alloc::string::String;
+#[cfg(feature = "debugging")]
 use alloc::vec;
 use alloc::vec::Vec;
 use core::hash::Hash;
@@ -17,8 +18,97 @@ use p3_field::PrimeCharacteristicRing;
 use crate::NonPrimitiveOpType;
 use crate::expr::{Expr, ExpressionGraph};
 use crate::types::{ExprId, NonPrimitiveOpId};
-#[cfg(debug_assertions)]
+#[cfg(feature = "debugging")]
 use crate::{AllocationEntry, AllocationType};
+
+/// Per-operation counters for profiling expression allocations.
+///
+/// This is only compiled when the `profiling` feature is enabled on the `p3-circuit` crate.
+#[cfg(feature = "profiling")]
+#[derive(Debug, Clone, Default)]
+pub struct OpCounts {
+    /// Number of public input expressions allocated.
+    pub publics: u64,
+    /// Number of constant expressions allocated.
+    pub consts: u64,
+    /// Number of addition expressions allocated.
+    pub adds: u64,
+    /// Number of subtraction expressions allocated.
+    pub subs: u64,
+    /// Number of multiplication expressions allocated.
+    pub muls: u64,
+    /// Number of division expressions allocated.
+    pub divs: u64,
+    /// Number of non-primitive calls allocated, broken down by type.
+    pub non_primitives: HashMap<NonPrimitiveOpType, u64>,
+}
+
+/// Internal profiling state tracking global and per-scope counts.
+#[cfg(feature = "profiling")]
+#[derive(Debug, Default)]
+pub struct ProfilingState {
+    pub(crate) global: OpCounts,
+    pub(crate) per_scope: HashMap<String, OpCounts>,
+    /// Dedicated scope stack for profiling so it can be enabled independently of debug assertions.
+    pub(crate) scope_stack: Vec<String>,
+}
+
+#[cfg(feature = "profiling")]
+impl ProfilingState {
+    #[inline]
+    fn bump_with(&mut self, mut f: impl FnMut(&mut OpCounts)) {
+        // Global totals.
+        f(&mut self.global);
+
+        // Per-scope totals (if a scope is active).
+        if let Some(scope) = self.scope_stack.last().cloned() {
+            let entry = self.per_scope.entry(scope).or_default();
+            f(entry);
+        }
+    }
+
+    #[inline]
+    fn bump_const(&mut self) {
+        self.bump_with(|c| c.consts += 1);
+    }
+
+    #[inline]
+    fn bump_public(&mut self) {
+        self.bump_with(|c| c.publics += 1);
+    }
+
+    #[inline]
+    fn bump_add(&mut self) {
+        self.bump_with(|c| c.adds += 1);
+    }
+
+    #[inline]
+    fn bump_sub(&mut self) {
+        self.bump_with(|c| c.subs += 1);
+    }
+
+    #[inline]
+    fn bump_mul(&mut self) {
+        self.bump_with(|c| c.muls += 1);
+    }
+
+    #[inline]
+    fn bump_div(&mut self) {
+        self.bump_with(|c| c.divs += 1);
+    }
+
+    #[inline]
+    fn bump_non_primitive(&mut self, op_type: NonPrimitiveOpType) {
+        // Global totals.
+        *self.global.non_primitives.entry(op_type).or_default() += 1;
+
+        // Per-scope totals (if a scope is active).
+        if let Some(scope) = self.scope_stack.last().cloned() {
+            let entry = self.per_scope.entry(scope).or_default();
+            *entry.non_primitives.entry(op_type).or_default() += 1;
+        }
+    }
+}
 
 /// Manages expression graph construction, constant pooling, and debug instrumentation.
 ///
@@ -64,7 +154,7 @@ pub struct ExpressionBuilder<F> {
     /// - Scope context
     ///
     /// **Only present in debug builds.**
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "debugging")]
     allocation_log: Vec<AllocationEntry>,
 
     /// Hierarchical scope stack for organizing allocations.
@@ -75,8 +165,15 @@ pub struct ExpressionBuilder<F> {
     /// The current scope is attached to each allocation.
     ///
     /// **Only present in debug builds.**
-    #[cfg(debug_assertions)]
-    scope_stack: Vec<&'static str>,
+    #[cfg(feature = "debugging")]
+    scope_stack: Vec<String>,
+
+    /// Optional profiling state for counting allocations by type and scope.
+    ///
+    /// This is only compiled when the `profiling` feature is enabled to avoid
+    /// any runtime overhead in normal builds.
+    #[cfg(feature = "profiling")]
+    profiling: ProfilingState,
 }
 
 impl<F> ExpressionBuilder<F>
@@ -121,10 +218,12 @@ where
             graph,
             const_pool,
             pending_connects: Vec::new(),
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "debugging")]
             allocation_log: Vec::new(),
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "debugging")]
             scope_stack: Vec::new(),
+            #[cfg(feature = "profiling")]
+            profiling: ProfilingState::default(),
         }
     }
 
@@ -167,12 +266,16 @@ where
         // Insert into the constant pool for future lookups.
         self.const_pool.insert(val, expr_id);
 
+        // Count constant allocations when profiling is enabled.
+        #[cfg(feature = "profiling")]
+        self.profiling.bump_const();
+
         // Log the allocation in debug builds only.
         //
-        // In release builds, this entire call compiles to nothing.
-        #[cfg(debug_assertions)]
+        // When the `debugging` feature is disabled, this compiles to a no-op.
+        #[cfg(feature = "debugging")]
         self.log_alloc(expr_id, label, || (AllocationType::Const, vec![]));
-        #[cfg(not(debug_assertions))]
+        #[cfg(not(feature = "debugging"))]
         self.log_alloc(expr_id, label, || ());
 
         expr_id
@@ -202,12 +305,16 @@ where
         // The `pos` field indicates which public input slot this expression reads from.
         let expr_id = self.graph.add_expr(Expr::Public(pos));
 
+        // Count public input allocations when profiling is enabled.
+        #[cfg(feature = "profiling")]
+        self.profiling.bump_public();
+
         // Log the allocation in debug builds.
         //
         // Public inputs have no dependencies (they are leaf nodes in the expression DAG).
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "debugging")]
         self.log_alloc(expr_id, label, || (AllocationType::Public, vec![]));
-        #[cfg(not(debug_assertions))]
+        #[cfg(not(feature = "debugging"))]
         self.log_alloc(expr_id, label, || ());
 
         expr_id
@@ -235,10 +342,13 @@ where
             return lhs;
         }
 
+        #[cfg(feature = "profiling")]
+        self.profiling.bump_add();
+
         self.add_bin_op(
             Expr::Add { lhs, rhs },
             label,
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "debugging")]
             AllocationType::Add,
             lhs,
             rhs,
@@ -262,10 +372,13 @@ where
     ///
     /// An [`ExprId`] handle to the subtraction expression.
     pub fn add_sub(&mut self, lhs: ExprId, rhs: ExprId, label: &'static str) -> ExprId {
+        #[cfg(feature = "profiling")]
+        self.profiling.bump_sub();
+
         self.add_bin_op(
             Expr::Sub { lhs, rhs },
             label,
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "debugging")]
             AllocationType::Sub,
             lhs,
             rhs,
@@ -299,10 +412,13 @@ where
             return lhs;
         }
 
+        #[cfg(feature = "profiling")]
+        self.profiling.bump_mul();
+
         self.add_bin_op(
             Expr::Mul { lhs, rhs },
             label,
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "debugging")]
             AllocationType::Mul,
             lhs,
             rhs,
@@ -326,10 +442,13 @@ where
     ///
     /// An [`ExprId`] handle to the division expression.
     pub fn add_div(&mut self, lhs: ExprId, rhs: ExprId, label: &'static str) -> ExprId {
+        #[cfg(feature = "profiling")]
+        self.profiling.bump_div();
+
         self.add_bin_op(
             Expr::Div { lhs, rhs },
             label,
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "debugging")]
             AllocationType::Div,
             lhs,
             rhs,
@@ -351,11 +470,11 @@ where
             .graph
             .add_expr(Expr::NonPrimitiveOutput { call, output_idx });
 
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "debugging")]
         self.log_alloc(expr_id, label, || {
             (AllocationType::NonPrimitiveOutput, vec![vec![call]])
         });
-        #[cfg(not(debug_assertions))]
+        #[cfg(not(feature = "debugging"))]
         self.log_alloc(expr_id, label, || ());
 
         expr_id
@@ -377,18 +496,22 @@ where
         inputs: Vec<ExprId>,
         label: &'static str,
     ) -> ExprId {
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "debugging")]
         let dependencies: Vec<Vec<ExprId>> = inputs.iter().map(|&id| vec![id]).collect();
 
         let expr_id = self
             .graph
             .add_expr(Expr::NonPrimitiveCall { op_id, inputs });
 
-        #[cfg(debug_assertions)]
+        // Count non-primitive calls when profiling is enabled.
+        #[cfg(feature = "profiling")]
+        self.profiling.bump_non_primitive(op_type);
+
+        #[cfg(feature = "debugging")]
         self.log_alloc(expr_id, label, || {
             (AllocationType::NonPrimitiveOp(op_type), dependencies)
         });
-        #[cfg(not(debug_assertions))]
+        #[cfg(not(feature = "debugging"))]
         self.log_alloc(expr_id, label, || ());
 
         expr_id
@@ -413,7 +536,7 @@ where
         &mut self,
         expr: Expr<F>,
         label: &'static str,
-        #[cfg(debug_assertions)] alloc_type: AllocationType,
+        #[cfg(feature = "debugging")] alloc_type: AllocationType,
         lhs: ExprId,
         rhs: ExprId,
     ) -> ExprId {
@@ -423,9 +546,9 @@ where
         // Log the allocation with dependencies.
         //
         // Binary operations have two dependencies: one for lhs, one for rhs.
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "debugging")]
         self.log_alloc(expr_id, label, || (alloc_type, vec![vec![lhs], vec![rhs]]));
-        #[cfg(not(debug_assertions))]
+        #[cfg(not(feature = "debugging"))]
         self.log_alloc(expr_id, label, || ());
 
         expr_id
@@ -490,7 +613,7 @@ where
     /// - `id`: The expression ID being logged
     /// - `label`: Human-readable label
     /// - `info_fn`: Closure that produces allocation metadata **only when needed**
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "debugging")]
     #[inline(always)]
     fn log_alloc<Info>(&mut self, id: ExprId, label: &'static str, info_fn: Info)
     where
@@ -500,7 +623,7 @@ where
         let (alloc_type, dependencies) = info_fn();
 
         // Capture the current scope from the stack.
-        let scope = self.scope_stack.last().copied();
+        let scope = self.scope_stack.last().cloned();
 
         // Add an entry to the allocation log.
         self.allocation_log.push(AllocationEntry {
@@ -513,7 +636,7 @@ where
     }
 
     /// No-op logging helper for release builds.
-    #[cfg(not(debug_assertions))]
+    #[cfg(not(feature = "debugging"))]
     #[inline(always)]
     #[allow(clippy::needless_pass_by_ref_mut)]
     fn log_alloc<Info>(&mut self, _id: ExprId, _label: &'static str, _info_fn: Info)
@@ -535,7 +658,7 @@ where
     /// - `input_deps`: Input expression dependencies for this operation
     /// - `output_deps`: Output expression dependencies for this operation
     /// - `label`: Human-readable label
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "debugging")]
     pub fn log_non_primitive_op(
         &mut self,
         op_id: crate::types::NonPrimitiveOpId,
@@ -545,7 +668,7 @@ where
         label: &'static str,
     ) {
         // Capture the current scope.
-        let scope = self.scope_stack.last().copied();
+        let scope = self.scope_stack.last().cloned();
 
         // Combine inputs and outputs for dependency tracking.
         // Use a separator to distinguish inputs from outputs in the log.
@@ -575,9 +698,12 @@ where
     /// - `scope`: Human-readable scope name
     #[allow(unused_variables)]
     #[allow(clippy::missing_const_for_fn)]
-    pub fn push_scope(&mut self, scope: &'static str) {
-        #[cfg(debug_assertions)]
-        self.scope_stack.push(scope);
+    pub fn push_scope(&mut self, scope: impl Into<String>) {
+        let scope = scope.into();
+        #[cfg(feature = "debugging")]
+        self.scope_stack.push(scope.clone());
+        #[cfg(feature = "profiling")]
+        self.profiling.scope_stack.push(scope);
     }
 
     /// Pops the current scope from the scope stack (debug builds only).
@@ -587,8 +713,10 @@ where
     /// Panics if the scope stack is empty (mismatched push/pop).
     #[allow(clippy::missing_const_for_fn)]
     pub fn pop_scope(&mut self) {
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "debugging")]
         self.scope_stack.pop();
+        #[cfg(feature = "profiling")]
+        self.profiling.scope_stack.pop();
     }
 
     /// Returns the current scope (debug builds only).
@@ -599,9 +727,9 @@ where
     ///
     /// - `Some(&'static str)` - The name of the current scope
     /// - `None` - No active scope
-    #[cfg(debug_assertions)]
-    pub fn current_scope(&self) -> Option<&'static str> {
-        self.scope_stack.last().copied()
+    #[cfg(feature = "debugging")]
+    pub fn current_scope(&self) -> Option<&str> {
+        self.scope_stack.last().map(|s| s.as_str())
     }
 
     /// Returns a reference to the allocation log (debug builds only).
@@ -612,7 +740,7 @@ where
     /// # Returns
     ///
     /// A slice of [`AllocationEntry`] containing all recorded allocations.
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "debugging")]
     pub fn allocation_log(&self) -> &[AllocationEntry] {
         &self.allocation_log
     }
@@ -623,7 +751,7 @@ where
     #[allow(clippy::missing_const_for_fn)]
     #[allow(unused_variables)]
     pub fn dump_expr_ids(&self, expr_ids: &[ExprId]) {
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "debugging")]
         crate::alloc_entry::dump_expr_ids(&self.allocation_log, expr_ids);
     }
 
@@ -638,7 +766,7 @@ where
     /// this method does nothing.
     #[allow(clippy::missing_const_for_fn)]
     pub fn dump_allocation_log(&self) {
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "debugging")]
         crate::alloc_entry::dump_allocation_log(&self.allocation_log);
     }
 
@@ -652,15 +780,21 @@ where
     /// - **Debug builds**: Vector of unique scope names
     /// - **Release builds**: Empty vector (no scopes tracked)
     #[allow(clippy::missing_const_for_fn)]
-    pub fn list_scopes(&self) -> Vec<&'static str> {
-        #[cfg(debug_assertions)]
+    pub fn list_scopes(&self) -> Vec<String> {
+        #[cfg(feature = "debugging")]
         {
             crate::alloc_entry::list_scopes(&self.allocation_log)
         }
-        #[cfg(not(debug_assertions))]
+        #[cfg(not(feature = "debugging"))]
         {
             Vec::new()
         }
+    }
+
+    /// Returns the global and per-scope operation counts when profiling is enabled.
+    #[cfg(feature = "profiling")]
+    pub const fn profiling_counts(&self) -> (&OpCounts, &HashMap<String, OpCounts>) {
+        (&self.profiling.global, &self.profiling.per_scope)
     }
 }
 
@@ -675,10 +809,11 @@ where
 
 #[cfg(test)]
 mod tests {
-
     use p3_baby_bear::BabyBear;
 
     use super::*;
+    #[cfg(feature = "debugging")]
+    use crate::alloc::string::ToString;
 
     #[test]
     fn test_new_builder_has_zero_constant() {
@@ -1035,7 +1170,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "debugging")]
     fn test_scope_stack() {
         // Test scope push/pop functionality
         let mut builder = ExpressionBuilder::<BabyBear>::new();
@@ -1061,7 +1196,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "debugging")]
     fn test_allocation_log() {
         // Allocation log should track all allocations
         let mut builder = ExpressionBuilder::<BabyBear>::new();
@@ -1085,7 +1220,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "debugging")]
     fn test_list_scopes() {
         // list_scopes should return unique scopes
         let mut builder = ExpressionBuilder::<BabyBear>::new();
@@ -1100,8 +1235,8 @@ mod tests {
         builder.add_const(BabyBear::from_u64(3), "in_a_again");
 
         let scopes = builder.list_scopes();
-        assert!(scopes.contains(&"scope_a"));
-        assert!(scopes.contains(&"scope_b"));
+        assert!(scopes.contains(&("scope_a".to_string())));
+        assert!(scopes.contains(&("scope_b".to_string())));
     }
 
     #[test]
