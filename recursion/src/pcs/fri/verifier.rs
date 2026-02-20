@@ -1036,6 +1036,7 @@ fn open_input<F, EF, Comm>(
     commitments_with_opening_points: &ComsWithOpeningsTargets<Comm, TwoAdicMultiplicativeCoset<F>>,
     batch_opened_values: &[Vec<Vec<Target>>], // Per batch -> per matrix -> per column
     permutation_config: Option<Poseidon2Config>,
+    pre_packed_input_caps: Option<&[Vec<Vec<Target>>]>,
 ) -> Result<(Vec<(usize, Target)>, Vec<NonPrimitiveOpId>), VerificationError>
 where
     F: Field + TwoAdicField + PrimeField64,
@@ -1096,8 +1097,19 @@ where
     {
         // Recursive MMCS verification for this batch
         if let Some(perm_config) = permutation_config {
-            let lifted_commitment = batch_commit.to_observation_targets();
-            let packed_commitment = pack_lifted_to_ext::<F, EF>(builder, &lifted_commitment);
+            // Use pre-packed cap if available, otherwise pack on the fly
+            let commitment_cap: Vec<Vec<Target>> = if let Some(pre_packed) = pre_packed_input_caps {
+                pre_packed[batch_idx].clone()
+            } else {
+                let lifted_commitment = batch_commit.to_observation_targets();
+                let packed_commitment_flat =
+                    pack_lifted_to_ext::<F, EF>(builder, &lifted_commitment);
+                let rate_ext = perm_config.rate_ext();
+                packed_commitment_flat
+                    .chunks(rate_ext)
+                    .map(|c| c.to_vec())
+                    .collect()
+            };
 
             let dimensions: Vec<Dimensions> = mats
                 .iter()
@@ -1110,7 +1122,7 @@ where
             let op_ids = verify_batch_circuit::<F, EF>(
                 builder,
                 perm_config,
-                &packed_commitment,
+                &commitment_cap,
                 &dimensions,
                 index_bits,
                 batch_openings,
@@ -1320,6 +1332,36 @@ where
     let beta_pows_per_phase = precompute_beta_powers_per_phase(builder, betas, log_arities);
     let powers_of_g_final = precompute_two_adic_powers::<F, EF>(builder, log_max_height);
 
+    // Pre-pack commitment caps once so they can be reused across all queries.
+    // Each input batch commitment and each commit-phase commitment is packed from
+    // lifted representation to extension representation a single time.
+    let pre_packed_input_caps: Option<Vec<Vec<Vec<Target>>>> =
+        permutation_config.map(|perm_config| {
+            let rate_ext = perm_config.rate_ext();
+            commitments_with_opening_points
+                .iter()
+                .map(|(commit, _)| {
+                    let lifted = commit.to_observation_targets();
+                    let packed = pack_lifted_to_ext::<F, EF>(builder, &lifted);
+                    packed.chunks(rate_ext).map(|c| c.to_vec()).collect()
+                })
+                .collect()
+        });
+
+    let pre_packed_commit_caps: Option<Vec<Vec<Vec<Target>>>> =
+        permutation_config.map(|perm_config| {
+            let rate_ext = perm_config.rate_ext();
+            fri_proof_targets
+                .commit_phase_commits
+                .iter()
+                .map(|commit| {
+                    let lifted = commit.to_observation_targets();
+                    let packed = pack_lifted_to_ext::<F, EF>(builder, &lifted);
+                    packed.chunks(rate_ext).map(|c| c.to_vec()).collect()
+                })
+                .collect()
+        });
+
     // Collect all MMCS operation IDs for private data setting
     let mut all_mmcs_op_ids = Vec::new();
 
@@ -1342,6 +1384,7 @@ where
             commitments_with_opening_points,
             &batch_opened_values,
             permutation_config,
+            pre_packed_input_caps.as_deref(),
         )?;
         all_mmcs_op_ids.extend(input_mmcs_ops);
 
@@ -1465,9 +1508,20 @@ where
                 let evals =
                     reconstruct_evals(builder, current_folded, siblings, index_in_group_bits);
 
-                // Pack commitment from lifted to packed representation
-                let lifted_commitment = commit.to_observation_targets();
-                let packed_commitment = pack_lifted_to_ext::<F, EF>(builder, &lifted_commitment);
+                // Use pre-packed commit-phase cap
+                let commitment_cap: Vec<Vec<Target>> =
+                    if let Some(ref pre_packed) = pre_packed_commit_caps {
+                        pre_packed[phase_idx].clone()
+                    } else {
+                        let lifted_commitment = commit.to_observation_targets();
+                        let packed_commitment_flat =
+                            pack_lifted_to_ext::<F, EF>(builder, &lifted_commitment);
+                        let rate_ext = perm_config.rate_ext();
+                        packed_commitment_flat
+                            .chunks(rate_ext)
+                            .map(|c| c.to_vec())
+                            .collect()
+                    };
 
                 // Dimensions: width = arity, height = 2^log_folded_height
                 let folded_height = 1usize << log_folded_height;
@@ -1500,7 +1554,7 @@ where
                 let commit_phase_ops = verify_batch_circuit::<F, EF>(
                     builder,
                     perm_config,
-                    &packed_commitment,
+                    &commitment_cap,
                     &dimensions,
                     &parent_index_bits,
                     &evals_base_for_mmcs,

@@ -141,31 +141,37 @@ where
         .collect()
 }
 
-/// Recursive verison of `MerkleTreeMmcs::verify_batch`. Adds a circuit that verifies an opened batch of rows with respect to a given commitment.
+/// Recursive version of `MerkleTreeMmcs::verify_batch`. Adds a circuit that verifies an opened
+/// batch of rows with respect to a given commitment (Merkle cap).
 ///
 /// - `circuit`: The circuit builder to which we add the verify_batch circuit
-/// - `commit`: The merkle root of the tree.
+/// - `commitment_cap`: The Merkle cap entries. Each inner slice has `rate_ext` packed extension
+///   targets representing one cap entry. A single-element cap (`cap_height = 0`) corresponds to
+///   the traditional single root.
 /// - `dimensions`: A vector of the dimensions of the matrices committed to.
-/// - `directions`: The little-endian binary decomposition of the index of a leaf in the tree.
-/// - `opened_values`: A vector of matrix rows. Assume that the tallest matrix committed
-///   to has height `2^n >= M_tall.height() > 2^{n - 1}` and the `j`th matrix has height
-///   `2^m >= Mj.height() > 2^{m - 1}`. Then `j`'th value of opened values must be the row `Mj[index >> (m - n)]`.
-/// - `proof`: A vector of sibling nodes. The `i`th element should be the node at level `i`
-///   with index `(index << i) ^ 1`.
+/// - `index_bits`: The little-endian binary decomposition of the index of a leaf in the tree.
+///   Length must equal `log2_ceil(max_height)`.
+/// - `opened_values`: A vector of matrix rows (packed extension field targets).
 ///
-/// Returns the list of permutations operations requiring private data, otherwise returns an error.
+/// Returns the list of permutation operations requiring private data, otherwise returns an error.
+///
+/// # Merkle Cap Support
+///
+/// The Merkle cap of height `h` is the `h`-th layer from the root. A cap of height 0 is the root
+/// itself. When `cap_height > 0`, the opening proof is `cap_height` elements shorter and the
+/// remaining upper index bits select the correct cap entry to verify against.
 ///
 /// # Parameters
 /// - `circuit`: The circuit builder
 /// - `permutation_config`: Poseidon2 configuration
-/// - `commitment`: The Merkle root (2 extension elements)
+/// - `commitment_cap`: Merkle cap entries, each with `rate_ext` packed extension targets
 /// - `dimensions`: Matrix dimensions (height used for tree structure)
-/// - `index_bits`: Merkle path direction bits
+/// - `index_bits`: All Merkle path direction bits (length = `log_max_height`)
 /// - `opened_base_coeffs`: Base field coefficients per matrix (already decomposed)
 pub fn verify_batch_circuit<F, EF>(
     circuit: &mut CircuitBuilder<EF>,
     permutation_config: Poseidon2Config,
-    commitment: &[Target],
+    commitment_cap: &[Vec<Target>],
     dimensions: &[Dimensions],
     index_bits: &[Target],
     opened_base_coeffs: &[Vec<Target>],
@@ -175,6 +181,7 @@ where
     EF: ExtensionField<F>,
 {
     use p3_circuit::ops::mmcs::add_mmcs_verify;
+    use p3_util::log2_strict_usize;
 
     if dimensions.len() != opened_base_coeffs.len() {
         return Err(CircuitBuilderError::WrongBatchSize {
@@ -183,20 +190,45 @@ where
         });
     }
 
+    assert!(
+        !commitment_cap.is_empty(),
+        "commitment cap must have at least one entry"
+    );
+
     use core::cmp::Reverse;
 
     use itertools::Itertools;
 
+    // Derive cap_height from commitment size: cap has 2^cap_height entries
+    let cap_height = if commitment_cap.len() == 1 {
+        0
+    } else {
+        log2_strict_usize(commitment_cap.len())
+    };
+
+    let max_height_log = index_bits.len();
+    let path_depth = max_height_log - cap_height;
+
+    // Split index_bits into path bits (for Merkle traversal) and cap index bits
+    let path_bits = &index_bits[..path_depth];
+    let cap_index_bits = &index_bits[path_depth..];
+
+    // Select the correct cap entry using a multiplexer
+    let selected_root = select_cap_entry(circuit, commitment_cap, cap_index_bits);
+
     // Group matrices by height level (matching format_openings logic)
     // Native MMCS combines all matrices at the same height THEN hashes them together
-    let max_height_log = index_bits.len();
     let mut heights_tallest_first = dimensions
         .iter()
         .enumerate()
         .sorted_by_key(|(_, dims)| Reverse(dims.height))
         .peekable();
 
-    let mut formatted_digests = vec![vec![]; max_height_log];
+    // Build digests for path_depth levels (the Merkle path below the cap) plus one
+    // extra level for matrices whose heights match the cap level. In the native MMCS,
+    // these cap-level rows are injected after the last sibling compression.
+    let digest_levels = path_depth + 1;
+    let mut formatted_digests = vec![vec![]; digest_levels];
     for (i, digest) in formatted_digests.iter_mut().enumerate() {
         let curr_height = 1 << (max_height_log - i);
 
@@ -225,9 +257,58 @@ where
         circuit,
         permutation_config,
         &op_vals_digests,
-        index_bits,
-        commitment,
+        path_bits,
+        &selected_root,
     )
+}
+
+/// Select one cap entry from a Merkle cap using a binary tree multiplexer.
+///
+/// For `cap_height = 0` (single entry), returns the entry directly.
+/// For `cap_height > 0`, progressively halves the candidates using one index bit
+/// at each level. Each selection step computes `left + bit * (right - left)` per
+/// component, requiring only one multiplication per component per level.
+///
+/// Total cost: `rate_ext * (2^cap_height - 1)` multiplications, compared to
+/// `(cap_height + rate_ext) * 2^cap_height` for the one-hot + dot-product approach.
+fn select_cap_entry<EF: Field>(
+    circuit: &mut CircuitBuilder<EF>,
+    cap: &[Vec<Target>],
+    index_bits: &[Target],
+) -> Vec<Target> {
+    if cap.len() == 1 {
+        return cap[0].clone();
+    }
+
+    debug_assert_eq!(cap.len(), 1 << index_bits.len());
+
+    let rate_ext = cap[0].len();
+
+    // Binary tree selection: each bit halves the number of candidates.
+    // bit[0] (LSB) selects between adjacent pairs, bit[1] between groups of 4, etc.
+    let mut current: Vec<Vec<Target>> = cap.to_vec();
+
+    for &bit in index_bits {
+        let half = current.len() / 2;
+        let mut next = Vec::with_capacity(half);
+        for i in 0..half {
+            let left = &current[2 * i];
+            let right = &current[2 * i + 1];
+            let mut selected = Vec::with_capacity(rate_ext);
+            for j in 0..rate_ext {
+                // left[j] + bit * (right[j] - left[j])
+                let diff = circuit.sub(right[j], left[j]);
+                let term = circuit.mul(bit, diff);
+                let val = circuit.add(left[j], term);
+                selected.push(val);
+            }
+            next.push(selected);
+        }
+        current = next;
+    }
+
+    debug_assert_eq!(current.len(), 1);
+    current.into_iter().next().unwrap()
 }
 
 /// Convert a base field Merkle proof to extension field sibling values.
@@ -412,10 +493,14 @@ mod test {
     }
 
     fn test_all_openings(mats: Vec<RowMajorMatrix<F>>) {
+        test_all_openings_with_cap_height(mats, 0);
+    }
+
+    fn test_all_openings_with_cap_height(mats: Vec<RowMajorMatrix<F>>, cap_height: usize) {
         let perm = default_babybear_poseidon2_16();
         let hash = MyHash::new(perm.clone());
         let compress = MyCompress::new(perm.clone());
-        let mmcs = MyMmcs::new(hash, compress);
+        let mmcs = MyMmcs::new(hash, compress, cap_height);
 
         let dimensions = mats.iter().map(DenseMatrix::dimensions).collect_vec();
 
@@ -429,7 +514,7 @@ mod test {
 
         let (commit, prover_data) = mmcs.commit(mats);
 
-        let path_depth = log2_ceil_usize(max_height);
+        let log_max_height = log2_ceil_usize(max_height);
         for index in 0..max_height {
             let mut builder = CircuitBuilder::<CF>::new();
             let permutation_config = Poseidon2Config::BabyBearD4Width16;
@@ -440,7 +525,9 @@ mod test {
 
             let batch_opening = mmcs.open_batch(index, &prover_data);
 
-            let directions = (0..path_depth).map(|k| index >> k & 1 == 1).collect_vec();
+            let directions = (0..log_max_height)
+                .map(|k| index >> k & 1 == 1)
+                .collect_vec();
 
             let openings: Vec<Vec<_>> = batch_opening
                 .opened_values
@@ -452,13 +539,19 @@ mod test {
                 })
                 .collect_vec();
 
-            let directions_expr = builder.alloc_public_inputs(path_depth, "directions");
-            let root = builder.alloc_public_inputs(permutation_config.rate_ext(), "root");
+            let directions_expr = builder.alloc_public_inputs(log_max_height, "directions");
+
+            // Allocate cap entries: each entry has rate_ext extension targets
+            let cap_len = commit.num_roots();
+            let rate_ext = permutation_config.rate_ext();
+            let cap_exprs: Vec<Vec<_>> = (0..cap_len)
+                .map(|_| builder.alloc_public_inputs(rate_ext, "cap entry").to_vec())
+                .collect();
 
             let permutation_mmcs_ops = verify_batch_circuit::<F, CF>(
                 &mut builder,
                 permutation_config,
-                &root,
+                &cap_exprs,
                 &dimensions,
                 &directions_expr,
                 &openings,
@@ -479,10 +572,12 @@ mod test {
                 .flat_map(|values| values.iter().map(|&v| CF::from(v)))
                 .collect();
             public_inputs.extend(directions_expr_vals.iter());
-            let commit_base = commit.into_iter().collect_vec();
-            let commit_ext = base_digest_to_ext(&commit_base, permutation_config);
-            debug_assert_eq!(permutation_config.rate_ext(), commit_ext.len());
-            public_inputs.extend(commit_ext);
+            // Pack each cap entry to extension field and add as public inputs
+            for entry in commit.roots() {
+                let commit_ext = base_digest_to_ext(entry, permutation_config);
+                debug_assert_eq!(rate_ext, commit_ext.len());
+                public_inputs.extend(commit_ext);
+            }
 
             runner.set_public_inputs(&public_inputs).unwrap();
 
@@ -509,8 +604,6 @@ mod test {
                     .unwrap();
             }
 
-            // Whe then we run the runner and the MMCS trace is generated, it will be checked that
-            // the root computed by the MmcsVerify gate matches that given as input.
             let _ = runner.run().unwrap();
         }
     }
@@ -652,12 +745,49 @@ mod test {
     }
 
     #[test]
+    fn commit_with_cap_height_1() {
+        init_logger();
+        let mut rng = SmallRng::seed_from_u64(99);
+        let mat = RowMajorMatrix::<F>::rand(&mut rng, 8, 3);
+        test_all_openings_with_cap_height(vec![mat], 1);
+    }
+
+    #[test]
+    fn commit_with_cap_height_2() {
+        init_logger();
+        let mut rng = SmallRng::seed_from_u64(99);
+        let mat_0 = RowMajorMatrix::<F>::rand(&mut rng, 16, 2);
+        let mat_1 = RowMajorMatrix::<F>::rand(&mut rng, 4, 3);
+        test_all_openings_with_cap_height(vec![mat_0, mat_1], 2);
+    }
+
+    #[test]
+    fn commit_batch_stark_with_cap_height() {
+        init_logger();
+        let mut rng = SmallRng::seed_from_u64(42);
+        let mat_0 = RowMajorMatrix::<F>::rand(&mut rng, 512, 1);
+        let mat_1 = RowMajorMatrix::<F>::rand(&mut rng, 8, 1);
+        let mat_2 = RowMajorMatrix::<F>::rand(&mut rng, 4, 1);
+        let mat_3 = RowMajorMatrix::<F>::rand(&mut rng, 128, 12);
+        let mat_4 = RowMajorMatrix::<F>::rand(&mut rng, 4, 3);
+        test_all_openings_with_cap_height(vec![mat_0, mat_1, mat_2, mat_3, mat_4], 2);
+    }
+
+    #[test]
+    fn lifted_verify_with_cap_height() {
+        init_logger();
+        let mut rng = SmallRng::seed_from_u64(99);
+        let mat = RowMajorMatrix::<F>::rand(&mut rng, 8, 3);
+        test_lifted_openings_with_cap_height(vec![mat], 1);
+    }
+
+    #[test]
     fn verify_tampered_proof_fails() {
         let mut rng = SmallRng::seed_from_u64(1);
         let perm = Perm::new_from_rng_128(&mut rng);
         let hash = MyHash::new(perm.clone());
         let compress = MyCompress::new(perm);
-        let mmcs = MyMmcs::new(hash.clone(), compress);
+        let mmcs = MyMmcs::new(hash.clone(), compress, 0);
 
         // 4 8x1 matrixes, 4 8x2 matrixes
         let mut mats = (0..4)
@@ -742,8 +872,9 @@ mod test {
                 .flat_map(|digest| digest.map(CF::from)),
         );
         public_inputs.extend(directions.iter());
-        let commit_base = commit.into_iter().collect_vec();
-        let commit_ext = base_digest_to_ext(&commit_base, permutation_config);
+        // For cap_height=0, commit has 1 entry
+        let commit_entry = &commit.roots()[0];
+        let commit_ext = base_digest_to_ext(commit_entry, permutation_config);
         debug_assert_eq!(permutation_config.rate_ext(), commit_ext.len());
         public_inputs.extend(commit_ext);
 
@@ -771,7 +902,7 @@ mod test {
                 .unwrap();
         }
 
-        // When the we run the runner and the MMCS trace is generated, it will be checked that
+        // When we run the runner and the MMCS trace is generated, it will be checked that
         // the root computed by the MmcsVerify gate does not match the one given as input.
         let result = runner.run();
 
@@ -795,7 +926,7 @@ mod test {
         let perm = default_babybear_poseidon2_16();
         let hash = MyHash::new(perm.clone());
         let compress = MyCompress::new(perm.clone());
-        let mmcs = MyMmcs::new(hash, compress);
+        let mmcs = MyMmcs::new(hash, compress, 0);
 
         // Create a small matrix (similar to small FRI proofs)
         let mat = RowMajorMatrix::new(
@@ -814,7 +945,7 @@ mod test {
 
         let dimensions = vec![mat.dimensions()];
         let max_height = mat.height();
-        let path_depth = log2_ceil_usize(max_height);
+        let log_max_height = log2_ceil_usize(max_height);
 
         let (commit, prover_data) = mmcs.commit(vec![mat]);
 
@@ -828,7 +959,9 @@ mod test {
 
             let batch_opening = mmcs.open_batch(index, &prover_data);
 
-            let directions = (0..path_depth).map(|k| index >> k & 1 == 1).collect_vec();
+            let directions = (0..log_max_height)
+                .map(|k| index >> k & 1 == 1)
+                .collect_vec();
 
             let lifted_openings: Vec<Vec<_>> = batch_opening
                 .opened_values
@@ -841,17 +974,23 @@ mod test {
                 })
                 .collect();
 
-            let directions_expr = builder.alloc_public_inputs(path_depth, "directions");
+            let directions_expr = builder.alloc_public_inputs(log_max_height, "directions");
 
-            let lifted_root: Vec<_> = (0..permutation_config.rate())
-                .map(|_| builder.add_public_input())
-                .collect();
-            let packed_root = pack_lifted_targets::<F, CF>(&mut builder, &lifted_root);
+            // Allocate cap entries as LIFTED targets, then pack
+            let cap_len = commit.num_roots();
+            let mut cap_exprs = Vec::with_capacity(cap_len);
+            for _ in 0..cap_len {
+                let lifted: Vec<_> = (0..permutation_config.rate())
+                    .map(|_| builder.add_public_input())
+                    .collect();
+                let packed = pack_lifted_targets::<F, CF>(&mut builder, &lifted);
+                cap_exprs.push(packed);
+            }
 
             let _permutation_mmcs_ops = verify_batch_circuit::<F, CF>(
                 &mut builder,
                 permutation_config,
-                &packed_root,
+                &cap_exprs,
                 &dimensions,
                 &directions_expr,
                 &lifted_openings,
@@ -862,7 +1001,6 @@ mod test {
             let mut runner = circuit.runner();
 
             // Set public inputs using LIFTED representation
-            // First: lifted opened values (one EF per base field value)
             let mut public_inputs: Vec<CF> = batch_opening
                 .opened_values
                 .iter()
@@ -872,9 +1010,10 @@ mod test {
             // Then: direction bits
             public_inputs.extend(directions.iter().map(|&bit| CF::from_bool(bit)));
 
-            // Then: lifted root (one EF per base field digest element)
-            let commit_base = commit.into_iter().collect_vec();
-            public_inputs.extend(commit_base.iter().map(|&v| CF::from(v)));
+            // Then: lifted cap entries (one EF per base field digest element per entry)
+            for entry in commit.roots() {
+                public_inputs.extend(entry.iter().map(|&v| CF::from(v)));
+            }
 
             runner.set_public_inputs(&public_inputs).unwrap();
 
@@ -902,7 +1041,6 @@ mod test {
                     .unwrap();
             }
 
-            // Run and verify
             let result = runner.run();
             assert!(
                 result.is_ok(),
@@ -952,10 +1090,14 @@ mod test {
 
     /// Test helper that runs MMCS verification using lifted representation for various matrix configs.
     fn test_lifted_openings(mats: Vec<RowMajorMatrix<F>>) {
+        test_lifted_openings_with_cap_height(mats, 0);
+    }
+
+    fn test_lifted_openings_with_cap_height(mats: Vec<RowMajorMatrix<F>>, cap_height: usize) {
         let perm = default_babybear_poseidon2_16();
         let hash = MyHash::new(perm.clone());
         let compress = MyCompress::new(perm.clone());
-        let mmcs = MyMmcs::new(hash, compress);
+        let mmcs = MyMmcs::new(hash, compress, cap_height);
 
         let dimensions = mats.iter().map(DenseMatrix::dimensions).collect_vec();
 
@@ -969,7 +1111,7 @@ mod test {
 
         let (commit, prover_data) = mmcs.commit(mats);
 
-        let path_depth = log2_ceil_usize(max_height);
+        let log_max_height = log2_ceil_usize(max_height);
         for index in 0..max_height {
             let mut builder = CircuitBuilder::<CF>::new();
             let permutation_config = Poseidon2Config::BabyBearD4Width16;
@@ -980,7 +1122,9 @@ mod test {
 
             let batch_opening = mmcs.open_batch(index, &prover_data);
 
-            let directions = (0..path_depth).map(|k| index >> k & 1 == 1).collect_vec();
+            let directions = (0..log_max_height)
+                .map(|k| index >> k & 1 == 1)
+                .collect_vec();
 
             let lifted_openings: Vec<Vec<_>> = batch_opening
                 .opened_values
@@ -993,17 +1137,23 @@ mod test {
                 })
                 .collect();
 
-            let directions_expr = builder.alloc_public_inputs(path_depth, "directions");
+            let directions_expr = builder.alloc_public_inputs(log_max_height, "directions");
 
-            let lifted_root: Vec<_> = (0..permutation_config.rate())
-                .map(|_| builder.add_public_input())
-                .collect();
-            let packed_root = pack_lifted_targets::<F, CF>(&mut builder, &lifted_root);
+            // Allocate cap entries as LIFTED, then pack
+            let cap_len = commit.num_roots();
+            let mut cap_exprs = Vec::with_capacity(cap_len);
+            for _ in 0..cap_len {
+                let lifted: Vec<_> = (0..permutation_config.rate())
+                    .map(|_| builder.add_public_input())
+                    .collect();
+                let packed = pack_lifted_targets::<F, CF>(&mut builder, &lifted);
+                cap_exprs.push(packed);
+            }
 
             let permutation_mmcs_ops = verify_batch_circuit::<F, CF>(
                 &mut builder,
                 permutation_config,
-                &packed_root,
+                &cap_exprs,
                 &dimensions,
                 &directions_expr,
                 &lifted_openings,
@@ -1022,8 +1172,10 @@ mod test {
 
             public_inputs.extend(directions.iter().map(|&bit| CF::from_bool(bit)));
 
-            let commit_base = commit.into_iter().collect_vec();
-            public_inputs.extend(commit_base.iter().map(|&v| CF::from(v)));
+            // Lifted cap entries
+            for entry in commit.roots() {
+                public_inputs.extend(entry.iter().map(|&v| CF::from(v)));
+            }
 
             runner.set_public_inputs(&public_inputs).unwrap();
 

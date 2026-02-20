@@ -50,7 +50,9 @@ use p3_field::{Field, PrimeCharacteristicRing};
 use p3_fri::{FriParameters, TwoAdicFriPcs};
 use p3_lookup::logup::LogUpGadget;
 use p3_merkle_tree::MerkleTreeMmcs;
-use p3_recursion::pcs::{HashTargets, InputProofTargets, RecValMmcs, set_fri_mmcs_private_data};
+use p3_recursion::pcs::{
+    InputProofTargets, MerkleCapTargets, RecValMmcs, set_fri_mmcs_private_data,
+};
 use p3_recursion::traits::{RecursiveAir, RecursivePcs};
 use p3_recursion::verifier::VerificationError;
 use p3_recursion::{
@@ -58,7 +60,7 @@ use p3_recursion::{
     ProveNextLayerParams, RecursionInput, RecursionOutput, prove_next_layer,
 };
 use p3_symmetric::{PaddingFreeSponge, TruncatedPermutation};
-use p3_uni_stark::{StarkConfig, StarkGenericConfig};
+use p3_uni_stark::{StarkConfig, StarkGenericConfig, Val};
 use serde::Serialize;
 use tracing::info;
 use tracing_forest::ForestLayer;
@@ -77,6 +79,7 @@ enum FieldOption {
 struct FriParams {
     log_blowup: usize,
     max_log_arity: usize,
+    cap_height: usize,
     log_final_poly_len: usize,
     commit_pow_bits: usize,
     query_pow_bits: usize,
@@ -114,6 +117,9 @@ struct Args {
         help = "Maximum arity allowed during FRI folding phases"
     )]
     max_log_arity: usize,
+
+    #[arg(long, default_value_t = 0, help = "Height of the Merkle cap to open")]
+    cap_height: usize,
 
     #[arg(
         long,
@@ -155,6 +161,7 @@ fn main() {
     let fri_params = FriParams {
         log_blowup: args.log_blowup,
         max_log_arity: args.max_log_arity,
+        cap_height: args.cap_height,
         log_final_poly_len: args.log_final_poly_len,
         commit_pow_bits: args.commit_pow_bits,
         query_pow_bits: args.query_pow_bits,
@@ -253,11 +260,11 @@ macro_rules! define_field_module {
                             RecValMmcs<F, DIGEST_ELEMS, MyHash, MyCompress>,
                         >,
                         InnerFri,
-                        HashTargets<F, DIGEST_ELEMS>,
+                        MerkleCapTargets<F, DIGEST_ELEMS>,
                         <MyPcs as Pcs<Challenge, Challenger>>::Domain,
                     >,
             {
-                type Commitment = HashTargets<F, DIGEST_ELEMS>;
+                type Commitment = MerkleCapTargets<F, DIGEST_ELEMS>;
                 type InputProof = InputProofTargets<
                     F,
                     Challenge,
@@ -272,7 +279,7 @@ macro_rules! define_field_module {
                     f: impl FnOnce(&Self::RawOpeningProof) -> R,
                 ) -> R
                 where
-                    A: RecursiveAir<F, Challenge, LogUpGadget>,
+                    A: RecursiveAir<Val<Self>, Self::Challenge, LogUpGadget>,
                 {
                     match prev {
                         RecursionInput::UniStark { proof, .. } => f(&proof.opening_proof),
@@ -302,7 +309,7 @@ macro_rules! define_field_module {
                         RecValMmcs<F, DIGEST_ELEMS, MyHash, MyCompress>,
                     >,
                     InnerFri,
-                    HashTargets<F, DIGEST_ELEMS>,
+                    MerkleCapTargets<F, DIGEST_ELEMS>,
                     <MyPcs as Pcs<Challenge, Challenger>>::Domain,
                 >>::VerifierParams {
                     &self.fri_verifier_params
@@ -329,7 +336,7 @@ macro_rules! define_field_module {
                 let perm = $default_perm();
                 let hash = MyHash::new(perm.clone());
                 let compress = MyCompress::new(perm.clone());
-                let val_mmcs = ValMmcs::new(hash, compress);
+                let val_mmcs = ValMmcs::new(hash, compress, fp.cap_height);
                 let challenge_mmcs = ChallengeMmcs::new(val_mmcs.clone());
                 let dft = Dft::default();
 
