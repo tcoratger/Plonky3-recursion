@@ -7,6 +7,7 @@ use alloc::vec::Vec;
 use alloc::{format, vec};
 use core::iter;
 
+use hashbrown::HashMap;
 use p3_circuit::op::Poseidon2Config;
 use p3_circuit::{CircuitBuilder, NonPrimitiveOpId};
 use p3_field::coset::TwoAdicMultiplicativeCoset;
@@ -951,10 +952,10 @@ fn compute_single_reduced_opening<EF: Field>(
     builder: &mut CircuitBuilder<EF>,
     opened_values: &[Target], // Values at evaluation point x
     point_values: &[Target],  // Values at challenge point z
-    evaluation_point: Target, // x
-    challenge_point: Target,  // z
     alpha_pow: Target,        // Current alpha power (for this height)
     alpha: Target,            // Alpha challenge
+    alpha_powers_set: &mut HashMap<usize, Target>,
+    inv_z_minus_x: Target, // 1 / (z - x), shared across matrices at same (height, z)
 ) -> (Target, Target) // (new_alpha_pow, reduced_opening_contrib)
 {
     builder.push_scope("compute_single_reduced_opening");
@@ -985,13 +986,18 @@ fn compute_single_reduced_opening<EF: Field>(
         inner = builder.add(prod, diffs[i]);
     }
 
-    // reduced_opening = alpha_pow * inner / (z - x)
+    // reduced_opening = alpha_pow * inner * (1 / (z - x))
     let numerator = builder.mul(alpha_pow, inner);
-    let z_minus_x = builder.sub(challenge_point, evaluation_point);
-    let reduced_opening = builder.div(numerator, z_minus_x);
+    let reduced_opening = builder.mul(numerator, inv_z_minus_x);
 
     // Advance alpha_pow by alpha^n using square-and-multiply
-    let alpha_n = circuit_exp_by_constant(builder, alpha, n);
+    let alpha_n = if let Some(alpha_n) = alpha_powers_set.get(&n) {
+        *alpha_n
+    } else {
+        let alpha_n = circuit_exp_by_constant(builder, alpha, n);
+        alpha_powers_set.insert(n, alpha_n);
+        alpha_n
+    };
     let new_alpha_pow = builder.mul(alpha_pow, alpha_n);
 
     builder.pop_scope();
@@ -1135,6 +1141,9 @@ where
             mmcs_op_ids.extend(op_ids);
         }
 
+        let mut alpha_powers_set = HashMap::new();
+        let mut inv_z_minus_x_cache: HashMap<(usize, Target), Target> = HashMap::new();
+
         // For each matrix in the batch
         for (mat_idx, ((mat_domain, mat_points_and_values), mat_opening)) in zip_eq(
             mats.iter(),
@@ -1162,14 +1171,23 @@ where
                     )));
                 }
 
+                let inv_z_minus_x =
+                    *inv_z_minus_x_cache
+                        .entry((log_height, *z))
+                        .or_insert_with(|| {
+                            let z_minus_x = builder.sub(*z, x);
+                            let one = builder.add_const(EF::ONE);
+                            builder.div(one, z_minus_x)
+                        });
+
                 let (new_alpha_pow_h, ro_contrib) = compute_single_reduced_opening(
                     builder,
                     mat_opening,
                     ps_at_z,
-                    x,
-                    *z,
                     *alpha_pow_h,
                     alpha,
+                    &mut alpha_powers_set,
+                    inv_z_minus_x,
                 );
 
                 *ro_h = builder.add(*ro_h, ro_contrib);
