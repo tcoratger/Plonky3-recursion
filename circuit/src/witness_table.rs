@@ -1,4 +1,3 @@
-use alloc::vec;
 use alloc::vec::Vec;
 
 use p3_field::PrimeCharacteristicRing;
@@ -6,22 +5,18 @@ use p3_field::PrimeCharacteristicRing;
 use crate::CircuitError;
 use crate::types::WitnessId;
 
-/// Memory-efficient witness storage with split initialization tracking.
+/// Witness storage optimized for release performance.
 ///
-/// Stores field element values separately from their initialization flags.
+/// In **debug** builds: `Vec<F>` + `Vec<bool>` for full validation
+/// (unset detection, conflict detection).
+///
+/// In **release** builds: bare `Vec<F>` — zero overhead per access because
+/// the circuit is already validated at build time and ops execute in
+/// topological order.
 pub(crate) struct WitnessTable<F> {
-    /// Field element storage.
-    ///
-    /// Slots are zero-initialized on allocation.
-    ///
-    /// A slot's value is only meaningful when the corresponding flag is set.
     values: Vec<F>,
 
-    /// Per-slot initialization flags.
-    ///
-    /// `true` indicates:
-    /// - the slot has been explicitly written,
-    /// - its value can be read safely.
+    #[cfg(debug_assertions)]
     initialized: Vec<bool>,
 }
 
@@ -30,33 +25,33 @@ impl<F: PrimeCharacteristicRing> WitnessTable<F> {
     pub fn new(count: usize) -> Self {
         Self {
             values: F::zero_vec(count),
-            initialized: vec![false; count],
+            #[cfg(debug_assertions)]
+            initialized: alloc::vec![false; count],
         }
     }
 
     /// Return the total number of slots.
+    #[cfg(debug_assertions)]
     #[inline]
     pub const fn len(&self) -> usize {
         self.values.len()
     }
 
     /// Return whether the slot at `idx` has been written.
+    #[cfg(debug_assertions)]
     #[inline]
     pub fn is_initialized(&self, idx: usize) -> bool {
         self.initialized[idx]
     }
 
     /// Read the value at the given witness index.
-    ///
-    /// Returns `WitnessNotSet` if the slot is out of bounds or uninitialized.
-    #[inline]
+    #[cfg(debug_assertions)]
+    #[inline(always)]
     pub fn get(&self, widx: WitnessId) -> Result<F, CircuitError>
     where
         F: Clone,
     {
         let idx = widx.0 as usize;
-
-        // Bounds-check and initialization-check in one branch.
         if idx < self.initialized.len() && self.initialized[idx] {
             Ok(self.values[idx].clone())
         } else {
@@ -64,36 +59,44 @@ impl<F: PrimeCharacteristicRing> WitnessTable<F> {
         }
     }
 
+    /// Read the value at the given witness index (release: direct indexed read).
+    #[cfg(not(debug_assertions))]
+    #[inline(always)]
+    pub fn get(&self, widx: WitnessId) -> Result<F, CircuitError>
+    where
+        F: Clone,
+    {
+        Ok(self.values[widx.0 as usize].clone())
+    }
+
     /// Return a reference to the value at `idx` without any checks.
-    ///
-    /// # Safety contract
-    ///
-    /// The caller must guarantee that the slot has been initialized.
-    #[inline]
+    #[inline(always)]
     pub fn get_value_unchecked(&self, idx: usize) -> &F {
         &self.values[idx]
     }
 
     /// Write a value and mark the slot as initialized.
-    ///
-    /// No conflict detection is performed here — the caller is responsible
-    /// for checking whether a different value already occupies this slot.
-    #[inline]
+    #[cfg(debug_assertions)]
+    #[inline(always)]
     pub fn set_unchecked(&mut self, idx: usize, value: F) {
         self.values[idx] = value;
         self.initialized[idx] = true;
     }
 
+    /// Write a value (release: single store, no initialization tracking).
+    #[cfg(not(debug_assertions))]
+    #[inline(always)]
+    pub fn set_unchecked(&mut self, idx: usize, value: F) {
+        self.values[idx] = value;
+    }
+
     /// Borrow the raw values slice.
-    ///
-    /// Intended for trace builders that iterate every slot after execution.
     pub fn values(&self) -> &[F] {
         &self.values
     }
 
     /// Borrow the initialization flags slice.
-    ///
-    /// Intended for trace builders that need to distinguish set vs. unset slots.
+    #[cfg(debug_assertions)]
     pub fn initialized(&self) -> &[bool] {
         &self.initialized
     }

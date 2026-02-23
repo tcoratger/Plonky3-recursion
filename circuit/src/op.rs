@@ -2,6 +2,7 @@ use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
+#[cfg(debug_assertions)]
 use alloc::{format, vec};
 use core::any::Any;
 use core::fmt::Debug;
@@ -513,13 +514,14 @@ impl<'a, F: PrimeCharacteristicRing + Eq + Clone> ExecutionContext<'a, F> {
     }
 
     /// Get witness value at the given index
-    #[inline]
+    #[inline(always)]
     pub fn get_witness(&self, widx: WitnessId) -> Result<F, CircuitError> {
         self.witness.get(widx)
     }
 
-    /// Set witness value at the given index
-    #[inline]
+    /// Set witness value at the given index (debug: full conflict detection).
+    #[cfg(debug_assertions)]
+    #[inline(always)]
     pub fn set_witness(&mut self, widx: WitnessId, value: F) -> Result<(), CircuitError> {
         let idx = widx.0 as usize;
         if idx >= self.witness.len() {
@@ -542,6 +544,14 @@ impl<'a, F: PrimeCharacteristicRing + Eq + Clone> ExecutionContext<'a, F> {
         }
 
         self.witness.set_unchecked(idx, value);
+        Ok(())
+    }
+
+    /// Set witness value at the given index (release: direct write, no checks).
+    #[cfg(not(debug_assertions))]
+    #[inline(always)]
+    pub fn set_witness(&mut self, widx: WitnessId, value: F) -> Result<(), CircuitError> {
+        self.witness.set_unchecked(widx.0 as usize, value);
         Ok(())
     }
 

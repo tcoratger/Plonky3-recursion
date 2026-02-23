@@ -1,8 +1,10 @@
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
+#[cfg(debug_assertions)]
+use alloc::format;
 use alloc::string::ToString;
+use alloc::vec;
 use alloc::vec::Vec;
-use alloc::{format, vec};
 
 use hashbrown::HashMap;
 use tracing::instrument;
@@ -191,7 +193,11 @@ impl<F: CircuitField> CircuitRunner<F> {
             };
             for (dup, canon) in &rewrite {
                 let r = root(*canon);
-                if self.witness.is_initialized(r.0 as usize) {
+                #[cfg(debug_assertions)]
+                let should_copy = self.witness.is_initialized(r.0 as usize);
+                #[cfg(not(debug_assertions))]
+                let should_copy = true;
+                if should_copy {
                     let val = *self.witness.get_value_unchecked(r.0 as usize);
                     self.set_witness(*dup, val)?;
                 }
@@ -199,8 +205,11 @@ impl<F: CircuitField> CircuitRunner<F> {
         }
 
         // Delegate to trace builders for each table
+        #[cfg(debug_assertions)]
         let witness_trace =
             WitnessTraceBuilder::new(self.witness.values(), self.witness.initialized()).build()?;
+        #[cfg(not(debug_assertions))]
+        let witness_trace = WitnessTraceBuilder::new(self.witness.values()).build()?;
         let const_trace = ConstTraceBuilder::new(&self.circuit.ops).build()?;
         let public_trace =
             PublicTraceBuilder::new(&self.circuit.ops, self.witness.values()).build()?;
@@ -242,10 +251,14 @@ impl<F: CircuitField> CircuitRunner<F> {
                 Op::Const { out, val } => {
                     self.set_witness(*out, *val)?;
                 }
-                Op::Public { out, public_pos: _ } => {
+                Op::Public {
+                    out: _out,
+                    public_pos: _,
+                } => {
                     // Public inputs should already be set
-                    if !self.witness.is_initialized(out.0 as usize) {
-                        return Err(CircuitError::PublicInputNotSet { witness_id: *out });
+                    #[cfg(debug_assertions)]
+                    if !self.witness.is_initialized(_out.0 as usize) {
+                        return Err(CircuitError::PublicInputNotSet { witness_id: *_out });
                     }
                 }
                 Op::Alu {
@@ -333,8 +346,9 @@ impl<F: CircuitField> CircuitRunner<F> {
         self.witness.get(widx)
     }
 
-    /// Sets witness value by ID.
-    #[inline]
+    /// Sets witness value by ID (debug: full conflict detection).
+    #[cfg(debug_assertions)]
+    #[inline(always)]
     fn set_witness(&mut self, widx: WitnessId, value: F) -> Result<(), CircuitError> {
         let idx = widx.0 as usize;
         if idx >= self.witness.len() {
@@ -375,12 +389,21 @@ impl<F: CircuitField> CircuitRunner<F> {
         Ok(())
     }
 
+    /// Sets witness value by ID (release: direct write, no checks).
+    #[cfg(not(debug_assertions))]
+    #[inline(always)]
+    fn set_witness(&mut self, widx: WitnessId, value: F) -> Result<(), CircuitError> {
+        self.witness.set_unchecked(widx.0 as usize, value);
+        Ok(())
+    }
+
     /// Reference to the witness values slice (for benchmarking trace builders after `execute_all`).
     pub fn witness_values(&self) -> &[F] {
         self.witness.values()
     }
 
     /// Reference to the witness initialization flags (for benchmarking trace builders).
+    #[cfg(debug_assertions)]
     pub fn witness_initialized(&self) -> &[bool] {
         self.witness.initialized()
     }
