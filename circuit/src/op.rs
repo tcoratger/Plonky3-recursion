@@ -14,6 +14,7 @@ use strum_macros::EnumCount;
 
 use crate::ops::Poseidon2PermPrivateData;
 use crate::types::{NonPrimitiveOpId, WitnessId};
+use crate::witness_table::WitnessTable;
 use crate::{CircuitError, PreprocessedColumns};
 
 /// ALU operation kinds for the unified arithmetic table.
@@ -481,7 +482,7 @@ pub type OpStateMap = BTreeMap<NonPrimitiveOpType, Box<dyn OpExecutionState>>;
 /// runtime state without exposing internal implementation details.
 pub struct ExecutionContext<'a, F> {
     /// Mutable reference to witness table for reading/writing values
-    witness: &'a mut [Option<F>],
+    witness: &'a mut WitnessTable<F>,
     /// Private data map for non-primitive operations
     non_primitive_op_private_data: &'a [Option<NonPrimitiveOpPrivateData<F>>],
     /// Operation configurations
@@ -495,8 +496,8 @@ pub struct ExecutionContext<'a, F> {
 
 impl<'a, F: PrimeCharacteristicRing + Eq + Clone> ExecutionContext<'a, F> {
     /// Create a new execution context
-    pub fn new(
-        witness: &'a mut [Option<F>],
+    pub(crate) fn new(
+        witness: &'a mut WitnessTable<F>,
         non_primitive_op_private_data: &'a [Option<NonPrimitiveOpPrivateData<F>>],
         enabled_ops: &'a HashMap<NonPrimitiveOpType, NonPrimitiveOpConfig<F>>,
         operation_id: NonPrimitiveOpId,
@@ -514,24 +515,20 @@ impl<'a, F: PrimeCharacteristicRing + Eq + Clone> ExecutionContext<'a, F> {
     /// Get witness value at the given index
     #[inline]
     pub fn get_witness(&self, widx: WitnessId) -> Result<F, CircuitError> {
-        self.witness
-            .get(widx.0 as usize)
-            .and_then(|opt| opt.as_ref())
-            .cloned()
-            .ok_or(CircuitError::WitnessNotSet { witness_id: widx })
+        self.witness.get(widx)
     }
 
     /// Set witness value at the given index
     #[inline]
     pub fn set_witness(&mut self, widx: WitnessId, value: F) -> Result<(), CircuitError> {
-        if widx.0 as usize >= self.witness.len() {
+        let idx = widx.0 as usize;
+        if idx >= self.witness.len() {
             return Err(CircuitError::WitnessIdOutOfBounds { witness_id: widx });
         }
 
-        let slot = &mut self.witness[widx.0 as usize];
-
         // Check for conflicting reassignment
-        if let Some(existing_value) = slot.as_ref() {
+        if self.witness.is_initialized(idx) {
+            let existing_value = self.witness.get_value_unchecked(idx);
             if *existing_value == value {
                 // Same value - this is fine (duplicate set via connect)
                 return Ok(());
@@ -540,11 +537,11 @@ impl<'a, F: PrimeCharacteristicRing + Eq + Clone> ExecutionContext<'a, F> {
                 witness_id: widx,
                 existing: format!("{existing_value:?}"),
                 new: format!("{value:?}"),
-                expr_ids: vec![], // TODO: Could be filled with expression IDs if tracked
+                expr_ids: vec![],
             });
         }
 
-        *slot = Some(value);
+        self.witness.set_unchecked(idx, value);
         Ok(())
     }
 
@@ -662,6 +659,7 @@ mod tests {
 
     use super::*;
     use crate::ops::poseidon2_perm::Poseidon2PermPrivateData;
+    use crate::witness_table::WitnessTable;
 
     type F = BabyBear;
 
@@ -843,7 +841,9 @@ mod tests {
     fn test_execution_context_get_witness() {
         // Create a witness table with known test values
         let val = F::from_u64(42);
-        let mut witness = vec![Some(val), Some(F::from_u64(100))];
+        let mut witness = WitnessTable::new(2);
+        witness.set_unchecked(0, val);
+        witness.set_unchecked(1, F::from_u64(100));
         let private_data = vec![];
         let configs = HashMap::new();
         let op_id = NonPrimitiveOpId(0);
@@ -863,7 +863,8 @@ mod tests {
     #[test]
     fn test_execution_context_get_witness_unset() {
         // Create a witness table where some values are not yet set
-        let mut witness = vec![None, Some(F::from_u64(100))];
+        let mut witness = WitnessTable::new(2);
+        witness.set_unchecked(1, F::from_u64(100));
         let private_data = vec![];
         let configs = HashMap::new();
         let op_id = NonPrimitiveOpId(0);
@@ -889,7 +890,7 @@ mod tests {
     #[test]
     fn test_execution_context_set_witness() {
         // Create an empty witness table to be populated
-        let mut witness = vec![None, None];
+        let mut witness = WitnessTable::new(2);
         let private_data = vec![];
         let configs = HashMap::new();
         let op_id = NonPrimitiveOpId(0);
@@ -907,14 +908,16 @@ mod tests {
         assert!(result.is_ok());
 
         // Verify the value was actually written to the witness table
-        assert_eq!(witness[0], Some(val));
+        assert!(witness.is_initialized(0));
+        assert_eq!(*witness.get_value_unchecked(0), val);
     }
 
     #[test]
     fn test_execution_context_set_witness_conflict() {
         // Create a witness table with an existing value
         let existing_val = F::from_u64(50);
-        let mut witness = vec![Some(existing_val)];
+        let mut witness = WitnessTable::new(1);
+        witness.set_unchecked(0, existing_val);
         let private_data = vec![];
         let configs = HashMap::new();
         let op_id = NonPrimitiveOpId(0);
@@ -944,7 +947,8 @@ mod tests {
     fn test_execution_context_set_witness_idempotent() {
         // Create a witness table with an existing value
         let val = F::from_u64(50);
-        let mut witness = vec![Some(val)];
+        let mut witness = WitnessTable::new(1);
+        witness.set_unchecked(0, val);
         let private_data = vec![];
         let configs = HashMap::new();
         let op_id = NonPrimitiveOpId(0);
@@ -961,13 +965,14 @@ mod tests {
 
         // Idempotent writes should succeed without error
         assert!(result.is_ok());
-        assert_eq!(witness[0], Some(val));
+        assert!(witness.is_initialized(0));
+        assert_eq!(*witness.get_value_unchecked(0), val);
     }
 
     #[test]
     fn test_execution_context_set_witness_out_of_bounds() {
         // Create a small witness table with limited capacity
-        let mut witness = vec![None];
+        let mut witness = WitnessTable::new(1);
         let private_data = vec![];
         let configs = HashMap::new();
         let op_id = NonPrimitiveOpId(0);
@@ -1001,7 +1006,7 @@ mod tests {
         ))];
 
         // Create execution context with access to private data
-        let mut witness = vec![];
+        let mut witness = WitnessTable::new(0);
         let configs = HashMap::new();
         let op_id = NonPrimitiveOpId(0);
         let mut op_states = BTreeMap::new();
@@ -1022,7 +1027,7 @@ mod tests {
     fn test_execution_context_get_private_data_missing() {
         // Create an execution context without private data
         let private_data = vec![];
-        let mut witness = vec![];
+        let mut witness = WitnessTable::new(0);
         let configs = HashMap::new();
         let op_id = NonPrimitiveOpId(0);
         let mut op_states = BTreeMap::new();
@@ -1052,7 +1057,7 @@ mod tests {
         configs.insert(op_type, NonPrimitiveOpConfig::None);
 
         // Create execution context with configurations
-        let mut witness = vec![];
+        let mut witness = WitnessTable::new(0);
         let private_data = vec![];
         let op_id = NonPrimitiveOpId(0);
         let mut op_states = BTreeMap::new();
@@ -1070,7 +1075,7 @@ mod tests {
     fn test_execution_context_get_config_missing() {
         // Create an empty configuration map
         let configs = HashMap::new();
-        let mut witness = vec![];
+        let mut witness = WitnessTable::new(0);
         let private_data = vec![];
         let op_id = NonPrimitiveOpId(0);
         let mut op_states = BTreeMap::new();
@@ -1096,7 +1101,7 @@ mod tests {
     #[test]
     fn test_execution_context_operation_id() {
         // Create execution context with a specific operation identifier
-        let mut witness = vec![];
+        let mut witness = WitnessTable::new(0);
         let private_data = vec![];
         let configs = HashMap::new();
         let expected_id = NonPrimitiveOpId(42);
@@ -1134,7 +1139,7 @@ mod tests {
     #[test]
     fn test_execution_context_op_state() {
         // Test the generic operation state accessors
-        let mut witness: Vec<Option<F>> = vec![];
+        let mut witness = WitnessTable::<F>::new(0);
         let private_data = vec![];
         let configs = HashMap::new();
         let op_id = NonPrimitiveOpId(0);

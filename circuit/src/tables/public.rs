@@ -25,12 +25,12 @@ pub struct PublicTrace<F> {
 /// Builder for generating public input traces.
 pub struct PublicTraceBuilder<'a, F> {
     primitive_ops: &'a [Op<F>],
-    witness: &'a [Option<F>],
+    witness: &'a [F],
 }
 
 impl<'a, F: Clone> PublicTraceBuilder<'a, F> {
     /// Creates a new public trace builder.
-    pub const fn new(primitive_ops: &'a [Op<F>], witness: &'a [Option<F>]) -> Self {
+    pub const fn new(primitive_ops: &'a [Op<F>], witness: &'a [F]) -> Self {
         Self {
             primitive_ops,
             witness,
@@ -48,7 +48,6 @@ impl<'a, F: Clone> PublicTraceBuilder<'a, F> {
                 let value = self
                     .witness
                     .get(out.0 as usize)
-                    .and_then(|opt| opt.as_ref())
                     .cloned()
                     .ok_or(CircuitError::WitnessNotSet { witness_id: *out })?;
                 values.push(value);
@@ -79,7 +78,7 @@ mod tests {
         let ops = vec![Op::Public { out, public_pos: 0 }];
 
         // Prepare the witness table with the public input value
-        let witness = vec![Some(val)];
+        let witness = vec![val];
 
         // Build the trace using the builder pattern
         let builder = PublicTraceBuilder::new(&ops, &witness);
@@ -114,8 +113,8 @@ mod tests {
             },
         ];
 
-        // Prepare witness table with gaps (index 1 is unused)
-        let witness = vec![Some(val1), None, Some(val2)];
+        // Prepare witness table (index 1 is a placeholder, not referenced by public ops)
+        let witness = vec![val1, F::ZERO, val2];
 
         // Build the trace
         let builder = PublicTraceBuilder::new(&ops, &witness);
@@ -138,7 +137,7 @@ mod tests {
     fn test_empty_operations() {
         // Provide an empty operations list
         let ops: Vec<Op<F>> = vec![];
-        let witness: Vec<Option<F>> = vec![];
+        let witness: Vec<F> = vec![];
 
         // Build the trace
         let builder = PublicTraceBuilder::new(&ops, &witness);
@@ -151,12 +150,12 @@ mod tests {
 
     #[test]
     fn test_witness_not_set_error() {
-        // Create a public input operation referencing an unset witness slot
-        let out = WitnessId(0);
+        // Create a public input operation referencing an out-of-bounds witness slot
+        let out = WitnessId(5);
         let ops = vec![Op::Public { out, public_pos: 0 }];
 
-        // Witness table has the slot but value is None (not yet set)
-        let witness: Vec<Option<F>> = vec![None];
+        // Witness table is too small for the referenced index
+        let witness: Vec<F> = vec![];
 
         // Attempt to build the trace
         let builder = PublicTraceBuilder::new(&ops, &witness);

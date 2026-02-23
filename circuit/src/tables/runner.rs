@@ -15,14 +15,15 @@ use super::{NonPrimitiveTrace, Traces};
 use crate::circuit::Circuit;
 use crate::op::{ExecutionContext, NonPrimitiveOpPrivateData, NonPrimitiveOpType, Op, OpStateMap};
 use crate::types::{NonPrimitiveOpId, WitnessId};
+use crate::witness_table::WitnessTable;
 use crate::{AluOpKind, CircuitError, CircuitField};
 
 /// Circuit execution engine.
 pub struct CircuitRunner<F> {
     /// Circuit specification.
     circuit: Circuit<F>,
-    /// Witness values (None = unset, Some = computed).
-    witness: Vec<Option<F>>,
+    /// Flat witness storage with separate initialization tracking.
+    witness: WitnessTable<F>,
     /// Private data for non-primitive operations (not on witness bus)
     non_primitive_op_private_data: Vec<Option<NonPrimitiveOpPrivateData<F>>>,
     /// Map from NonPrimitiveOpId -> index in `circuit.ops` for type checks.
@@ -34,7 +35,7 @@ pub struct CircuitRunner<F> {
 impl<F: CircuitField> CircuitRunner<F> {
     /// Creates circuit runner with empty witness storage.
     pub fn new(circuit: Circuit<F>) -> Self {
-        let witness = vec![None; circuit.witness_count as usize];
+        let witness = WitnessTable::new(circuit.witness_count as usize);
         let mut max_op_id: Option<u32> = None;
         for op in &circuit.ops {
             if let Op::NonPrimitiveOpWithExecutor { op_id, .. } = op {
@@ -190,17 +191,21 @@ impl<F: CircuitField> CircuitRunner<F> {
             };
             for (dup, canon) in &rewrite {
                 let r = root(*canon);
-                if let Some(ref val) = self.witness[r.0 as usize] {
-                    self.set_witness(*dup, *val)?;
+                if self.witness.is_initialized(r.0 as usize) {
+                    let val = *self.witness.get_value_unchecked(r.0 as usize);
+                    self.set_witness(*dup, val)?;
                 }
             }
         }
 
         // Delegate to trace builders for each table
-        let witness_trace = WitnessTraceBuilder::new(&self.witness).build()?;
+        let witness_trace =
+            WitnessTraceBuilder::new(self.witness.values(), self.witness.initialized()).build()?;
         let const_trace = ConstTraceBuilder::new(&self.circuit.ops).build()?;
-        let public_trace = PublicTraceBuilder::new(&self.circuit.ops, &self.witness).build()?;
-        let alu_trace = AluTraceBuilder::new(&self.circuit.ops, &self.witness).build()?;
+        let public_trace =
+            PublicTraceBuilder::new(&self.circuit.ops, self.witness.values()).build()?;
+        let alu_trace =
+            AluTraceBuilder::new(&self.circuit.ops, self.witness.values()).build()?;
 
         let mut non_primitive_traces: HashMap<NonPrimitiveOpType, Box<dyn NonPrimitiveTrace<F>>> =
             HashMap::new();
@@ -240,7 +245,7 @@ impl<F: CircuitField> CircuitRunner<F> {
                 }
                 Op::Public { out, public_pos: _ } => {
                     // Public inputs should already be set
-                    if self.witness[out.0 as usize].is_none() {
+                    if !self.witness.is_initialized(out.0 as usize) {
                         return Err(CircuitError::PublicInputNotSet { witness_id: *out });
                     }
                 }
@@ -326,24 +331,20 @@ impl<F: CircuitField> CircuitRunner<F> {
     /// Gets witness value by ID.
     #[inline(always)]
     fn get_witness(&self, widx: WitnessId) -> Result<F, CircuitError> {
-        self.witness
-            .get(widx.0 as usize)
-            .and_then(|opt| opt.as_ref())
-            .cloned()
-            .ok_or(CircuitError::WitnessNotSet { witness_id: widx })
+        self.witness.get(widx)
     }
 
     /// Sets witness value by ID.
     #[inline]
     fn set_witness(&mut self, widx: WitnessId, value: F) -> Result<(), CircuitError> {
-        if widx.0 as usize >= self.witness.len() {
+        let idx = widx.0 as usize;
+        if idx >= self.witness.len() {
             return Err(CircuitError::WitnessIdOutOfBounds { witness_id: widx });
         }
 
-        let slot = &mut self.witness[widx.0 as usize];
-
         // Check for conflicting reassignment
-        if let Some(existing_value) = slot.as_ref() {
+        if self.witness.is_initialized(idx) {
+            let existing_value = self.witness.get_value_unchecked(idx);
             if *existing_value == value {
                 return Ok(());
             }
@@ -371,13 +372,18 @@ impl<F: CircuitField> CircuitRunner<F> {
             });
         }
 
-        *slot = Some(value);
+        self.witness.set_unchecked(idx, value);
         Ok(())
     }
 
-    /// Reference to the witness slice (for benchmarking trace builders after `execute_all`).
-    pub fn witness(&self) -> &[Option<F>] {
-        &self.witness
+    /// Reference to the witness values slice (for benchmarking trace builders after `execute_all`).
+    pub fn witness_values(&self) -> &[F] {
+        self.witness.values()
+    }
+
+    /// Reference to the witness initialization flags (for benchmarking trace builders).
+    pub fn witness_initialized(&self) -> &[bool] {
+        self.witness.initialized()
     }
 
     /// Reference to the circuit ops (for benchmarking trace builders after `execute_all`).

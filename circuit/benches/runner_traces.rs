@@ -137,21 +137,22 @@ fn bench_trace_build(c: &mut Criterion) {
     let mut runner = circuit.runner();
     runner.set_public_inputs(&[expected_fib]).unwrap();
     runner.execute_all().unwrap();
-    let witness = runner.witness();
+    let values = runner.witness_values();
+    let initialized = runner.witness_initialized();
     let ops = runner.ops();
 
     let mut group = c.benchmark_group("trace_build");
     group.bench_function("witness", |b| {
-        b.iter(|| black_box(WitnessTraceBuilder::new(witness).build().unwrap()));
+        b.iter(|| black_box(WitnessTraceBuilder::new(values, initialized).build().unwrap()));
     });
     group.bench_function("const", |b| {
         b.iter(|| black_box(ConstTraceBuilder::new(ops).build().unwrap()));
     });
     group.bench_function("public", |b| {
-        b.iter(|| black_box(PublicTraceBuilder::new(ops, witness).build().unwrap()));
+        b.iter(|| black_box(PublicTraceBuilder::new(ops, values).build().unwrap()));
     });
     group.bench_function("alu", |b| {
-        b.iter(|| black_box(AluTraceBuilder::new(ops, witness).build().unwrap()));
+        b.iter(|| black_box(AluTraceBuilder::new(ops, values).build().unwrap()));
     });
     group.finish();
 }

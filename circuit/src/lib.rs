@@ -14,6 +14,7 @@ pub mod tables;
 pub mod test_utils;
 pub mod types;
 pub mod utils;
+pub(crate) mod witness_table;
 
 // Re-export public API
 #[cfg(feature = "debugging")]

@@ -55,30 +55,31 @@ impl<F> WitnessTrace<F> {
 
 /// Builder for generating witness traces.
 pub struct WitnessTraceBuilder<'a, F> {
-    witness: &'a [Option<F>],
+    values: &'a [F],
+    initialized: &'a [bool],
 }
 
 impl<'a, F: Clone> WitnessTraceBuilder<'a, F> {
-    /// Creates a new witness trace builder.
-    pub const fn new(witness: &'a [Option<F>]) -> Self {
-        Self { witness }
+    /// Creates a new witness trace builder from flat value/initialized slices.
+    pub const fn new(values: &'a [F], initialized: &'a [bool]) -> Self {
+        Self {
+            values,
+            initialized,
+        }
     }
 
     /// Builds the witness trace from the populated witness table.
     pub fn build(self) -> Result<WitnessTrace<F>, CircuitError> {
-        let capacity = self.witness.len();
+        let capacity = self.values.len();
         let mut index = Vec::with_capacity(capacity);
         let mut values = Vec::with_capacity(capacity);
 
-        for (i, witness_opt) in self.witness.iter().enumerate() {
-            match witness_opt {
-                Some(value) => {
-                    index.push(WitnessId(i as u32));
-                    values.push(value.clone());
-                }
-                None => {
-                    return Err(CircuitError::WitnessNotSetForIndex { index: i });
-                }
+        for (i, (&is_init, value)) in self.initialized.iter().zip(self.values.iter()).enumerate() {
+            if is_init {
+                index.push(WitnessId(i as u32));
+                values.push(value.clone());
+            } else {
+                return Err(CircuitError::WitnessNotSetForIndex { index: i });
             }
         }
 
@@ -101,10 +102,11 @@ mod tests {
     fn test_single_witness() {
         // Create a witness table with a single value
         let val = F::from_u64(42);
-        let witness = vec![Some(val)];
+        let values = vec![val];
+        let initialized = vec![true];
 
         // Build the trace using the builder pattern
-        let builder = WitnessTraceBuilder::new(&witness);
+        let builder = WitnessTraceBuilder::new(&values, &initialized);
         let trace = builder.build().expect("Failed to build trace");
 
         // Verify the trace contains exactly one witness
@@ -123,10 +125,11 @@ mod tests {
         let val2 = F::from_u64(20);
         let val3 = F::from_u64(30);
 
-        let witness = vec![Some(val1), Some(val2), Some(val3)];
+        let values = vec![val1, val2, val3];
+        let initialized = vec![true, true, true];
 
         // Build the trace
-        let builder = WitnessTraceBuilder::new(&witness);
+        let builder = WitnessTraceBuilder::new(&values, &initialized);
         let trace = builder.build().expect("Failed to build trace");
 
         // Verify we have exactly three witnesses
@@ -147,10 +150,11 @@ mod tests {
     #[test]
     fn test_empty_witness() {
         // Provide an empty witness table
-        let witness: Vec<Option<F>> = vec![];
+        let values: Vec<F> = vec![];
+        let initialized: Vec<bool> = vec![];
 
         // Build the trace
-        let builder = WitnessTraceBuilder::new(&witness);
+        let builder = WitnessTraceBuilder::new(&values, &initialized);
         let trace = builder.build().expect("Failed to build trace");
 
         // Verify the trace is empty
@@ -161,10 +165,11 @@ mod tests {
     #[test]
     fn test_witness_not_set_error() {
         // Create a witness table with an unset slot in the middle
-        let witness: Vec<Option<F>> = vec![Some(F::from_u64(10)), None, Some(F::from_u64(30))];
+        let values = vec![F::from_u64(10), F::default(), F::from_u64(30)];
+        let initialized = vec![true, false, true];
 
         // Attempt to build the trace
-        let builder = WitnessTraceBuilder::new(&witness);
+        let builder = WitnessTraceBuilder::new(&values, &initialized);
         let result = builder.build();
 
         // Verify the build fails with the expected error at index 1

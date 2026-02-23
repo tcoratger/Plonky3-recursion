@@ -51,12 +51,12 @@ impl<F> AluTrace<F> {
 /// Builder for generating ALU traces.
 pub struct AluTraceBuilder<'a, F> {
     primitive_ops: &'a [Op<F>],
-    witness: &'a [Option<F>],
+    witness: &'a [F],
 }
 
 impl<'a, F: Clone + Field> AluTraceBuilder<'a, F> {
     /// Creates a new ALU trace builder.
-    pub const fn new(primitive_ops: &'a [Op<F>], witness: &'a [Option<F>]) -> Self {
+    pub const fn new(primitive_ops: &'a [Op<F>], witness: &'a [F]) -> Self {
         Self {
             primitive_ops,
             witness,
@@ -132,7 +132,6 @@ impl<'a, F: Clone + Field> AluTraceBuilder<'a, F> {
     fn resolve(&self, id: &WitnessId) -> Result<F, CircuitError> {
         self.witness
             .get(id.0 as usize)
-            .and_then(|opt| opt.as_ref())
             .cloned()
             .ok_or(CircuitError::WitnessNotSet { witness_id: *id })
     }
@@ -154,7 +153,7 @@ mod tests {
         let a = F::from_u64(5);
         let b = F::from_u64(3);
         let out = F::from_u64(8);
-        let witness = vec![Some(a), Some(b), Some(out)];
+        let witness = vec![a, b, out];
 
         let ops = vec![Op::add(WitnessId(0), WitnessId(1), WitnessId(2))];
 
@@ -173,7 +172,7 @@ mod tests {
         let a = F::from_u64(5);
         let b = F::from_u64(3);
         let out = F::from_u64(15);
-        let witness = vec![Some(a), Some(b), Some(out)];
+        let witness = vec![a, b, out];
 
         let ops = vec![Op::mul(WitnessId(0), WitnessId(1), WitnessId(2))];
 
@@ -194,7 +193,7 @@ mod tests {
         let b = F::from_u64(3);
         let c = F::from_u64(2);
         let out = F::from_u64(17);
-        let witness = vec![Some(a), Some(b), Some(c), Some(out)];
+        let witness = vec![a, b, c, out];
 
         let ops = vec![Op::mul_add(
             WitnessId(0),
@@ -217,9 +216,9 @@ mod tests {
     #[test]
     fn test_bool_check() {
         // BoolCheck: a * (a - 1) = 0, out = a
-        // For a = 1: 1 * 0 = 0 ✓
+        // For a = 1: 1 * 0 = 0
         let a = F::ONE;
-        let witness = vec![Some(a), Some(F::ZERO)]; // a and placeholder for b
+        let witness = vec![a, F::ZERO]; // a and placeholder for b
 
         let ops = vec![Op::bool_check(WitnessId(0), WitnessId(1), WitnessId(0))];
 
@@ -241,14 +240,7 @@ mod tests {
         let b2 = F::from_u64(3);
         let out2 = F::from_u64(21); // mul
 
-        let witness = vec![
-            Some(a1),
-            Some(b1),
-            Some(out1),
-            Some(a2),
-            Some(b2),
-            Some(out2),
-        ];
+        let witness = vec![a1, b1, out1, a2, b2, out2];
 
         let ops = vec![
             Op::add(WitnessId(0), WitnessId(1), WitnessId(2)),
@@ -265,7 +257,7 @@ mod tests {
 
     #[test]
     fn test_empty_operations_creates_dummy_row() {
-        let witness = vec![Some(F::ZERO)];
+        let witness = vec![F::ZERO];
         let ops: Vec<Op<F>> = vec![];
 
         let builder = AluTraceBuilder::new(&ops, &witness);
@@ -280,7 +272,8 @@ mod tests {
 
     #[test]
     fn test_missing_witness_returns_error() {
-        let witness = vec![None, Some(F::from_u64(5)), Some(F::from_u64(5))];
+        // Witness has only 1 element but op references index 1 and 2 which are out of bounds
+        let witness = vec![F::from_u64(5)];
 
         let ops = vec![Op::add(WitnessId(0), WitnessId(1), WitnessId(2))];
 
@@ -290,7 +283,7 @@ mod tests {
         assert!(result.is_err());
         match result {
             Err(CircuitError::WitnessNotSet { witness_id }) => {
-                assert_eq!(witness_id, WitnessId(0));
+                assert_eq!(witness_id, WitnessId(1));
             }
             _ => panic!("Expected WitnessNotSet error"),
         }
