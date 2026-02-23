@@ -995,11 +995,11 @@ We’ll use a simple Fibonacci example throughout this page to ground the ideas 
 <pre><code class="language-rust ignore">let mut builder = CircuitBuilder::&lt;F&gt;::new();
 
 // Public input: expected F(n)
-let expected_result = builder.add_public_input();
+let expected_result = builder.public_input();
 
 // Compute F(n) iteratively
-let mut a = builder.add_const(F::ZERO); // F(0)
-let mut b = builder.add_const(F::ONE);  // F(1)
+let mut a = builder.define_const(F::ZERO); // F(0)
+let mut b = builder.define_const(F::ONE);  // F(1)
 
 for _i in 2..=n {
     let next = builder.add(a, b); // F(N) &lt;- F(N-1) + F(N-2)
@@ -1037,7 +1037,7 @@ be pruned away from the graph, and the operation removed.</p>
 <p>In order to recursively verify an AIR, its constraints need to be added to the circuit and folded together. In Plonky3, we can get an AIR's constraints in symbolic form. Since our primitive chips (see section <a href="architecture_and_internals/./construction.html#execution-ir">Execution IR</a>) encompass the various entries in the symbolic representation, we can simply map each symbolic operation to its circuit counterpart. The <code>symbolic_to_circuit</code> function does exactly that for a given symbolic constraint.</p>
 <p>We can consider a small example to show how operations are mapped. Given public inputs <code>a</code> and <code>b</code>, and a constant <code>c</code>, we have the following symbolic constraint: <code>Mul{ a, Sub {b, Const{ c }}}</code> (which corresponds to: <code>a * (b - c)</code>).</p>
 <pre><code class="language-rust ignore">// We get the `ExprId` corresponding to Const{ c } by adding a constant to the circuit.
-let x = builder.add_const(c);
+let x = builder.define_const(c);
 // We use the previously computed `x` to compute the subtraction in the circuit.
 let y = builder.sub(b, x);
 // We use the previously computed `y` to compute the multiplication in the circuit.
@@ -1062,7 +1062,7 @@ fn eval_folded_circuit(
             get_symbolic_constraints(self, 0, columns.public_values.len());
 
         // Fold all the constraints using the folding challenge.
-        let mut acc = builder.add_const(F::ZERO);
+        let mut acc = builder.define_const(F::ZERO);
         for s_c in symbolic_constraints {
             let mul_prev = builder.mul(acc, *alpha);
 
@@ -1397,7 +1397,7 @@ let a_plus_bc = builder.alloc_add(input_a, b_times_c, "a_plus_bc");
 let a_minus_bc = builder.alloc_sub(input_a, b_times_c, "a_minus_bc");
 
 // Default allocation
-let x = builder.add_public_input(); // unlabelled
+let x = builder.public_input(); // unlabelled
 let y = builder.add(x, z);          // unlabelled</code></pre>
 <p>The <code>CircuitBuilder</code> also allows for nested scoping of allocation logs, so that users can debug
 a specific context within a larger circuit. Scoping can be defined arbitrarily by users as follows:</p>
@@ -1455,6 +1455,9 @@ This ensures that all constraints are properly satisfied before proceeding to th
 <li><code>--commit-pow-bits</code>: additional PoW grinding during the FRI commit phase. Default 0.</li>
 <li><code>--query-pow-bits</code>: additional PoW grinding during the FRI query phase. Default 16.</li>
 <li><code>--num-recursive-layers</code>: number of recursive proofs to be generated in a chain, starting from the base proof (Keccak or Fibonacci). Default 3.</li>
+<li><code>--witness-lanes</code>: number of witness lanes for the table packing in recursive layers. Default varies per examples.</li>
+<li><code>--public-lanes</code>: number of public lanes for the table packing in recursive layers. Default varies per examples.</li>
+<li><code>--alu-lanes</code>: number of ALU lanes for the table packing in recursive layers. Default varies per examples.</li>
 </ul>
 <h2 id="results"><a class="header" href="#results">Results</a></h2>
 <p>Running on a Apple M4 pro, 14 Cores, with <strong>KoalaBear</strong> field and extension of <strong>degree 4</strong>, using default parameters mentioned above, performance benchmarks are as follows:</p>
