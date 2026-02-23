@@ -36,7 +36,7 @@ impl<F: PrimeCharacteristicRing> WitnessTable<F> {
 
     /// Return the total number of slots.
     #[inline]
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.values.len()
     }
 
