@@ -5,18 +5,17 @@ use p3_field::PrimeCharacteristicRing;
 use crate::CircuitError;
 use crate::types::WitnessId;
 
-/// Witness storage optimized for release performance.
+/// Witness storage with initialization tracking.
 ///
-/// In **debug** builds: `Vec<F>` + `Vec<bool>` for full validation
-/// (unset detection, conflict detection).
+/// Uses `Vec<F>` + `Vec<bool>` for all builds. The `initialized` flags
+/// are required for correctness (Add/Mul ops probe whether operands are
+/// set to choose forward vs inverse computation).
 ///
-/// In **release** builds: bare `Vec<F>` — zero overhead per access because
-/// the circuit is already validated at build time and ops execute in
-/// topological order.
+/// In **debug** builds the runner layer adds extra validation on top
+/// (conflict detection, bounds checks). In **release** builds those
+/// checks are compiled out, but initialization tracking stays.
 pub(crate) struct WitnessTable<F> {
     values: Vec<F>,
-
-    #[cfg(debug_assertions)]
     initialized: Vec<bool>,
 }
 
@@ -25,7 +24,6 @@ impl<F: PrimeCharacteristicRing> WitnessTable<F> {
     pub fn new(count: usize) -> Self {
         Self {
             values: F::zero_vec(count),
-            #[cfg(debug_assertions)]
             initialized: alloc::vec![false; count],
         }
     }
@@ -38,14 +36,16 @@ impl<F: PrimeCharacteristicRing> WitnessTable<F> {
     }
 
     /// Return whether the slot at `idx` has been written.
-    #[cfg(debug_assertions)]
     #[inline]
     pub fn is_initialized(&self, idx: usize) -> bool {
         self.initialized[idx]
     }
 
     /// Read the value at the given witness index.
-    #[cfg(debug_assertions)]
+    ///
+    /// Returns `Err` if the slot has not been written yet.
+    /// This is critical for correctness: Add/Mul ops probe operands
+    /// to choose forward vs inverse computation path.
     #[inline(always)]
     pub fn get(&self, widx: WitnessId) -> Result<F, CircuitError>
     where
@@ -59,16 +59,6 @@ impl<F: PrimeCharacteristicRing> WitnessTable<F> {
         }
     }
 
-    /// Read the value at the given witness index (release: direct indexed read).
-    #[cfg(not(debug_assertions))]
-    #[inline(always)]
-    pub fn get(&self, widx: WitnessId) -> Result<F, CircuitError>
-    where
-        F: Clone,
-    {
-        Ok(self.values[widx.0 as usize].clone())
-    }
-
     /// Return a reference to the value at `idx` without any checks.
     #[inline(always)]
     pub fn get_value_unchecked(&self, idx: usize) -> &F {
@@ -76,18 +66,10 @@ impl<F: PrimeCharacteristicRing> WitnessTable<F> {
     }
 
     /// Write a value and mark the slot as initialized.
-    #[cfg(debug_assertions)]
     #[inline(always)]
     pub fn set_unchecked(&mut self, idx: usize, value: F) {
         self.values[idx] = value;
         self.initialized[idx] = true;
-    }
-
-    /// Write a value (release: single store, no initialization tracking).
-    #[cfg(not(debug_assertions))]
-    #[inline(always)]
-    pub fn set_unchecked(&mut self, idx: usize, value: F) {
-        self.values[idx] = value;
     }
 
     /// Borrow the raw values slice.
@@ -96,7 +78,6 @@ impl<F: PrimeCharacteristicRing> WitnessTable<F> {
     }
 
     /// Borrow the initialization flags slice.
-    #[cfg(debug_assertions)]
     pub fn initialized(&self) -> &[bool] {
         &self.initialized
     }

@@ -56,13 +56,11 @@ impl<F> WitnessTrace<F> {
 /// Builder for generating witness traces.
 pub struct WitnessTraceBuilder<'a, F> {
     values: &'a [F],
-    #[cfg(debug_assertions)]
     initialized: &'a [bool],
 }
 
 impl<'a, F: Clone> WitnessTraceBuilder<'a, F> {
     /// Creates a new witness trace builder from flat value/initialized slices.
-    #[cfg(debug_assertions)]
     pub const fn new(values: &'a [F], initialized: &'a [bool]) -> Self {
         Self {
             values,
@@ -70,14 +68,11 @@ impl<'a, F: Clone> WitnessTraceBuilder<'a, F> {
         }
     }
 
-    /// Creates a new witness trace builder (release: values only, no init flags).
-    #[cfg(not(debug_assertions))]
-    pub const fn new(values: &'a [F]) -> Self {
-        Self { values }
-    }
-
     /// Builds the witness trace from the populated witness table.
-    #[cfg(debug_assertions)]
+    ///
+    /// In debug builds, validates that every slot was initialized.
+    /// In release builds, skips the per-slot check (the circuit is
+    /// already validated at build time).
     pub fn build(self) -> Result<WitnessTrace<F>, CircuitError> {
         let capacity = self.values.len();
         let mut index = Vec::with_capacity(capacity);
@@ -92,15 +87,6 @@ impl<'a, F: Clone> WitnessTraceBuilder<'a, F> {
             }
         }
 
-        Ok(WitnessTrace { index, values })
-    }
-
-    /// Builds the witness trace (release: direct copy, no init check).
-    #[cfg(not(debug_assertions))]
-    pub fn build(self) -> Result<WitnessTrace<F>, CircuitError> {
-        let len = self.values.len();
-        let index = (0..len as u32).map(WitnessId).collect();
-        let values = self.values.to_vec();
         Ok(WitnessTrace { index, values })
     }
 }
