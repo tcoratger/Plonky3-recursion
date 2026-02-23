@@ -204,8 +204,7 @@ impl<F: CircuitField> CircuitRunner<F> {
         let const_trace = ConstTraceBuilder::new(&self.circuit.ops).build()?;
         let public_trace =
             PublicTraceBuilder::new(&self.circuit.ops, self.witness.values()).build()?;
-        let alu_trace =
-            AluTraceBuilder::new(&self.circuit.ops, self.witness.values()).build()?;
+        let alu_trace = AluTraceBuilder::new(&self.circuit.ops, self.witness.values()).build()?;
 
         let mut non_primitive_traces: HashMap<NonPrimitiveOpType, Box<dyn NonPrimitiveTrace<F>>> =
             HashMap::new();

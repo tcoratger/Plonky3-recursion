@@ -143,7 +143,13 @@ fn bench_trace_build(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("trace_build");
     group.bench_function("witness", |b| {
-        b.iter(|| black_box(WitnessTraceBuilder::new(values, initialized).build().unwrap()));
+        b.iter(|| {
+            black_box(
+                WitnessTraceBuilder::new(values, initialized)
+                    .build()
+                    .unwrap(),
+            )
+        });
     });
     group.bench_function("const", |b| {
         b.iter(|| black_box(ConstTraceBuilder::new(ops).build().unwrap()));
