@@ -36,6 +36,9 @@ Each example supports additional parameterization around the FRI parameters, nam
 - `--commit-pow-bits`: additional PoW grinding during the FRI commit phase. Default 0.
 - `--query-pow-bits`: additional PoW grinding during the FRI query phase. Default 16.
 - `--num-recursive-layers`: number of recursive proofs to be generated in a chain, starting from the base proof (Keccak or Fibonacci). Default 3.
+- `--witness-lanes`: number of witness lanes for the table packing in recursive layers. Default varies per examples.
+- `--public-lanes`: number of public lanes for the table packing in recursive layers. Default varies per examples.
+- `--alu-lanes`: number of ALU lanes for the table packing in recursive layers. Default varies per examples.
 
 ## Results
 
