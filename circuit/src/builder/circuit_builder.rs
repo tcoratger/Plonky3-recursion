@@ -450,7 +450,7 @@ where
     ///
     /// When `b` ∈ {0,1}, this returns `t` if b = 1, else `s` if b = 0.
     /// Call `assert_bool(b)` beforehand if you need booleanity enforced.
-    /// Cost: 1 mul + 2 add (0 if trivial).
+    /// Cost: 1 sub + 1 mul_add (0 if trivial).
     pub fn select(&mut self, b: ExprId, t: ExprId, s: ExprId) -> ExprId {
         // Trivial: both branches identical
         if t == s {
