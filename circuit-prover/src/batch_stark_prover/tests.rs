@@ -93,9 +93,11 @@ fn test_table_lookups() {
     let (mut airs, log_degrees): (Vec<_>, Vec<usize>) = airs_degrees.into_iter().unzip();
 
     // Witness multiplicities: index 0 gets c_idx lookups from ALU ops without c; values from preprocessed.
+    // Constant folding evaluates mul(5,2) at build time, so there is no Mul ALU op.
     let mut expected_multiplicities = vec![BabyBear::from_u64(2); 11];
-    expected_multiplicities[0] = BabyBear::from_u64(5);
-    expected_multiplicities[7] = BabyBear::from_u64(0);
+    expected_multiplicities[0] = BabyBear::from_u64(6);
+    expected_multiplicities[1] = BabyBear::from_u64(1);
+    expected_multiplicities[2] = BabyBear::from_u64(1);
     // Pad multiplicities.
     let total_witness_length = (expected_multiplicities
         .len()
