@@ -10,7 +10,7 @@ use p3_air::DebugConstraintBuilder;
 use p3_air::{Air, AirBuilder, BaseAir};
 use p3_baby_bear::{BabyBear, GenericPoseidon2LinearLayersBabyBear};
 use p3_batch_stark::{StarkGenericConfig, Val};
-use p3_circuit::op::{NonPrimitiveOpType, Poseidon2Config};
+use p3_circuit::op::{NpoTypeId, Poseidon2Config};
 use p3_circuit::ops::{GoldilocksD2Width8, Poseidon2CircuitRow, Poseidon2Params, Poseidon2Trace};
 use p3_circuit::tables::Traces;
 use p3_field::extension::{BinomialExtensionField, BinomiallyExtendable};
@@ -923,8 +923,8 @@ impl Poseidon2Prover {
         self.config
     }
 
-    pub(crate) const fn poseidon2_op_type(&self) -> NonPrimitiveOpType {
-        NonPrimitiveOpType::Poseidon2Perm(self.config)
+    pub(crate) fn poseidon2_op_type(&self) -> NpoTypeId {
+        NpoTypeId::poseidon2_perm(self.config)
     }
 }
 
@@ -1069,7 +1069,7 @@ impl Poseidon2Prover {
             From<SymbolicExpression<Val<SC>>> + Algebra<SC::Challenge>,
     {
         let t = traces.non_primitive_trace::<Poseidon2Trace<Val<SC>>>(
-            NonPrimitiveOpType::Poseidon2Perm(self.config),
+            &NpoTypeId::poseidon2_perm(self.config),
         )?;
 
         let rows = t.total_rows();
@@ -1243,7 +1243,7 @@ impl Poseidon2Prover {
         };
 
         Some(BatchTableInstance {
-            op_type: NonPrimitiveOpType::Poseidon2Perm(self.config),
+            op_type: NpoTypeId::poseidon2_perm(self.config),
             air: DynamicAirEntry::new(Box::new(air)),
             trace: matrix,
             public_values: Vec::new(),
@@ -1259,7 +1259,7 @@ where
     SymbolicExpressionExt<Val<SC>, SC::Challenge>:
         From<SymbolicExpression<Val<SC>>> + Algebra<SC::Challenge>,
 {
-    fn op_type(&self) -> NonPrimitiveOpType {
+    fn op_type(&self) -> NpoTypeId {
         self.poseidon2_op_type()
     }
 
@@ -1344,7 +1344,7 @@ where
     SymbolicExpressionExt<Val<SC>, SC::Challenge>:
         From<SymbolicExpression<Val<SC>>> + Algebra<SC::Challenge>,
 {
-    fn op_type(&self) -> NonPrimitiveOpType {
+    fn op_type(&self) -> NpoTypeId {
         self.0.poseidon2_op_type()
     }
 
