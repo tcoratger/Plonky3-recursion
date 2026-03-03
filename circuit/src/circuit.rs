@@ -53,16 +53,10 @@ pub struct PreprocessedColumns<F> {
     /// as an extension-field value. This is used by creator tables to set their
     /// signed multiplicity on the `WitnessChecks` bus.
     pub ext_reads: Vec<u32>,
-    /// Tracks WitnessIds that are duplicate Poseidon2 rate outputs.
-    ///
-    /// Due to the circuit optimizer's witness_rewrite deduplication, two distinct Poseidon2
-    /// operations can end up sharing the same output WitnessId (when they hash identical inputs).
-    /// The FIRST operation is the creator; subsequent ones must be treated as readers (out_ctl=-1).
-    ///
-    /// `poseidon2_dup_wids[i] = true` means WitnessId(i) is a duplicate Poseidon2 output:
-    /// the creator was a previous op. Used by the prover to set out_ctl = -1 instead
-    /// of +ext_reads[i].
-    pub poseidon2_dup_wids: Vec<bool>,
+    /// Per-NPO duplicate-output flags: `dup_npo_outputs[op_type][wid] == true` means
+    /// `WitnessId(wid)` was already defined by an earlier op and this NPO occurrence is
+    /// a reader, not the creator. Populated by `generate_preprocessed_columns`.
+    pub dup_npo_outputs: HashMap<NpoTypeId, Vec<bool>>,
 }
 
 impl<F: Field + Clone> Clone for PreprocessedColumns<F> {
@@ -72,7 +66,7 @@ impl<F: Field + Clone> Clone for PreprocessedColumns<F> {
             non_primitive: self.non_primitive.clone(),
             d: self.d,
             ext_reads: self.ext_reads.clone(),
-            poseidon2_dup_wids: self.poseidon2_dup_wids.clone(),
+            dup_npo_outputs: self.dup_npo_outputs.clone(),
         }
     }
 }
@@ -86,7 +80,7 @@ impl<F: Field> PreprocessedColumns<F> {
             non_primitive: NonPrimitivePreprocessedMap::new(),
             d: 1,
             ext_reads: Vec::new(),
-            poseidon2_dup_wids: Vec::new(),
+            dup_npo_outputs: HashMap::new(),
         }
     }
 
@@ -100,7 +94,7 @@ impl<F: Field> PreprocessedColumns<F> {
             non_primitive: NonPrimitivePreprocessedMap::new(),
             d,
             ext_reads: Vec::new(),
-            poseidon2_dup_wids: Vec::new(),
+            dup_npo_outputs: HashMap::new(),
         }
     }
 
@@ -394,28 +388,30 @@ impl<F: Field> Circuit<F> {
                     ..
                 } => {
                     executor.preprocess(inputs, outputs, &mut preprocessed)?;
+
                     let op_type = executor.op_type();
-                    if op_type.as_str().starts_with("poseidon2_perm/") {
-                        for out_limb in outputs.iter().take(2) {
-                            for wid in out_limb {
-                                let wid_idx = wid.0 as usize;
-                                if wid_idx < defined.len() && defined[wid_idx] {
-                                    let dup_len = preprocessed.poseidon2_dup_wids.len();
-                                    if wid_idx >= dup_len {
-                                        preprocessed.poseidon2_dup_wids.resize(wid_idx + 1, false);
-                                    }
-                                    preprocessed.poseidon2_dup_wids[wid_idx] = true;
-                                    preprocessed.increment_ext_reads(&[*wid]);
-                                } else {
-                                    if wid_idx >= defined.len() {
-                                        defined.resize(wid_idx + 1, false);
-                                    }
-                                    defined[wid_idx] = true;
+                    let n_exposed = executor.num_exposed_outputs().unwrap_or(outputs.len());
+                    for out_limb in outputs.iter().take(n_exposed) {
+                        for wid in out_limb {
+                            let wid_idx = wid.0 as usize;
+                            if wid_idx < defined.len() && defined[wid_idx] {
+                                let dup = preprocessed
+                                    .dup_npo_outputs
+                                    .entry(op_type.clone())
+                                    .or_default();
+                                if wid_idx >= dup.len() {
+                                    dup.resize(wid_idx + 1, false);
                                 }
+                                dup[wid_idx] = true;
+                                preprocessed.increment_ext_reads(&[*wid]);
+                            } else {
+                                if wid_idx >= defined.len() {
+                                    defined.resize(wid_idx + 1, false);
+                                }
+                                defined[wid_idx] = true;
                             }
                         }
                     }
-                    // Other non-primitive ops: no special handling here.
                 }
                 Op::Hint { .. } => {
                     // Hints do not participate in preprocessed columns or table-backed ops.

@@ -2,17 +2,20 @@ use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::vec;
 use alloc::vec::Vec;
-use core::borrow::Borrow;
+use core::any::Any;
+use core::borrow::{Borrow, BorrowMut};
 use core::mem::transmute;
 
+use hashbrown::HashMap;
 #[cfg(debug_assertions)]
 use p3_air::DebugConstraintBuilder;
 use p3_air::{Air, AirBuilder, BaseAir};
 use p3_baby_bear::{BabyBear, GenericPoseidon2LinearLayersBabyBear};
 use p3_batch_stark::{StarkGenericConfig, Val};
-use p3_circuit::op::{NpoTypeId, Poseidon2Config};
+use p3_circuit::op::{NonPrimitivePreprocessedMap, NpoTypeId, Poseidon2Config};
 use p3_circuit::ops::{GoldilocksD2Width8, Poseidon2CircuitRow, Poseidon2Params, Poseidon2Trace};
 use p3_circuit::tables::Traces;
+use p3_circuit::{CircuitError, PreprocessedColumns};
 use p3_field::extension::{BinomialExtensionField, BinomiallyExtendable};
 use p3_field::{Algebra, ExtensionField, Field, PrimeCharacteristicRing, PrimeField, PrimeField64};
 use p3_goldilocks::{GenericPoseidon2LinearLayersGoldilocks, Goldilocks};
@@ -26,20 +29,23 @@ use p3_poseidon2_circuit_air::{
     Poseidon2CircuitAir, Poseidon2CircuitAirBabyBearD4Width16,
     Poseidon2CircuitAirBabyBearD4Width24, Poseidon2CircuitAirGoldilocksD2Width8,
     Poseidon2CircuitAirKoalaBearD4Width16, Poseidon2CircuitAirKoalaBearD4Width24,
-    eval_unchecked_with_concrete, extract_preprocessed_from_operations,
+    Poseidon2PreprocessedRow, eval_unchecked_with_concrete, extract_preprocessed_from_operations,
     goldilocks_d2_width8_default_air, goldilocks_d2_width8_default_air_with_preprocessed,
-    goldilocks_d2_width8_round_constants,
+    goldilocks_d2_width8_round_constants, poseidon2_preprocessed_width,
 };
 use p3_uni_stark::{
     ProverConstraintFolder, SymbolicAirBuilder, SymbolicExpression, SymbolicExpressionExt,
     VerifierConstraintFolder,
 };
+use p3_util::log2_ceil_usize;
 
 use super::dynamic_air::{BatchAir, BatchTableInstance, DynamicAirEntry, TableProver};
 use crate::batch_stark_prover::{
     BABY_BEAR_MODULUS, KOALA_BEAR_MODULUS, NonPrimitiveTableEntry, TablePacking,
 };
+use crate::common::{CircuitTableAir, NpoAirBuilder, NpoPreprocessor};
 use crate::config::{BabyBearConfig, GoldilocksConfig, KoalaBearConfig, StarkField};
+use crate::constraint_profile::ConstraintProfile;
 
 pub enum Poseidon2AirWrapperInner {
     BabyBearD4Width16(Box<Poseidon2CircuitAirBabyBearD4Width16>),
@@ -1023,7 +1029,7 @@ impl Poseidon2Prover {
         SC: StarkGenericConfig + 'static + Send + Sync,
         Val<SC>: StarkField,
         SymbolicExpressionExt<Val<SC>, SC::Challenge>:
-            From<SymbolicExpression<Val<SC>>> + Algebra<SC::Challenge>,
+            Algebra<SymbolicExpression<Val<SC>>> + Algebra<SC::Challenge>,
     {
         DynamicAirEntry::new(Box::new(Poseidon2AirWrapper {
             inner: Self::air_wrapper_for_config_with_preprocessed::<Val<SC>>(
@@ -1066,7 +1072,7 @@ impl Poseidon2Prover {
         Val<SC>: StarkField,
         CF: Field + ExtensionField<Val<SC>>,
         SymbolicExpressionExt<Val<SC>, SC::Challenge>:
-            From<SymbolicExpression<Val<SC>>> + Algebra<SC::Challenge>,
+            Algebra<SymbolicExpression<Val<SC>>> + Algebra<SC::Challenge>,
     {
         let t = traces.non_primitive_trace::<Poseidon2Trace<Val<SC>>>(
             &NpoTypeId::poseidon2_perm(self.config),
@@ -1112,7 +1118,7 @@ impl Poseidon2Prover {
         SC: StarkGenericConfig + 'static + Send + Sync,
         Val<SC>: StarkField,
         SymbolicExpressionExt<Val<SC>, SC::Challenge>:
-            From<SymbolicExpression<Val<SC>>> + Algebra<SC::Challenge>,
+            Algebra<SymbolicExpression<Val<SC>>> + Algebra<SC::Challenge>,
     {
         let rows = t.total_rows();
 
@@ -1257,7 +1263,7 @@ where
     SC: StarkGenericConfig + 'static + Send + Sync,
     Val<SC>: StarkField + BinomiallyExtendable<4>,
     SymbolicExpressionExt<Val<SC>, SC::Challenge>:
-        From<SymbolicExpression<Val<SC>>> + Algebra<SC::Challenge>,
+        Algebra<SymbolicExpression<Val<SC>>> + Algebra<SC::Challenge>,
 {
     fn op_type(&self) -> NpoTypeId {
         self.poseidon2_op_type()
@@ -1334,15 +1340,14 @@ where
         Some(self.wrapper_from_config_with_preprocessed(committed_prep, min_height))
     }
 }
-
-pub(crate) struct Poseidon2ProverD2(pub(crate) Poseidon2Prover);
+pub struct Poseidon2ProverD2(pub(crate) Poseidon2Prover);
 
 impl<SC> TableProver<SC> for Poseidon2ProverD2
 where
     SC: StarkGenericConfig + 'static + Send + Sync,
     Val<SC>: StarkField + BinomiallyExtendable<2>,
     SymbolicExpressionExt<Val<SC>, SC::Challenge>:
-        From<SymbolicExpression<Val<SC>>> + Algebra<SC::Challenge>,
+        Algebra<SymbolicExpression<Val<SC>>> + Algebra<SC::Challenge>,
 {
     fn op_type(&self) -> NpoTypeId {
         self.0.poseidon2_op_type()
@@ -1420,4 +1425,267 @@ where
                 .wrapper_from_config_with_preprocessed(committed_prep, min_height),
         )
     }
+}
+
+/// Shared helper implementing Poseidon2-specific preprocessing on generic preprocessed columns.
+fn poseidon2_preprocess_for_prover<F, ExtF, const D: usize>(
+    preprocessed: &mut PreprocessedColumns<ExtF>,
+) -> Result<NonPrimitivePreprocessedMap<F>, CircuitError>
+where
+    F: StarkField + PrimeField64,
+    ExtF: ExtensionField<F>,
+{
+    let prep_row_width = poseidon2_preprocessed_width();
+    let neg_one = F::NEG_ONE;
+
+    // Phase 1: scan Poseidon2 preprocessed data to count mmcs_index_sum conditional reads,
+    // and update `ext_reads` accordingly. This must happen before computing multiplicities.
+    for (op_type, prep) in preprocessed.non_primitive.iter() {
+        if op_type.as_str().starts_with("poseidon2_perm/") {
+            let prep_base: Vec<F> = prep
+                .iter()
+                .map(|v| v.as_base().ok_or(CircuitError::InvalidPreprocessedValues))
+                .collect::<Result<Vec<_>, CircuitError>>()?;
+
+            let num_rows = prep_base.len() / prep_row_width;
+            let trace_height = num_rows.next_power_of_two();
+            let has_padding = trace_height > num_rows;
+
+            for row_idx in 0..num_rows {
+                let row_start = row_idx * prep_row_width;
+                let row: &Poseidon2PreprocessedRow<F> =
+                    prep_base[row_start..row_start + prep_row_width].borrow();
+                let current_mmcs_merkle_flag = row.mmcs_merkle_flag;
+
+                // Check if next row exists and has new_start = 1.
+                // The Poseidon2 AIR pads the trace and sets new_start = 1 in the first
+                // padding row (only if padding exists), so the last real row can trigger a
+                // lookup if its mmcs_merkle_flag = 1 and there is padding.
+                let next_new_start = if row_idx + 1 < num_rows {
+                    let next_start = (row_idx + 1) * prep_row_width;
+                    let next_row: &Poseidon2PreprocessedRow<F> =
+                        prep_base[next_start..next_start + prep_row_width].borrow();
+                    next_row.new_start
+                } else if has_padding {
+                    F::ONE
+                } else {
+                    let first_row: &Poseidon2PreprocessedRow<F> =
+                        prep_base[0..prep_row_width].borrow();
+                    first_row.new_start
+                };
+
+                let multiplicity = current_mmcs_merkle_flag * next_new_start;
+                if multiplicity != F::ZERO {
+                    let mmcs_idx_u64 = F::as_canonical_u64(&row.mmcs_index_sum_ctl_idx);
+                    let mmcs_witness_idx = (mmcs_idx_u64 as usize) / D;
+
+                    if mmcs_witness_idx >= preprocessed.ext_reads.len() {
+                        preprocessed.ext_reads.resize(mmcs_witness_idx + 1, 0);
+                    }
+                    preprocessed.ext_reads[mmcs_witness_idx] += 1;
+                }
+            }
+        }
+    }
+
+    // Phase 2: update Poseidon2 out_ctl values in the base-field preprocessed data.
+    //
+    // Poseidon2 duplicate creators (from optimizer witness_rewrite deduplication)
+    // are recorded in plugin-owned metadata under this op_type. For those, out_ctl = -1
+    // (reader contribution). For first-occurrence creators, out_ctl = +ext_reads[wid].
+    let mut non_primitive_base: NonPrimitivePreprocessedMap<F> = HashMap::new();
+    for (op_type, prep) in preprocessed.non_primitive.iter() {
+        if op_type.as_str().starts_with("poseidon2_perm/") {
+            let dup_wids = preprocessed.dup_npo_outputs.get(op_type);
+
+            let mut prep_base: Vec<F> = prep
+                .iter()
+                .map(|v| v.as_base().ok_or(CircuitError::InvalidPreprocessedValues))
+                .collect::<Result<Vec<_>, CircuitError>>()?;
+
+            let num_rows = prep_base.len() / prep_row_width;
+
+            for row_idx in 0..num_rows {
+                let row_start = row_idx * prep_row_width;
+                let row: &mut Poseidon2PreprocessedRow<F> =
+                    prep_base[row_start..row_start + prep_row_width].borrow_mut();
+
+                for out_limb in &mut row.output_limbs {
+                    if out_limb.out_ctl != F::ZERO {
+                        let out_wid = F::as_canonical_u64(&out_limb.idx) as usize / D;
+                        let is_dup = dup_wids
+                            .and_then(|d| d.get(out_wid).copied())
+                            .unwrap_or(false);
+                        if is_dup {
+                            out_limb.out_ctl = neg_one;
+                        } else {
+                            let n_reads = preprocessed.ext_reads.get(out_wid).copied().unwrap_or(0);
+                            out_limb.out_ctl = F::from_u32(n_reads);
+                        }
+                    }
+                }
+            }
+
+            non_primitive_base.insert(op_type.clone(), prep_base);
+        }
+    }
+
+    Ok(non_primitive_base)
+}
+
+/// Stateless plugin used for Poseidon2 preprocessing.
+#[derive(Clone, Default)]
+pub struct Poseidon2Preprocessor;
+
+impl NpoPreprocessor<BabyBear> for Poseidon2Preprocessor {
+    fn preprocess(
+        &self,
+        _circuit: &dyn Any,
+        preprocessed: &mut dyn Any,
+    ) -> Result<NonPrimitivePreprocessedMap<BabyBear>, CircuitError> {
+        if let Some(prep) = preprocessed.downcast_mut::<PreprocessedColumns<BabyBear>>() {
+            return poseidon2_preprocess_for_prover::<BabyBear, BabyBear, 1>(prep);
+        }
+        if let Some(prep) =
+            preprocessed.downcast_mut::<PreprocessedColumns<BinomialExtensionField<BabyBear, 4>>>()
+        {
+            return poseidon2_preprocess_for_prover::<
+                BabyBear,
+                BinomialExtensionField<BabyBear, 4>,
+                4,
+            >(prep);
+        }
+        Ok(NonPrimitivePreprocessedMap::new())
+    }
+}
+
+impl NpoPreprocessor<KoalaBear> for Poseidon2Preprocessor {
+    fn preprocess(
+        &self,
+        _circuit: &dyn Any,
+        preprocessed: &mut dyn Any,
+    ) -> Result<NonPrimitivePreprocessedMap<KoalaBear>, CircuitError> {
+        if let Some(prep) = preprocessed.downcast_mut::<PreprocessedColumns<KoalaBear>>() {
+            return poseidon2_preprocess_for_prover::<KoalaBear, KoalaBear, 1>(prep);
+        }
+        if let Some(prep) =
+            preprocessed.downcast_mut::<PreprocessedColumns<BinomialExtensionField<KoalaBear, 4>>>()
+        {
+            return poseidon2_preprocess_for_prover::<
+                KoalaBear,
+                BinomialExtensionField<KoalaBear, 4>,
+                4,
+            >(prep);
+        }
+        Ok(NonPrimitivePreprocessedMap::new())
+    }
+}
+
+impl NpoPreprocessor<Goldilocks> for Poseidon2Preprocessor {
+    fn preprocess(
+        &self,
+        _circuit: &dyn Any,
+        preprocessed: &mut dyn Any,
+    ) -> Result<NonPrimitivePreprocessedMap<Goldilocks>, CircuitError> {
+        if let Some(prep) = preprocessed.downcast_mut::<PreprocessedColumns<Goldilocks>>() {
+            return poseidon2_preprocess_for_prover::<Goldilocks, Goldilocks, 1>(prep);
+        }
+        if let Some(prep) = preprocessed
+            .downcast_mut::<PreprocessedColumns<BinomialExtensionField<Goldilocks, 2>>>()
+        {
+            return poseidon2_preprocess_for_prover::<
+                Goldilocks,
+                BinomialExtensionField<Goldilocks, 2>,
+                2,
+            >(prep);
+        }
+        Ok(NonPrimitivePreprocessedMap::new())
+    }
+}
+
+#[derive(Clone, Default)]
+pub struct Poseidon2AirBuilderD2;
+
+impl<SC> NpoAirBuilder<SC, 2> for Poseidon2AirBuilderD2
+where
+    SC: StarkGenericConfig + 'static + Send + Sync,
+    Val<SC>: StarkField + BinomiallyExtendable<2>,
+    SymbolicExpressionExt<Val<SC>, SC::Challenge>:
+        Algebra<SymbolicExpression<Val<SC>>> + Algebra<SC::Challenge>,
+{
+    fn try_build(
+        &self,
+        op_type: &NpoTypeId,
+        prep_base: &[Val<SC>],
+        min_height: usize,
+        constraint_profile: ConstraintProfile,
+    ) -> Option<(CircuitTableAir<SC, 2>, usize)> {
+        let suffix = op_type.as_str().strip_prefix("poseidon2_perm/")?;
+        let config = Poseidon2Config::from_variant_name(suffix)?;
+        let Poseidon2Config::GoldilocksD2Width8 = config else {
+            return None;
+        };
+        let prover = Poseidon2ProverD2(Poseidon2Prover::new(config, constraint_profile));
+        let wrapper = prover
+            .0
+            .wrapper_from_config_with_preprocessed(prep_base.to_vec(), min_height);
+        let width = prover.0.preprocessed_width_from_config();
+        let num_rows = prep_base.len().div_ceil(width);
+        let degree = log2_ceil_usize(
+            num_rows
+                .next_power_of_two()
+                .max(min_height.next_power_of_two()),
+        );
+        Some((CircuitTableAir::Dynamic(wrapper), degree))
+    }
+}
+
+#[derive(Clone, Default)]
+pub struct Poseidon2AirBuilderD4;
+
+impl<SC> NpoAirBuilder<SC, 4> for Poseidon2AirBuilderD4
+where
+    SC: StarkGenericConfig + 'static + Send + Sync,
+    Val<SC>: StarkField + BinomiallyExtendable<4>,
+    SymbolicExpressionExt<Val<SC>, SC::Challenge>:
+        Algebra<SymbolicExpression<Val<SC>>> + Algebra<SC::Challenge>,
+{
+    fn try_build(
+        &self,
+        op_type: &NpoTypeId,
+        prep_base: &[Val<SC>],
+        min_height: usize,
+        constraint_profile: ConstraintProfile,
+    ) -> Option<(CircuitTableAir<SC, 4>, usize)> {
+        let suffix = op_type.as_str().strip_prefix("poseidon2_perm/")?;
+        let config = Poseidon2Config::from_variant_name(suffix)?;
+        let config = match config {
+            Poseidon2Config::BabyBearD1Width16
+            | Poseidon2Config::BabyBearD4Width16
+            | Poseidon2Config::BabyBearD4Width24
+            | Poseidon2Config::KoalaBearD1Width16
+            | Poseidon2Config::KoalaBearD4Width16
+            | Poseidon2Config::KoalaBearD4Width24 => config,
+            _ => return None,
+        };
+        let prover = Poseidon2Prover::new(config, constraint_profile);
+        let wrapper = prover.wrapper_from_config_with_preprocessed(prep_base.to_vec(), min_height);
+        let width = prover.preprocessed_width_from_config();
+        let num_rows = prep_base.len().div_ceil(width);
+        let degree = log2_ceil_usize(
+            num_rows
+                .next_power_of_two()
+                .max(min_height.next_power_of_two()),
+        );
+        Some((CircuitTableAir::Dynamic(wrapper), degree))
+    }
+}
+
+/// Returns a type-erased Poseidon2 preprocessor for use when `Val<SC>` is BabyBear, Goldilocks, or KoalaBear.
+pub fn poseidon2_preprocessor<F>() -> Box<dyn NpoPreprocessor<F>>
+where
+    F: StarkField + PrimeField64,
+    Poseidon2Preprocessor: NpoPreprocessor<F>,
+{
+    Box::new(Poseidon2Preprocessor)
 }

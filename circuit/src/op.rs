@@ -1,6 +1,7 @@
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
 use alloc::string::String;
+use alloc::sync::Arc;
 use alloc::vec::Vec;
 use alloc::{format, vec};
 use core::any::Any;
@@ -15,7 +16,7 @@ use strum_macros::EnumCount;
 // Re-export Poseidon2 config types from their canonical location
 pub use crate::ops::poseidon2_perm::{Poseidon2Config, Poseidon2PermExec, Poseidon2PermExecBase};
 use crate::types::{NonPrimitiveOpId, WitnessId};
-use crate::{CircuitError, PreprocessedColumns};
+use crate::{CircuitError, NpoCircuitPlugin, PreprocessedColumns};
 
 /// ALU operation kinds for the unified arithmetic table.
 ///
@@ -412,6 +413,8 @@ impl core::fmt::Display for NpoTypeId {
 /// Preprocessed data for non-primitive tables, keyed by operation type.
 pub type NonPrimitivePreprocessedMap<F> = HashMap<NpoTypeId, Vec<F>>;
 
+/// Registry of NPO plugins, keyed by type ID.
+pub type NpoRegistry<F> = HashMap<NpoTypeId, Arc<dyn NpoCircuitPlugin<F>>>;
 /// Type-erased, plugin-owned configuration for a non-primitive operation.
 ///
 /// Each NPO plugin both produces and consumes its own typed data through
@@ -666,7 +669,9 @@ pub trait NonPrimitiveExecutor<F: Field>: Debug {
     /// - the multiplicity for the `Witness` table.
     ///
     /// Uses the `PreprocessedColumns` API to ensure witness multiplicities are updated
-    /// consistently when reading from the witness table.
+    /// consistently when reading from the witness table. Duplicate-output detection
+    /// (which outputs were already defined by an earlier op) is handled generically
+    /// by `generate_preprocessed_columns` after this method returns.
     fn preprocess(
         &self,
         _inputs: &[Vec<WitnessId>],
@@ -674,6 +679,16 @@ pub trait NonPrimitiveExecutor<F: Field>: Debug {
         _preprocessed: &mut PreprocessedColumns<F>,
     ) -> Result<(), CircuitError> {
         Ok(())
+    }
+
+    /// How many leading output groups are exposed as creators on the witness-checks bus.
+    /// `generate_preprocessed_columns` only performs duplicate-output detection on the
+    /// first `n` groups returned here.
+    ///
+    /// Override when some outputs are private (e.g. capacity elements in a permutation).
+    /// Default: all groups.
+    fn num_exposed_outputs(&self) -> Option<usize> {
+        None
     }
 
     /// Clone as trait object

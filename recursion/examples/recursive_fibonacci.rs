@@ -230,6 +230,7 @@ macro_rules! define_field_module {
         $enable_poseidon2_fn:ident,
         $register_poseidon2_fn:ident,
         $default_perm_circuit:path,
+        $backend_ctor:ident,
         $backend_width:expr,
         $backend_rate:expr
     ) => {
@@ -334,7 +335,7 @@ macro_rules! define_field_module {
                     }
                 }
 
-                fn enable_poseidon2_on_circuit(
+                fn prepare_circuit_for_verification(
                     &self,
                     circuit: &mut CircuitBuilder<Challenge>,
                 ) -> Result<(), VerificationError> {
@@ -466,7 +467,8 @@ macro_rules! define_field_module {
                     get_airs_and_degrees_with_prep::<ConfigWithFriParams, _, 1>(
                         &base_circuit,
                         table_packing_0,
-                        None,
+                        &[],
+                        &[],
                         ConstraintProfile::Standard,
                     )
                     .unwrap();
@@ -498,15 +500,16 @@ macro_rules! define_field_module {
                     return;
                 }
 
-                let backend =
-                    FriRecursionBackend::<$backend_width, $backend_rate>::new($poseidon2_config);
+                let backend = FriRecursionBackend::<$backend_width, $backend_rate>::$backend_ctor(
+                    $poseidon2_config,
+                );
                 let mut output = RecursionOutput(proof_0, Rc::new(circuit_prover_data_0));
 
                 for layer in 1..=num_recursive_layers {
                     let params = ProveNextLayerParams {
                         table_packing: table_packing
                             .with_fri_params(fri_params.log_final_poly_len, fri_params.log_blowup),
-                        use_poseidon2_in_circuit: true,
+                        use_npos_in_circuit: true,
                         constraint_profile: ConstraintProfile::Standard,
                     };
                     let config = config_with_fri_params(fri_params);
@@ -554,6 +557,7 @@ define_field_module!(
     enable_poseidon2_perm,
     register_poseidon2_table,
     p3_koala_bear::default_koalabear_poseidon2_16,
+    new_d4,
     16,
     8
 );
@@ -572,6 +576,7 @@ define_field_module!(
     enable_poseidon2_perm,
     register_poseidon2_table,
     p3_baby_bear::default_babybear_poseidon2_16,
+    new_d4,
     16,
     8
 );
@@ -590,6 +595,7 @@ define_field_module!(
     enable_poseidon2_perm_width_8,
     register_poseidon2_table_d2,
     default_goldilocks_poseidon2_8,
+    new_d2,
     8,
     4
 );

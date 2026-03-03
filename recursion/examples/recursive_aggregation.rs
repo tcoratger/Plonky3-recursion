@@ -213,6 +213,7 @@ macro_rules! define_field_module {
         $enable_poseidon2_fn:ident,
         $register_poseidon2_fn:ident,
         $default_perm_circuit:path,
+        $backend_ctor:ident,
         $backend_width:expr,
         $backend_rate:expr
     ) => {
@@ -317,7 +318,7 @@ macro_rules! define_field_module {
                     }
                 }
 
-                fn enable_poseidon2_on_circuit(
+                fn prepare_circuit_for_verification(
                     &self,
                     circuit: &mut CircuitBuilder<Challenge>,
                 ) -> Result<(), VerificationError> {
@@ -419,7 +420,8 @@ macro_rules! define_field_module {
                     get_airs_and_degrees_with_prep::<ConfigWithFriParams, _, 1>(
                         &circuit,
                         table_packing,
-                        None,
+                        &[],
+                        &[],
                         ConstraintProfile::Standard,
                     )
                     .unwrap();
@@ -456,8 +458,9 @@ macro_rules! define_field_module {
                 let config = config_with_fri_params(fri_params);
                 let base_table_packing = TablePacking::new(1, 1)
                     .with_fri_params(fri_params.log_final_poly_len, fri_params.log_blowup);
-                let backend =
-                    FriRecursionBackend::<$backend_width, $backend_rate>::new($poseidon2_config);
+                let backend = FriRecursionBackend::<$backend_width, $backend_rate>::$backend_ctor(
+                    $poseidon2_config,
+                );
 
                 let tree_depth = num_recursive_layers;
                 let num_leaves = 1usize << tree_depth;
@@ -489,7 +492,7 @@ macro_rules! define_field_module {
                             table_packing.clone()
                         }
                         .with_fri_params(fri_params.log_final_poly_len, fri_params.log_blowup),
-                        use_poseidon2_in_circuit: true,
+                        use_npos_in_circuit: true,
                         constraint_profile: ConstraintProfile::Standard,
                     };
 
@@ -557,6 +560,7 @@ define_field_module!(
     enable_poseidon2_perm,
     register_poseidon2_table,
     p3_koala_bear::default_koalabear_poseidon2_16,
+    new_d4,
     16,
     8
 );
@@ -575,6 +579,7 @@ define_field_module!(
     enable_poseidon2_perm,
     register_poseidon2_table,
     p3_baby_bear::default_babybear_poseidon2_16,
+    new_d4,
     16,
     8
 );
@@ -593,6 +598,7 @@ define_field_module!(
     enable_poseidon2_perm_width_8,
     register_poseidon2_table_d2,
     default_goldilocks_poseidon2_8,
+    new_d2,
     8,
     4
 );
