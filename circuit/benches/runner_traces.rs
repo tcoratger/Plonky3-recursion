@@ -148,10 +148,26 @@ fn bench_trace_build(c: &mut Criterion) {
     group.finish();
 }
 
+fn bench_preprocessing(c: &mut Criterion) {
+    let mut group = c.benchmark_group("preprocessing");
+    for n in [100, 500, 2000, 10_000] {
+        group.bench_with_input(BenchmarkId::new("fibonacci", n), &n, |b, &n| {
+            let (circuit, _) = fib_circuit(n);
+            b.iter(|| black_box(circuit.generate_preprocessed_columns(1).unwrap()));
+        });
+        group.bench_with_input(BenchmarkId::new("mul_heavy", n), &n, |b, &n| {
+            let (circuit, _) = mul_heavy_circuit(n);
+            b.iter(|| black_box(circuit.generate_preprocessed_columns(1).unwrap()));
+        });
+    }
+    group.finish();
+}
+
 criterion_group!(
     benches,
     bench_runner_traces,
     bench_execute_all,
     bench_trace_build,
+    bench_preprocessing,
 );
 criterion_main!(benches);

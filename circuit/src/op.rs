@@ -1,6 +1,5 @@
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
-use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use alloc::{format, vec};
@@ -400,13 +399,26 @@ impl<F: Field + PartialEq> PartialEq for Op<F> {
 ///
 /// Each unique (operation-kind, configuration) pair gets its own `NpoTypeId`.
 /// For example, Poseidon2 with BabyBear D=4 W=16 is `"poseidon2_perm/baby_bear_d4_w16"`.
-#[derive(Clone, PartialEq, Eq, Hash, Ord, PartialOrd, Serialize, Deserialize)]
-pub struct NpoTypeId(String);
+#[derive(Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
+pub struct NpoTypeId(Arc<str>);
+
+impl Serialize for NpoTypeId {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        self.0.serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for NpoTypeId {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let s = <&str>::deserialize(deserializer)?;
+        Ok(Self(Arc::from(s)))
+    }
+}
 
 impl NpoTypeId {
     /// Create a new NPO type identifier.
-    pub fn new(id: impl Into<String>) -> Self {
-        Self(id.into())
+    pub fn new(id: impl AsRef<str>) -> Self {
+        Self(Arc::from(id.as_ref()))
     }
 
     /// The string key.

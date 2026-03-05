@@ -1,8 +1,6 @@
 use alloc::string::String;
 use alloc::vec;
 use alloc::vec::Vec;
-use core::fmt::Debug;
-use core::ops::{Add, Mul, Sub};
 
 use hashbrown::HashMap;
 use p3_field::Field;
@@ -14,31 +12,6 @@ use crate::op::{
 use crate::tables::{CircuitRunner, TraceGeneratorFn};
 use crate::types::{ExprId, NonPrimitiveOpId, WitnessId};
 use crate::{AluOpKind, CircuitError};
-
-/// Trait encapsulating the required field operations for circuits
-pub trait CircuitField:
-    Clone
-    + Default
-    + Add<Output = Self>
-    + Sub<Output = Self>
-    + Mul<Output = Self>
-    + PartialEq
-    + Debug
-    + Field
-{
-}
-
-impl<F> CircuitField for F where
-    F: Clone
-        + Default
-        + Add<Output = F>
-        + Sub<Output = F>
-        + Mul<Output = F>
-        + PartialEq
-        + Debug
-        + Field
-{
-}
 
 /// Preprocessed data for primitive and non-primitive operation tables.
 pub struct PreprocessedColumns<F> {
@@ -292,6 +265,9 @@ impl<F: Field> Circuit<F> {
         d: usize,
     ) -> Result<PreprocessedColumns<F>, CircuitError> {
         let mut preprocessed = PreprocessedColumns::new_with_d(d);
+        preprocessed
+            .ext_reads
+            .resize(self.witness_count as usize, 0);
 
         // Track which witnesses have been defined (first-occurrence = creator).
         // Const and Public define their outputs first. ALU ops define their output (forward)
@@ -400,14 +376,19 @@ impl<F: Field> Circuit<F> {
                             defined.resize(out_idx + 1, false);
                         }
                         defined[out_idx] = true;
-                        let mut readers = vec![*b];
+                        let mut buf = [WitnessId(0); 4];
+                        let mut n = 0;
+                        buf[n] = *b;
+                        n += 1;
                         if a_is_reader {
-                            readers.push(*a);
+                            buf[n] = *a;
+                            n += 1;
                         }
                         if c_is_reader {
-                            readers.push(c_wid);
+                            buf[n] = c_wid;
+                            n += 1;
                         }
-                        preprocessed.increment_ext_reads(&readers);
+                        preprocessed.increment_ext_reads(&buf[..n]);
                     } else if !b_already_defined {
                         // Backward: b is the creator, out is always a reader.
                         // a and c contribute to ext_reads only if they are constrained.
@@ -416,25 +397,37 @@ impl<F: Field> Circuit<F> {
                             defined.resize(b_idx + 1, false);
                         }
                         defined[b_idx] = true;
-                        let mut readers = vec![*out];
+                        let mut buf = [WitnessId(0); 4];
+                        let mut n = 0;
+                        buf[n] = *out;
+                        n += 1;
                         if a_is_reader {
-                            readers.push(*a);
+                            buf[n] = *a;
+                            n += 1;
                         }
                         if c_is_reader {
-                            readers.push(c_wid);
+                            buf[n] = c_wid;
+                            n += 1;
                         }
-                        preprocessed.increment_ext_reads(&readers);
+                        preprocessed.increment_ext_reads(&buf[..n]);
                     } else {
                         // All-reader: b and out are always readers.
                         // a and c contribute to ext_reads only if they are constrained.
-                        let mut readers = vec![*b, *out];
+                        let mut buf = [WitnessId(0); 4];
+                        let mut n = 0;
+                        buf[n] = *b;
+                        n += 1;
+                        buf[n] = *out;
+                        n += 1;
                         if a_is_reader {
-                            readers.push(*a);
+                            buf[n] = *a;
+                            n += 1;
                         }
                         if c_is_reader {
-                            readers.push(c_wid);
+                            buf[n] = c_wid;
+                            n += 1;
                         }
-                        preprocessed.increment_ext_reads(&readers);
+                        preprocessed.increment_ext_reads(&buf[..n]);
                     }
                 }
                 Op::NonPrimitiveOpWithExecutor {
@@ -487,7 +480,7 @@ impl<F: Field> Circuit<F> {
     }
 }
 
-impl<F: CircuitField> Circuit<F> {
+impl<F: Field> Circuit<F> {
     /// Create a circuit runner for execution and trace generation
     pub fn runner(self) -> CircuitRunner<F> {
         CircuitRunner::new(self)

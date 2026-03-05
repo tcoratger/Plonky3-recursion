@@ -21,7 +21,7 @@ use crate::ops::poseidon2_perm::Poseidon2CircuitPlugin;
 use crate::ops::{Poseidon2Params, Poseidon2PermCall, Poseidon2PermCallBase};
 use crate::tables::TraceGeneratorFn;
 use crate::types::{ExprId, NonPrimitiveOpId, WitnessAllocator, WitnessId};
-use crate::{CircuitBuilderError, CircuitError, CircuitField, Poseidon2PermOps};
+use crate::{CircuitBuilderError, CircuitError, Poseidon2PermOps};
 
 /// Builder for constructing circuits.
 pub struct CircuitBuilder<F: Field> {
@@ -100,7 +100,7 @@ pub struct NpoLoweringContext<'a, F> {
 }
 
 impl<'a, F> NpoLoweringContext<'a, F> {
-    pub fn new(
+    pub const fn new(
         expr_to_widx: &'a mut HashMap<ExprId, WitnessId>,
         alloc_witness_id: &'a mut dyn FnMut(usize) -> WitnessId,
     ) -> Self {
@@ -221,14 +221,14 @@ where
         perm: P,
     ) where
         Config: Poseidon2Params,
-        F: CircuitField + ExtensionField<Config::BaseField>,
+        F: Field + ExtensionField<Config::BaseField>,
         P: Permutation<[Config::BaseField; 16]> + Clone + Send + Sync + 'static,
     {
         let d = Config::D;
         let width_ext = Config::WIDTH_EXT;
         let width = Config::WIDTH;
-        let exec: crate::op::Poseidon2PermExec<F> = Arc::new(move |input: &[F]| {
-            let mut base_input = vec![Config::BaseField::ZERO; width];
+        let exec = Arc::new(move |input: &[F]| {
+            let mut base_input = Config::BaseField::zero_vec(width);
             for (i, ext_elem) in input.iter().enumerate() {
                 let coeffs = ext_elem.as_basis_coefficients_slice();
                 base_input[i * d..(i + 1) * d].copy_from_slice(coeffs);
@@ -260,7 +260,7 @@ where
         perm: P,
     ) where
         Config: Poseidon2Params,
-        F: CircuitField + ExtensionField<Config::BaseField>,
+        F: Field + ExtensionField<Config::BaseField>,
         P: Permutation<[Config::BaseField; 8]> + Clone + Send + Sync + 'static,
     {
         assert!(
@@ -269,8 +269,8 @@ where
         );
         let d = Config::D;
         let width_ext = Config::WIDTH_EXT;
-        let exec: crate::op::Poseidon2PermExec<F> = Arc::new(move |input: &[F]| {
-            let mut base_input = vec![Config::BaseField::ZERO; 8];
+        let exec = Arc::new(move |input: &[F]| {
+            let mut base_input = Config::BaseField::zero_vec(8);
             for (i, ext_elem) in input.iter().enumerate() {
                 let coeffs = ext_elem.as_basis_coefficients_slice();
                 base_input[i * d..(i + 1) * d].copy_from_slice(coeffs);
@@ -308,21 +308,22 @@ where
         perm: P,
     ) where
         Config: Poseidon2Params,
-        F: CircuitField,
+        F: Field,
         P: Permutation<[F; 16]> + Clone + Send + Sync + 'static,
     {
-        assert!(
-            Config::D == 1,
-            "enable_poseidon2_perm_base only supports extension degree D=1"
-        );
-        assert!(
-            Config::WIDTH == 16,
-            "enable_poseidon2_perm_base only supports WIDTH=16"
-        );
+        const {
+            assert!(
+                Config::D == 1,
+                "enable_poseidon2_perm_base only supports extension degree D=1"
+            );
+            assert!(
+                Config::WIDTH == 16,
+                "enable_poseidon2_perm_base only supports WIDTH=16"
+            );
+        }
 
         // For D=1, the exec closure operates directly on 16 base field elements
-        let exec: crate::op::Poseidon2PermExecBase<F> =
-            Arc::new(move |input: &[F; 16]| perm.permute(*input));
+        let exec = Arc::new(move |input: &[F; 16]| perm.permute(*input));
 
         let plugin = Poseidon2CircuitPlugin::new_base(Config::CONFIG, exec, trace_generator);
         self.register_npo(plugin);
@@ -822,7 +823,7 @@ where
 
         // Stage 2: IR transformations and optimizations
         let optimizer = Optimizer::new();
-        let (ops, rewrite) = optimizer.optimize(ops);
+        let (mut ops, rewrite) = optimizer.optimize(ops);
 
         let resolve = |id: WitnessId| Optimizer::resolve_witness(&rewrite, id);
         let expr_to_widx = expr_to_widx
@@ -831,10 +832,19 @@ where
             .collect();
         let public_rows = public_rows.into_iter().map(resolve).collect();
 
+        // Apply rewrite to ALL ops (including non-primitives and hints) at build time,
+        // so the runner doesn't need to pay this cost on every execution.
+        if !rewrite.is_empty() {
+            for op in &mut ops {
+                op.apply_witness_rewrite(&rewrite);
+            }
+        }
+
         // Stage 3: Generate final circuit
         let mut circuit = Circuit::new(witness_count, expr_to_widx);
         circuit.ops = ops;
         circuit.public_rows = public_rows;
+        // Store rewrite map for the runner to fill duplicate witness slots.
         if !rewrite.is_empty() {
             circuit.witness_rewrite = Some(rewrite);
         }
