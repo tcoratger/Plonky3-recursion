@@ -44,17 +44,7 @@ impl Optimizer {
         &self,
         primitive_ops: Vec<Op<F>>,
     ) -> (Vec<Op<F>>, HashMap<WitnessId, WitnessId>) {
-        let (ops, mut rewrite) = self.deduplicate_alu_ops(primitive_ops);
-        // Flatten rewrite chains so every key maps directly to its final canonical ID.
-        // This eliminates repeated chain-walking in subsequent lookups.
-        let keys: Vec<WitnessId> = rewrite.keys().copied().collect();
-        for key in keys {
-            let mut cur = key;
-            while let Some(&next) = rewrite.get(&cur) {
-                cur = next;
-            }
-            rewrite.insert(key, cur);
-        }
+        let (ops, rewrite) = self.deduplicate_alu_ops(primitive_ops);
         let ops = self.fuse_bool_checks(ops);
         let ops = self.fuse_mul_adds(ops);
         (ops, rewrite)

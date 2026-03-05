@@ -36,27 +36,13 @@ fn dsu_find(parents: &mut HashMap<usize, usize>, x: usize) -> usize {
     root
 }
 
-/// Sparse disjoint-set "union" with union-by-rank for O(α(n)) amortized complexity.
+/// Sparse disjoint-set "union" by attaching `b`'s root under `a`'s root.
 #[inline]
-fn dsu_union(
-    parents: &mut HashMap<usize, usize>,
-    ranks: &mut HashMap<usize, usize>,
-    a: usize,
-    b: usize,
-) {
+fn dsu_union(parents: &mut HashMap<usize, usize>, a: usize, b: usize) {
     let ra = dsu_find(parents, a);
     let rb = dsu_find(parents, b);
     if ra != rb {
-        let rank_a = ranks.get(&ra).copied().unwrap_or(0);
-        let rank_b = ranks.get(&rb).copied().unwrap_or(0);
-        if rank_a < rank_b {
-            parents.insert(ra, rb);
-        } else {
-            parents.insert(rb, ra);
-            if rank_a == rank_b {
-                ranks.insert(ra, rank_a + 1);
-            }
-        }
+        parents.insert(rb, ra);
     }
 }
 
@@ -64,11 +50,10 @@ fn dsu_union(
 /// Returns a parent map keyed only by ExprIds that appear in `connects`.
 fn build_connect_dsu(connects: &[(ExprId, ExprId)]) -> HashMap<usize, usize> {
     let mut parents: HashMap<usize, usize> = HashMap::new();
-    let mut ranks: HashMap<usize, usize> = HashMap::new();
     for (a, b) in connects {
         let ai = a.0 as usize;
         let bi = b.0 as usize;
-        dsu_union(&mut parents, &mut ranks, ai, bi);
+        dsu_union(&mut parents, ai, bi);
     }
     parents
 }
@@ -552,7 +537,6 @@ where
 #[cfg(test)]
 mod tests {
     use p3_baby_bear::BabyBear;
-    use proptest::prelude::*;
 
     use super::*;
     use crate::AluOpKind;
@@ -580,14 +564,12 @@ mod tests {
 
         // Union merges two elements
         parents.clear();
-        let mut ranks = HashMap::new();
-        dsu_union(&mut parents, &mut ranks, 10, 20);
+        dsu_union(&mut parents, 10, 20);
         assert_eq!(dsu_find(&mut parents, 10), dsu_find(&mut parents, 20));
 
         // Union is idempotent
         parents.clear();
-        ranks.clear();
-        dsu_union(&mut parents, &mut ranks, 7, 7);
+        dsu_union(&mut parents, 7, 7);
         assert_eq!(dsu_find(&mut parents, 7), 7);
     }
 
@@ -1073,9 +1055,8 @@ mod tests {
     fn test_dsu_stress_chain() {
         // 1000-element chain: 0->1->2->...->999
         let mut parents = HashMap::new();
-        let mut ranks = HashMap::new();
         for i in 0..999 {
-            dsu_union(&mut parents, &mut ranks, i, i + 1);
+            dsu_union(&mut parents, i, i + 1);
         }
         // All elements should share the same root
         let root = dsu_find(&mut parents, 0);
@@ -1088,9 +1069,8 @@ mod tests {
     fn test_dsu_stress_star() {
         // 1000-element star: all connected to 0
         let mut parents = HashMap::new();
-        let mut ranks = HashMap::new();
         for i in 1..1000 {
-            dsu_union(&mut parents, &mut ranks, 0, i);
+            dsu_union(&mut parents, 0, i);
         }
         let root = dsu_find(&mut parents, 0);
         for i in 1..1000 {
@@ -1102,17 +1082,16 @@ mod tests {
     fn test_dsu_stress_mixed() {
         // Mixed pattern: chains of 10 merged together
         let mut parents = HashMap::new();
-        let mut ranks = HashMap::new();
         // Create 100 chains of 10
         for chain in 0..100 {
             let base = chain * 10;
             for i in 0..9 {
-                dsu_union(&mut parents, &mut ranks, base + i, base + i + 1);
+                dsu_union(&mut parents, base + i, base + i + 1);
             }
         }
         // Merge all chains via their first elements
         for chain in 1..100 {
-            dsu_union(&mut parents, &mut ranks, 0, chain * 10);
+            dsu_union(&mut parents, 0, chain * 10);
         }
         let root = dsu_find(&mut parents, 0);
         for i in 1..1000 {
@@ -1120,58 +1099,64 @@ mod tests {
         }
     }
 
-    // Strategy for generating lists of ExprId connect relations
-    fn connections(max_id: u32) -> impl Strategy<Value = Vec<(ExprId, ExprId)>> {
-        prop::collection::vec((0..max_id, 0..max_id), 0..20).prop_map(|pairs| {
-            pairs
-                .into_iter()
-                .map(|(a, b)| (ExprId(a), ExprId(b)))
-                .collect()
-        })
-    }
+    // Property-based tests for DSU utilities and connect DSU construction
+    #[cfg(test)]
+    mod proptests {
+        use proptest::prelude::*;
 
-    proptest! {
-        #[test]
-        fn dsu_find_idempotent(connects in connections(50)) {
-            let mut parents = build_connect_dsu(&connects);
-            let test_ids: Vec<usize> = (0..50).collect();
+        use super::*;
 
-            for &id in &test_ids {
-                let root1 = dsu_find(&mut parents, id);
-                let root2 = dsu_find(&mut parents, id);
-                prop_assert_eq!(root1, root2, "dsu_find should be idempotent");
-            }
+        // Strategy for generating lists of ExprId connect relations
+        fn connections(max_id: u32) -> impl Strategy<Value = Vec<(ExprId, ExprId)>> {
+            prop::collection::vec((0..max_id, 0..max_id), 0..20).prop_map(|pairs| {
+                pairs
+                    .into_iter()
+                    .map(|(a, b)| (ExprId(a), ExprId(b)))
+                    .collect()
+            })
         }
 
-        #[test]
-        fn dsu_union_transitivity(connects in connections(30)) {
-            let mut parents = build_connect_dsu(&connects);
+        proptest! {
+            #[test]
+            fn dsu_find_idempotent(connects in connections(50)) {
+                let mut parents = build_connect_dsu(&connects);
+                let test_ids: Vec<usize> = (0..50).collect();
 
-            // Check that all explicitly connected pairs have the same root
-            for (a, b) in &connects {
-                let ra = dsu_find(&mut parents, a.0 as usize);
-                let rb = dsu_find(&mut parents, b.0 as usize);
-                prop_assert_eq!(ra, rb, "connected nodes should have same root");
+                for &id in &test_ids {
+                    let root1 = dsu_find(&mut parents, id);
+                    let root2 = dsu_find(&mut parents, id);
+                    prop_assert_eq!(root1, root2, "dsu_find should be idempotent");
+                }
             }
-        }
 
-        #[test]
-        fn dsu_union_commutative(a in 0u32..100, b in 0u32..100) {
-            let mut parents1 = HashMap::new();
-            let mut ranks1 = HashMap::new();
-            let mut parents2 = HashMap::new();
-            let mut ranks2 = HashMap::new();
+            #[test]
+            fn dsu_union_transitivity(connects in connections(30)) {
+                let mut parents = build_connect_dsu(&connects);
 
-            dsu_union(&mut parents1, &mut ranks1, a as usize, b as usize);
-            dsu_union(&mut parents2, &mut ranks2, b as usize, a as usize);
+                // Check that all explicitly connected pairs have the same root
+                for (a, b) in &connects {
+                    let ra = dsu_find(&mut parents, a.0 as usize);
+                    let rb = dsu_find(&mut parents, b.0 as usize);
+                    prop_assert_eq!(ra, rb, "connected nodes should have same root");
+                }
+            }
 
-            let r1a = dsu_find(&mut parents1, a as usize);
-            let r1b = dsu_find(&mut parents1, b as usize);
-            let r2a = dsu_find(&mut parents2, a as usize);
-            let r2b = dsu_find(&mut parents2, b as usize);
+            #[test]
+            fn dsu_union_commutative(a in 0u32..100, b in 0u32..100) {
+                let mut parents1 = HashMap::new();
+                let mut parents2 = HashMap::new();
 
-            prop_assert_eq!(r1a, r1b, "union should connect a and b");
-            prop_assert_eq!(r2a, r2b, "union should connect b and a");
+                dsu_union(&mut parents1, a as usize, b as usize);
+                dsu_union(&mut parents2, b as usize, a as usize);
+
+                let r1a = dsu_find(&mut parents1, a as usize);
+                let r1b = dsu_find(&mut parents1, b as usize);
+                let r2a = dsu_find(&mut parents2, a as usize);
+                let r2b = dsu_find(&mut parents2, b as usize);
+
+                prop_assert_eq!(r1a, r1b, "union should connect a and b");
+                prop_assert_eq!(r2a, r2b, "union should connect b and a");
+            }
         }
     }
 }

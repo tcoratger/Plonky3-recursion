@@ -265,9 +265,6 @@ impl<F: Field> Circuit<F> {
         d: usize,
     ) -> Result<PreprocessedColumns<F>, CircuitError> {
         let mut preprocessed = PreprocessedColumns::new_with_d(d);
-        preprocessed
-            .ext_reads
-            .resize(self.witness_count as usize, 0);
 
         // Track which witnesses have been defined (first-occurrence = creator).
         // Const and Public define their outputs first. ALU ops define their output (forward)
@@ -376,19 +373,14 @@ impl<F: Field> Circuit<F> {
                             defined.resize(out_idx + 1, false);
                         }
                         defined[out_idx] = true;
-                        let mut buf = [WitnessId(0); 4];
-                        let mut n = 0;
-                        buf[n] = *b;
-                        n += 1;
+                        let mut readers = vec![*b];
                         if a_is_reader {
-                            buf[n] = *a;
-                            n += 1;
+                            readers.push(*a);
                         }
                         if c_is_reader {
-                            buf[n] = c_wid;
-                            n += 1;
+                            readers.push(c_wid);
                         }
-                        preprocessed.increment_ext_reads(&buf[..n]);
+                        preprocessed.increment_ext_reads(&readers);
                     } else if !b_already_defined {
                         // Backward: b is the creator, out is always a reader.
                         // a and c contribute to ext_reads only if they are constrained.
@@ -397,37 +389,25 @@ impl<F: Field> Circuit<F> {
                             defined.resize(b_idx + 1, false);
                         }
                         defined[b_idx] = true;
-                        let mut buf = [WitnessId(0); 4];
-                        let mut n = 0;
-                        buf[n] = *out;
-                        n += 1;
+                        let mut readers = vec![*out];
                         if a_is_reader {
-                            buf[n] = *a;
-                            n += 1;
+                            readers.push(*a);
                         }
                         if c_is_reader {
-                            buf[n] = c_wid;
-                            n += 1;
+                            readers.push(c_wid);
                         }
-                        preprocessed.increment_ext_reads(&buf[..n]);
+                        preprocessed.increment_ext_reads(&readers);
                     } else {
                         // All-reader: b and out are always readers.
                         // a and c contribute to ext_reads only if they are constrained.
-                        let mut buf = [WitnessId(0); 4];
-                        let mut n = 0;
-                        buf[n] = *b;
-                        n += 1;
-                        buf[n] = *out;
-                        n += 1;
+                        let mut readers = vec![*b, *out];
                         if a_is_reader {
-                            buf[n] = *a;
-                            n += 1;
+                            readers.push(*a);
                         }
                         if c_is_reader {
-                            buf[n] = c_wid;
-                            n += 1;
+                            readers.push(c_wid);
                         }
-                        preprocessed.increment_ext_reads(&buf[..n]);
+                        preprocessed.increment_ext_reads(&readers);
                     }
                 }
                 Op::NonPrimitiveOpWithExecutor {
