@@ -4,9 +4,6 @@ use p3_air::{Air, BaseAir, RowWindow};
 use p3_circuit::utils::{ColumnsTargets, RowSelectorsTargets};
 use p3_circuit::{CircuitBuilder, CircuitError};
 use p3_circuit_prover::air::{AluAir, ConstAir, PublicAir};
-use p3_commit::ExtensionMmcs;
-use p3_field::PrimeCharacteristicRing;
-use p3_fri::TwoAdicFriPcs;
 use p3_lookup::logup::LogUpGadget;
 use p3_matrix::dense::RowMajorMatrixView;
 use p3_matrix::stack::VerticalPair;
@@ -14,15 +11,14 @@ use p3_poseidon2_air::RoundConstants;
 use p3_poseidon2_circuit_air::Poseidon2CircuitAirBabyBearD4Width16;
 use p3_recursion::traits::{LookupMetadata, RecursiveAir};
 use p3_recursion::types::RecursiveLagrangeSelectors;
-use p3_uni_stark::{StarkConfig, SymbolicAirBuilder, VerifierConstraintFolder};
+use p3_test_utils::baby_bear_params::*;
+use p3_uni_stark::{SymbolicAirBuilder, VerifierConstraintFolder};
 use rand::rngs::SmallRng;
 use rand::{Rng, RngExt, SeedableRng};
 
-use crate::common::baby_bear_params::*;
-
 type Challenge = F;
-type ChallengeMmcs = ExtensionMmcs<F, Challenge, ValMmcs>;
-type MyPcs = TwoAdicFriPcs<F, Dft, ValMmcs, ChallengeMmcs>;
+type ChallengeMmcs = ExtensionMmcs<F, Challenge, MyMmcs>;
+type MyPcs = TwoAdicFriPcs<F, Dft, MyMmcs, ChallengeMmcs>;
 type MyConfig = StarkConfig<MyPcs, Challenge, Challenger>;
 
 fn run_recursive<A>(
