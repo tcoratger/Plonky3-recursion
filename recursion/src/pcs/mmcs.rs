@@ -1,15 +1,19 @@
 use alloc::vec;
 use alloc::vec::Vec;
-use core::cmp::min;
+use core::cmp::{Reverse, min};
 
+use itertools::Itertools;
 use p3_circuit::op::{NonPrimitiveOpPrivateData, Poseidon2Config};
+use p3_circuit::ops::mmcs::add_mmcs_verify;
 use p3_circuit::ops::poseidon2_perm::Poseidon2PermOps;
 use p3_circuit::ops::{Poseidon2PermCall, Poseidon2PermPrivateData};
 use p3_circuit::{CircuitBuilder, CircuitBuilderError, CircuitRunner, NonPrimitiveOpId};
-use p3_commit::BatchOpening;
+use p3_commit::{BatchOpening, Mmcs, OpenedValues};
 use p3_field::{BasedVectorSpace, ExtensionField, Field, PrimeField64, TwoAdicField};
 use p3_fri::FriProof;
 use p3_matrix::Dimensions;
+use p3_symmetric::{CryptographicHasher, PseudoCompressionFunction};
+use p3_util::log2_strict_usize;
 
 use crate::Target;
 
@@ -241,9 +245,6 @@ where
     F: Field + TwoAdicField + PrimeField64,
     EF: ExtensionField<F>,
 {
-    use p3_circuit::ops::mmcs::add_mmcs_verify;
-    use p3_util::log2_strict_usize;
-
     if dimensions.len() != opened_base_coeffs.len() {
         return Err(CircuitBuilderError::WrongBatchSize {
             expected: dimensions.len(),
@@ -255,10 +256,6 @@ where
         !commitment_cap.is_empty(),
         "commitment cap must have at least one entry"
     );
-
-    use core::cmp::Reverse;
-
-    use itertools::Itertools;
 
     // Derive cap_height from commitment size: cap has 2^cap_height entries
     let cap_height = if commitment_cap.len() == 1 {
@@ -337,12 +334,6 @@ where
     F: Field + TwoAdicField + PrimeField64,
     EF: ExtensionField<F>,
 {
-    use core::cmp::Reverse;
-
-    use itertools::Itertools;
-    use p3_circuit::ops::mmcs::add_mmcs_verify;
-    use p3_util::log2_strict_usize;
-
     if dimensions.len() != opened_extension_values.len() {
         return Err(CircuitBuilderError::WrongBatchSize {
             expected: dimensions.len(),
@@ -511,13 +502,13 @@ pub fn set_fri_mmcs_private_data<F, EF, FriMmcs, InputMmcs, H, C, const DIGEST_E
 where
     F: Field,
     EF: ExtensionField<F> + BasedVectorSpace<F>,
-    FriMmcs: p3_commit::Mmcs<EF, Proof = Vec<[F; DIGEST_ELEMS]>>,
-    InputMmcs: p3_commit::Mmcs<F, Proof = Vec<[F; DIGEST_ELEMS]>>,
-    H: p3_symmetric::CryptographicHasher<F, [F; DIGEST_ELEMS]>
-        + p3_symmetric::CryptographicHasher<F::Packing, [F::Packing; DIGEST_ELEMS]>
+    FriMmcs: Mmcs<EF, Proof = Vec<[F; DIGEST_ELEMS]>>,
+    InputMmcs: Mmcs<F, Proof = Vec<[F; DIGEST_ELEMS]>>,
+    H: CryptographicHasher<F, [F; DIGEST_ELEMS]>
+        + CryptographicHasher<F::Packing, [F::Packing; DIGEST_ELEMS]>
         + Sync,
-    C: p3_symmetric::PseudoCompressionFunction<[F; DIGEST_ELEMS], 2>
-        + p3_symmetric::PseudoCompressionFunction<[F::Packing; DIGEST_ELEMS], 2>
+    C: PseudoCompressionFunction<[F; DIGEST_ELEMS], 2>
+        + PseudoCompressionFunction<[F::Packing; DIGEST_ELEMS], 2>
         + Sync,
 {
     let mut op_idx = 0;
@@ -569,26 +560,61 @@ where
     Ok(())
 }
 
+/// [HidingFriPcs](p3_fri::HidingFriPcs) wraps the inner FRI proof as
+/// `(random_opened_values, inner_fri_proof)`.
+pub(crate) type HidingFriProof<F, EF, FriMmcs, InputMmcs> = (
+    OpenedValues<EF>,
+    FriProof<EF, FriMmcs, F, Vec<BatchOpening<F, InputMmcs>>>,
+);
+
+/// Variant of [`set_fri_mmcs_private_data`] for [HidingFriPcs](p3_fri::HidingFriPcs) opening proofs.
+pub fn set_hiding_fri_mmcs_private_data<
+    F,
+    EF,
+    FriMmcs,
+    InputMmcs,
+    H,
+    C,
+    const DIGEST_ELEMS: usize,
+>(
+    runner: &mut CircuitRunner<EF>,
+    op_ids: &[NonPrimitiveOpId],
+    fri_proof: &HidingFriProof<F, EF, FriMmcs, InputMmcs>,
+) -> Result<(), &'static str>
+where
+    F: Field,
+    EF: ExtensionField<F> + BasedVectorSpace<F>,
+    FriMmcs: Mmcs<EF, Proof = Vec<[F; DIGEST_ELEMS]>>,
+    InputMmcs: Mmcs<F, Proof = Vec<[F; DIGEST_ELEMS]>>,
+    H: CryptographicHasher<F, [F; DIGEST_ELEMS]>
+        + CryptographicHasher<F::Packing, [F::Packing; DIGEST_ELEMS]>
+        + Sync,
+    C: PseudoCompressionFunction<[F; DIGEST_ELEMS], 2>
+        + PseudoCompressionFunction<[F::Packing; DIGEST_ELEMS], 2>
+        + Sync,
+{
+    set_fri_mmcs_private_data::<F, EF, FriMmcs, InputMmcs, H, C, DIGEST_ELEMS>(
+        runner,
+        op_ids,
+        &fri_proof.1,
+    )
+}
+
 #[cfg(test)]
 mod test {
     use alloc::vec;
     use alloc::vec::Vec;
-    use core::cmp::Reverse;
 
-    use itertools::Itertools;
-    use p3_circuit::op::Poseidon2Config;
-    use p3_circuit::ops::mmcs::{add_mmcs_verify, format_openings};
-    use p3_circuit::ops::{Poseidon2PermPrivateData, generate_poseidon2_trace};
-    use p3_circuit::{CircuitBuilder, NonPrimitiveOpPrivateData};
-    use p3_commit::Mmcs;
+    use p3_circuit::ops::generate_poseidon2_trace;
+    use p3_circuit::ops::mmcs::format_openings;
+    use p3_field::PrimeCharacteristicRing;
     use p3_field::extension::BinomialExtensionField;
-    use p3_field::{BasedVectorSpace, ExtensionField, Field, PrimeCharacteristicRing};
     use p3_koala_bear::{KoalaBear, Poseidon2KoalaBear, default_koalabear_poseidon2_16};
+    use p3_matrix::Matrix;
     use p3_matrix::dense::{DenseMatrix, RowMajorMatrix};
-    use p3_matrix::{Dimensions, Matrix};
     use p3_merkle_tree::MerkleTreeMmcs;
     use p3_poseidon2_circuit_air::KoalaBearD4Width16;
-    use p3_symmetric::{CryptographicHasher, PaddingFreeSponge, TruncatedPermutation};
+    use p3_symmetric::{PaddingFreeSponge, TruncatedPermutation};
     use p3_util::log2_ceil_usize;
     use rand::SeedableRng;
     use rand::rngs::SmallRng;
@@ -598,7 +624,7 @@ mod test {
     use tracing_subscriber::util::SubscriberInitExt;
     use tracing_subscriber::{EnvFilter, Registry};
 
-    use crate::pcs::verify_batch_circuit;
+    use super::*;
 
     type F = KoalaBear;
     type CF = BinomialExtensionField<F, 4>;
