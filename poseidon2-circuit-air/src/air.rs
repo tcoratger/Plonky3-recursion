@@ -1039,6 +1039,7 @@ pub(crate) fn eval<
 ///   concrete builder's field type are all the same.
 ///
 /// - The erased and concrete builder types have identical memory layout.
+#[allow(clippy::missing_transmute_annotations)]
 pub unsafe fn eval_unchecked_with_concrete<
     F: PrimeField,
     AB: AirBuilder,
@@ -1139,6 +1140,7 @@ pub unsafe fn eval_unchecked_with_concrete<
 /// field type are the same at runtime.
 ///
 /// Violating this leads to undefined behavior.
+#[allow(clippy::missing_transmute_annotations)]
 pub unsafe fn eval_unchecked<
     F: PrimeField,
     AB: AirBuilder,
