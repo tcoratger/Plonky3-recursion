@@ -7,55 +7,56 @@ use p3_field::Field;
 
 use crate::op::Poseidon2Config;
 use crate::ops::Poseidon2PermCall;
-use crate::ops::poseidon2_perm::Poseidon2PermOps;
 use crate::{CircuitBuilder, CircuitBuilderError, ExprId, NonPrimitiveOpId};
 
-pub fn add_hash_slice<F: Field>(
-    builder: &mut CircuitBuilder<F>,
-    poseidon2_config: &Poseidon2Config,
-    inputs: &[ExprId],
-    reset: bool,
-) -> Result<Vec<ExprId>, CircuitBuilderError> {
-    let width_ext = poseidon2_config.width_ext();
-    let rate_ext = poseidon2_config.rate_ext();
-    let chunks = inputs.chunks(rate_ext);
-    let last_idx = chunks.len() - 1;
-    let mut outputs = vec![None; width_ext];
-    let mut last_op_id = NonPrimitiveOpId(0);
-    for (i, input) in chunks.enumerate() {
-        let is_first = i == 0;
-        let is_last = i == last_idx;
-        let call_inputs: Vec<Option<ExprId>> = input
-            .iter()
-            .cloned()
-            .map(Some)
-            .chain(iter::repeat(None))
-            .take(width_ext)
-            .collect();
-        let (op_id, maybe_outputs) = builder.add_poseidon2_perm(Poseidon2PermCall {
-            config: *poseidon2_config,
-            new_start: if is_first { reset } else { false },
-            merkle_path: false,
-            mmcs_bit: None,
-            inputs: call_inputs,
-            out_ctl: vec![is_last; rate_ext],
-            return_all_outputs: false,
-            mmcs_index_sum: None,
-        })?;
-        outputs = maybe_outputs;
-        last_op_id = op_id;
-    }
+impl<F: Field> CircuitBuilder<F> {
+    pub fn add_hash_slice(
+        &mut self,
+        poseidon2_config: &Poseidon2Config,
+        inputs: &[ExprId],
+        reset: bool,
+    ) -> Result<Vec<ExprId>, CircuitBuilderError> {
+        let width_ext = poseidon2_config.width_ext();
+        let rate_ext = poseidon2_config.rate_ext();
+        let chunks = inputs.chunks(rate_ext);
+        let last_idx = chunks.len() - 1;
+        let mut outputs = vec![None; width_ext];
+        let mut last_op_id = NonPrimitiveOpId(0);
+        for (i, input) in chunks.enumerate() {
+            let is_first = i == 0;
+            let is_last = i == last_idx;
+            let call_inputs: Vec<Option<ExprId>> = input
+                .iter()
+                .cloned()
+                .map(Some)
+                .chain(iter::repeat(None))
+                .take(width_ext)
+                .collect();
+            let (op_id, maybe_outputs) = self.add_poseidon2_perm(&Poseidon2PermCall {
+                config: *poseidon2_config,
+                new_start: is_first && reset,
+                merkle_path: false,
+                mmcs_bit: None,
+                inputs: call_inputs,
+                out_ctl: vec![is_last; rate_ext],
+                return_all_outputs: false,
+                mmcs_index_sum: None,
+            })?;
+            outputs = maybe_outputs;
+            last_op_id = op_id;
+        }
 
-    outputs
-        .into_iter()
-        .take(rate_ext)
-        .map(|o: Option<ExprId>| {
-            o.ok_or_else(|| CircuitBuilderError::MalformedNonPrimitiveOutputs {
-                op_id: last_op_id,
-                details: "".to_string(),
+        outputs
+            .into_iter()
+            .take(rate_ext)
+            .map(|o| {
+                o.ok_or_else(|| CircuitBuilderError::MalformedNonPrimitiveOutputs {
+                    op_id: last_op_id,
+                    details: "".to_string(),
+                })
             })
-        })
-        .collect()
+            .collect()
+    }
 }
 
 #[cfg(test)]
@@ -67,10 +68,7 @@ mod tests {
     use p3_symmetric::CryptographicHasher;
     use p3_test_utils::baby_bear_params::*;
 
-    use super::add_hash_slice;
-    use crate::ops::{
-        Poseidon2Config, Poseidon2Params, generate_poseidon2_trace, generate_recompose_trace,
-    };
+    use crate::ops::{Poseidon2Config, Poseidon2Params, generate_poseidon2_trace, generate_recompose_trace};
     use crate::{CircuitBuilder, ExprId};
 
     type CF = Challenge;
@@ -109,13 +107,9 @@ mod tests {
                 .map(|_| builder.public_input())
                 .collect();
 
-            let outputs = add_hash_slice(
-                &mut builder,
-                &Poseidon2Config::BabyBearD4Width16,
-                &input_exprs,
-                true,
-            )
-            .unwrap();
+            let outputs = builder
+                .add_hash_slice(&Poseidon2Config::BabyBearD4Width16, &input_exprs, true)
+                .unwrap();
 
             let out0_pi = builder.public_input();
             let out1_pi = builder.public_input();
@@ -185,13 +179,9 @@ mod tests {
             .map(|_| builder.public_input())
             .collect();
 
-        let outputs = add_hash_slice(
-            &mut builder,
-            &Poseidon2Config::BabyBearD4Width16,
-            &input_exprs,
-            true,
-        )
-        .unwrap();
+        let outputs = builder
+            .add_hash_slice(&Poseidon2Config::BabyBearD4Width16, &input_exprs, true)
+            .unwrap();
 
         let out0_pi = builder.public_input();
         let out1_pi = builder.public_input();

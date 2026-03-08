@@ -17,7 +17,6 @@ pub use poseidon2_perm::{
     Poseidon2PermCallBase,
     // Configuration
     Poseidon2PermExec,
-    Poseidon2PermOps,
     Poseidon2PermPrivateData,
     Poseidon2Trace,
     generate_poseidon2_trace,

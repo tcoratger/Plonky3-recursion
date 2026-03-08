@@ -8,9 +8,7 @@ use std::error::Error;
 
 use p3_batch_stark::ProverData;
 use p3_circuit::op::NpoTypeId;
-use p3_circuit::ops::{
-    Poseidon2PermCall, Poseidon2PermOps, generate_poseidon2_trace, generate_recompose_trace,
-};
+use p3_circuit::ops::{Poseidon2PermCall, generate_poseidon2_trace, generate_recompose_trace};
 use p3_circuit::{CircuitBuilder, ExprId};
 use p3_circuit_prover::batch_stark_prover::{poseidon2_air_builders_d4, recompose_air_builders};
 use p3_circuit_prover::common::{NpoPreprocessor, get_airs_and_degrees_with_prep};
@@ -102,7 +100,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
         }
 
-        let (_op_id, outputs) = builder.add_poseidon2_perm(Poseidon2PermCall {
+        let (_op_id, outputs) = builder.add_poseidon2_perm(&Poseidon2PermCall {
             config: Poseidon2Config::KoalaBearD4Width16,
             new_start: is_first,
             merkle_path: false,

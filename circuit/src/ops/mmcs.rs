@@ -10,7 +10,6 @@ use p3_matrix::Dimensions;
 use crate::builder::{CircuitBuilder, CircuitBuilderError};
 use crate::op::{NpoTypeId, Poseidon2Config};
 use crate::ops::Poseidon2PermCall;
-use crate::ops::poseidon2_perm::Poseidon2PermOps;
 use crate::types::ExprId;
 use crate::{CircuitError, NonPrimitiveOpId};
 
@@ -70,105 +69,107 @@ pub fn format_openings<T: Clone + alloc::fmt::Debug>(
     Ok(formatted_openings)
 }
 
-/// Verify a Merkle path in the circuit.
-///
-/// `openings_expr` contains the row digests at each tree level. When its length equals
-/// `directions_expr.len()`, every entry corresponds to a sibling-compression step.
-/// When its length is `directions_expr.len() + 1`, the extra trailing entry is a
-/// **tail digest**: it is compressed into the running hash *after* the last sibling
-/// step but *before* the root comparison. This mirrors the native MMCS behaviour
-/// where matrices at the cap level are injected after the final proof sibling.
-pub fn add_mmcs_verify<F: Field>(
-    builder: &mut CircuitBuilder<F>,
-    permutation_config: Poseidon2Config,
-    openings_expr: &[Vec<ExprId>],
-    directions_expr: &[ExprId],
-    root_expr: &[ExprId],
-) -> Result<Vec<NonPrimitiveOpId>, CircuitBuilderError> {
-    let width_ext = permutation_config.width_ext();
-    let rate_ext = permutation_config.rate_ext();
-    let mut op_ids = Vec::with_capacity(openings_expr.len());
-    let mut output: Vec<Option<ExprId>> = vec![None; width_ext];
-    let zero = builder.define_const(F::ZERO);
+impl<F: Field> CircuitBuilder<F> {
+    /// Verify a Merkle path in the circuit.
+    ///
+    /// `openings_expr` contains the row digests at each tree level. When its length equals
+    /// `directions_expr.len()`, every entry corresponds to a sibling-compression step.
+    /// When its length is `directions_expr.len() + 1`, the extra trailing entry is a
+    /// **tail digest**: it is compressed into the running hash *after* the last sibling
+    /// step but *before* the root comparison. This mirrors the native MMCS behaviour
+    /// where matrices at the cap level are injected after the final proof sibling.
+    pub fn add_mmcs_verify(
+        &mut self,
+        permutation_config: Poseidon2Config,
+        openings_expr: &[Vec<ExprId>],
+        directions_expr: &[ExprId],
+        root_expr: &[ExprId],
+    ) -> Result<Vec<NonPrimitiveOpId>, CircuitBuilderError> {
+        let width_ext = permutation_config.width_ext();
+        let rate_ext = permutation_config.rate_ext();
+        let mut op_ids = Vec::with_capacity(openings_expr.len());
+        let mut output = vec![None; width_ext];
+        let zero = self.define_const(F::ZERO);
 
-    let has_tail = openings_expr.len() > directions_expr.len()
-        && !openings_expr[directions_expr.len()].is_empty();
+        let has_tail = openings_expr.len() > directions_expr.len()
+            && !openings_expr[directions_expr.len()].is_empty();
 
-    let path_openings = &openings_expr[..directions_expr.len()];
+        let path_openings = &openings_expr[..directions_expr.len()];
 
-    for (i, (row_digest, direction)) in path_openings.iter().zip(directions_expr).enumerate() {
-        let is_first = i == 0;
-        let is_last_direction = i == directions_expr.len() - 1;
-        let is_final = is_last_direction && !has_tail;
+        for (i, (row_digest, direction)) in path_openings.iter().zip(directions_expr).enumerate() {
+            let is_first = i == 0;
+            let is_last_direction = i == directions_expr.len() - 1;
+            let is_final = is_last_direction && !has_tail;
 
-        if !is_first && !row_digest.is_empty() {
-            let mut inputs = vec![None; width_ext];
-            for (j, &d) in row_digest.iter().take(rate_ext).enumerate() {
-                inputs[rate_ext + j] = Some(d);
+            if !is_first && !row_digest.is_empty() {
+                let mut inputs = vec![None; width_ext];
+                for (j, &d) in row_digest.iter().take(rate_ext).enumerate() {
+                    inputs[rate_ext + j] = Some(d);
+                }
+                let _ = self.add_poseidon2_perm(&Poseidon2PermCall {
+                    config: permutation_config,
+                    new_start: false,
+                    merkle_path: true,
+                    mmcs_bit: Some(zero),
+                    inputs,
+                    out_ctl: vec![false; rate_ext],
+                    return_all_outputs: false,
+                    mmcs_index_sum: None,
+                })?;
             }
-            let _ = builder.add_poseidon2_perm(Poseidon2PermCall {
+
+            let mut inputs = vec![None; width_ext];
+            if is_first {
+                for (j, &d) in row_digest.iter().take(rate_ext).enumerate() {
+                    inputs[j] = Some(d);
+                }
+            }
+            let (op_id, maybe_output) = self.add_poseidon2_perm(&Poseidon2PermCall {
+                config: permutation_config,
+                new_start: is_first,
+                merkle_path: true,
+                mmcs_bit: Some(*direction),
+                inputs,
+                out_ctl: vec![is_final; rate_ext],
+                return_all_outputs: false,
+                mmcs_index_sum: None,
+            })?;
+            op_ids.push(op_id);
+            output = maybe_output;
+        }
+
+        if has_tail {
+            let tail = &openings_expr[directions_expr.len()];
+            let mut inputs = vec![None; width_ext];
+            for (j, &t) in tail.iter().take(rate_ext).enumerate() {
+                inputs[rate_ext + j] = Some(t);
+            }
+            let (_, tail_output) = self.add_poseidon2_perm(&Poseidon2PermCall {
                 config: permutation_config,
                 new_start: false,
                 merkle_path: true,
                 mmcs_bit: Some(zero),
                 inputs,
-                out_ctl: vec![false; rate_ext],
+                out_ctl: vec![true; rate_ext],
                 return_all_outputs: false,
                 mmcs_index_sum: None,
             })?;
+            output = tail_output;
         }
 
-        let mut inputs = vec![None; width_ext];
-        if is_first {
-            for (j, &d) in row_digest.iter().take(rate_ext).enumerate() {
-                inputs[j] = Some(d);
-            }
-        }
-        let (op_id, maybe_output) = builder.add_poseidon2_perm(Poseidon2PermCall {
-            config: permutation_config,
-            new_start: is_first,
-            merkle_path: true,
-            mmcs_bit: Some(*direction),
-            inputs,
-            out_ctl: vec![is_final; rate_ext],
-            return_all_outputs: false,
-            mmcs_index_sum: None,
-        })?;
-        op_ids.push(op_id);
-        output = maybe_output;
-    }
-
-    if has_tail {
-        let tail = &openings_expr[directions_expr.len()];
-        let mut inputs = vec![None; width_ext];
-        for (j, &t) in tail.iter().take(rate_ext).enumerate() {
-            inputs[rate_ext + j] = Some(t);
-        }
-        let (_, tail_output) = builder.add_poseidon2_perm(Poseidon2PermCall {
-            config: permutation_config,
-            new_start: false,
-            merkle_path: true,
-            mmcs_bit: Some(zero),
-            inputs,
-            out_ctl: vec![true; rate_ext],
-            return_all_outputs: false,
-            mmcs_index_sum: None,
-        })?;
-        output = tail_output;
-    }
-
-    let output: Vec<ExprId> = output
-        .into_iter()
-        .take(rate_ext)
-        .map(|x| {
-            x.ok_or_else(|| CircuitBuilderError::MalformedNonPrimitiveOutputs {
-                op_id: *op_ids.last().unwrap(),
-                details: "Expected output from last Poseidon2Perm call".to_string(),
+        let output = output
+            .into_iter()
+            .take(rate_ext)
+            .map(|x| {
+                x.ok_or_else(|| CircuitBuilderError::MalformedNonPrimitiveOutputs {
+                    op_id: *op_ids.last().unwrap(),
+                    details: "Expected output from last Poseidon2Perm call".to_string(),
+                })
             })
-        })
-        .collect::<Result<Vec<_>, _>>()?;
-    for (o, r) in output.iter().zip(root_expr.iter()) {
-        builder.connect(*o, *r);
+            .collect::<Result<Vec<_>, _>>()?;
+        for (o, r) in output.iter().zip(root_expr.iter()) {
+            self.connect(*o, *r);
+        }
+        Ok(op_ids)
     }
-    Ok(op_ids)
 }

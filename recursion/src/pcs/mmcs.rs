@@ -4,8 +4,6 @@ use core::cmp::{Reverse, min};
 
 use itertools::Itertools;
 use p3_circuit::op::{NonPrimitiveOpPrivateData, Poseidon2Config};
-use p3_circuit::ops::mmcs::add_mmcs_verify;
-use p3_circuit::ops::poseidon2_perm::Poseidon2PermOps;
 use p3_circuit::ops::{Poseidon2PermCall, Poseidon2PermPrivateData};
 use p3_circuit::{CircuitBuilder, CircuitBuilderError, CircuitRunner, NonPrimitiveOpId};
 use p3_commit::{BatchOpening, Mmcs, OpenedValues};
@@ -108,7 +106,7 @@ where
         }
 
         // Add permutation
-        let (_, maybe_outputs) = circuit.add_poseidon2_perm(Poseidon2PermCall {
+        let (_, maybe_outputs) = circuit.add_poseidon2_perm(&Poseidon2PermCall {
             config: *permutation_config,
             new_start: if is_first { reset } else { false },
             merkle_path: false,
@@ -176,7 +174,7 @@ where
             });
         }
 
-        let (_, maybe_outputs) = circuit.add_poseidon2_perm(Poseidon2PermCall {
+        let (_, maybe_outputs) = circuit.add_poseidon2_perm(&Poseidon2PermCall {
             config: *permutation_config,
             new_start: is_first && reset,
             merkle_path: false,
@@ -311,8 +309,7 @@ where
 
     let op_vals_digests = formatted_digests;
 
-    add_mmcs_verify(
-        circuit,
+    circuit.add_mmcs_verify(
         permutation_config,
         &op_vals_digests,
         path_bits,
@@ -383,8 +380,7 @@ where
             add_hash_extension_elements::<F, EF>(circuit, &permutation_config, &all_ext, true)?;
     }
 
-    add_mmcs_verify(
-        circuit,
+    circuit.add_mmcs_verify(
         permutation_config,
         &formatted_digests,
         path_bits,
@@ -1003,14 +999,9 @@ mod test {
         let directions_expr = builder.alloc_public_inputs(path_depth, "directions");
         let root_exprs = builder.alloc_public_inputs(permutation_config.rate_ext(), "root");
 
-        let permutation_mmcs_ops = add_mmcs_verify(
-            &mut builder,
-            permutation_config,
-            &openings,
-            &directions_expr,
-            &root_exprs,
-        )
-        .unwrap();
+        let permutation_mmcs_ops = builder
+            .add_mmcs_verify(permutation_config, &openings, &directions_expr, &root_exprs)
+            .unwrap();
         let circuit = builder.build().unwrap();
         #[cfg(debug_assertions)]
         let root_widx0 = circuit.expr_to_widx[&root_exprs[0]];

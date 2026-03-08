@@ -2,9 +2,9 @@ mod common;
 
 use p3_baby_bear::default_babybear_poseidon2_16;
 use p3_batch_stark::{CommonData, ProverData};
+use p3_circuit::CircuitBuilder;
 use p3_circuit::op::PrimitiveOpType;
 use p3_circuit::ops::{Poseidon2PermCall, generate_poseidon2_trace, generate_recompose_trace};
-use p3_circuit::{CircuitBuilder, Poseidon2PermOps};
 use p3_circuit_prover::air::{AluAir, ConstAir, PublicAir};
 use p3_circuit_prover::batch_stark_prover::{
     PrimitiveTable, poseidon2_air_builders_d4, poseidon2_table_provers_d4, recompose_air_builders,
@@ -827,7 +827,7 @@ fn test_poseidon2_ctl_lookups() {
 
     // Create a Poseidon2 operation with input CTL enabled for limbs 0 and 1
     let (_op_id, outputs) = builder
-        .add_poseidon2_perm(Poseidon2PermCall {
+        .add_poseidon2_perm(&Poseidon2PermCall {
             config: poseidon2_config,
             new_start: true,
             merkle_path: false,
@@ -845,7 +845,7 @@ fn test_poseidon2_ctl_lookups() {
 
     // Create another Poseidon2 operation that uses these outputs as inputs
     let (_op_id2, _) = builder
-        .add_poseidon2_perm(Poseidon2PermCall {
+        .add_poseidon2_perm(&Poseidon2PermCall {
             config: poseidon2_config,
             new_start: true,
             merkle_path: false,
@@ -913,7 +913,6 @@ fn test_poseidon2_ctl_lookups() {
 /// - Last operation: CTL outputs to witness
 #[test]
 fn test_poseidon2_chained_ctl_lookups() {
-    use p3_circuit::Poseidon2PermOps;
     use p3_circuit::ops::Poseidon2PermCall;
     use p3_poseidon2_circuit_air::BabyBearD4Width16;
 
@@ -932,7 +931,7 @@ fn test_poseidon2_chained_ctl_lookups() {
 
     // First Poseidon2 operation: new_start=true, inputs from witness
     let (_op_id, _outputs) = builder
-        .add_poseidon2_perm(Poseidon2PermCall {
+        .add_poseidon2_perm(&Poseidon2PermCall {
             config: poseidon2_config,
             new_start: true,
             merkle_path: false,
@@ -946,7 +945,7 @@ fn test_poseidon2_chained_ctl_lookups() {
 
     // Second Poseidon2 operation: new_start=false, chained from first
     let (_op_id2, _outputs2) = builder
-        .add_poseidon2_perm(Poseidon2PermCall {
+        .add_poseidon2_perm(&Poseidon2PermCall {
             config: poseidon2_config,
             new_start: false,
             merkle_path: false,
@@ -960,7 +959,7 @@ fn test_poseidon2_chained_ctl_lookups() {
 
     // Third Poseidon2 operation: new_start=false, chained, with output CTL
     let (_op_id3, outputs3) = builder
-        .add_poseidon2_perm(Poseidon2PermCall {
+        .add_poseidon2_perm(&Poseidon2PermCall {
             config: poseidon2_config,
             new_start: false,
             merkle_path: false,
@@ -975,7 +974,7 @@ fn test_poseidon2_chained_ctl_lookups() {
     // Fourth operation: new_start=true to signal end of previous chain
     // This operation uses the exposed outputs from op3 as inputs
     let (_op_id4, _) = builder
-        .add_poseidon2_perm(Poseidon2PermCall {
+        .add_poseidon2_perm(&Poseidon2PermCall {
             config: poseidon2_config,
             new_start: true,
             merkle_path: false,
