@@ -12,8 +12,9 @@ use p3_circuit::ops::{GoldilocksD2Width8, Poseidon2Config, Poseidon2Params};
 use p3_goldilocks::{GenericPoseidon2LinearLayersGoldilocks, Goldilocks};
 use p3_koala_bear::{GenericPoseidon2LinearLayersKoalaBear, KoalaBear};
 use p3_poseidon2_air::RoundConstants;
-use rand::SeedableRng;
+use rand::distr::StandardUniform;
 use rand::rngs::SmallRng;
+use rand::{RngExt, SeedableRng};
 
 use crate::Poseidon2CircuitAir;
 
@@ -229,13 +230,10 @@ pub type Poseidon2CircuitAirGoldilocksD2Width8 = Poseidon2CircuitAir<
 >;
 
 pub fn goldilocks_d2_width8_round_constants() -> RoundConstants<Goldilocks, 8, 4, 22> {
-    use rand::RngExt;
-    use rand::distr::StandardUniform;
     let mut rng = SmallRng::seed_from_u64(1);
-    let beginning_full: [[Goldilocks; 8]; 4] =
-        core::array::from_fn(|_| rng.sample(StandardUniform));
-    let ending_full: [[Goldilocks; 8]; 4] = core::array::from_fn(|_| rng.sample(StandardUniform));
-    let partial: [Goldilocks; 22] = core::array::from_fn(|_| rng.sample(StandardUniform));
+    let beginning_full = rng.sample(StandardUniform);
+    let ending_full = rng.sample(StandardUniform);
+    let partial = rng.sample(StandardUniform);
     RoundConstants::new(beginning_full, partial, ending_full)
 }
 
