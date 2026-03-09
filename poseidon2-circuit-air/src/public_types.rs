@@ -231,11 +231,10 @@ pub type Poseidon2CircuitAirGoldilocksD2Width8 = Poseidon2CircuitAir<
 
 pub fn goldilocks_d2_width8_round_constants() -> RoundConstants<Goldilocks, 8, 4, 22> {
     let mut rng = SmallRng::seed_from_u64(1);
-    RoundConstants::new(
-        rng.sample(StandardUniform),
-        rng.sample(StandardUniform),
-        rng.sample(StandardUniform),
-    )
+    let beginning_full: [[Goldilocks; 8]; 4] = rng.sample(StandardUniform);
+    let ending_full: [[Goldilocks; 8]; 4] = rng.sample(StandardUniform);
+    let partial: [Goldilocks; 22] = rng.sample(StandardUniform);
+    RoundConstants::new(beginning_full, partial, ending_full)
 }
 
 pub fn goldilocks_d2_width8_default_air() -> Poseidon2CircuitAirGoldilocksD2Width8 {
