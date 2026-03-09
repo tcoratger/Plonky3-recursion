@@ -86,6 +86,21 @@ impl<F> Traces<F> {
     }
 }
 
+impl<F: PartialEq> PartialEq for Traces<F> {
+    fn eq(&self, other: &Self) -> bool {
+        self.witness_trace == other.witness_trace
+            && self.const_trace == other.const_trace
+            && self.public_trace == other.public_trace
+            && self.alu_trace == other.alu_trace
+            && self.tag_to_witness == other.tag_to_witness
+            && self.non_primitive_traces.len() == other.non_primitive_traces.len()
+            && self
+                .non_primitive_traces
+                .keys()
+                .all(|k| other.non_primitive_traces.contains_key(k))
+    }
+}
+
 impl<F: Clone> Clone for Traces<F> {
     fn clone(&self) -> Self {
         Self {

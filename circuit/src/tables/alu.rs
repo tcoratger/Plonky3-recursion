@@ -36,7 +36,7 @@ pub struct AluOpRecord<F> {
 /// - Mul: a * b = out
 /// - BoolCheck: a * (a - 1) = 0, out = a
 /// - MulAdd: a * b + c = out
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct AluTrace<F> {
     /// Operation kind for each row
     pub op_kind: Vec<AluOpKind>,
@@ -189,12 +189,14 @@ mod tests {
         let builder = AluTraceBuilder::new(&ops, &witness);
         let trace = builder.build().expect("Failed to build trace");
 
-        assert_eq!(trace.len(), 1);
-        assert_eq!(trace.op_kind[0], AluOpKind::Add);
-        assert_eq!(trace.values[0][0], a);
-        assert_eq!(trace.values[0][1], b);
-        assert_eq!(trace.values[0][2], F::ZERO);
-        assert_eq!(trace.values[0][3], out);
+        assert_eq!(
+            trace,
+            AluTrace {
+                op_kind: vec![AluOpKind::Add],
+                values: vec![[a, b, F::ZERO, out]],
+                indices: vec![[WitnessId(0), WitnessId(1), WitnessId(0), WitnessId(2)]],
+            }
+        );
     }
 
     #[test]
@@ -209,12 +211,14 @@ mod tests {
         let builder = AluTraceBuilder::new(&ops, &witness);
         let trace = builder.build().expect("Failed to build trace");
 
-        assert_eq!(trace.len(), 1);
-        assert_eq!(trace.op_kind[0], AluOpKind::Mul);
-        assert_eq!(trace.values[0][0], a);
-        assert_eq!(trace.values[0][1], b);
-        assert_eq!(trace.values[0][2], F::ZERO);
-        assert_eq!(trace.values[0][3], out);
+        assert_eq!(
+            trace,
+            AluTrace {
+                op_kind: vec![AluOpKind::Mul],
+                values: vec![[a, b, F::ZERO, out]],
+                indices: vec![[WitnessId(0), WitnessId(1), WitnessId(0), WitnessId(2)]],
+            }
+        );
     }
 
     #[test]
@@ -236,12 +240,14 @@ mod tests {
         let builder = AluTraceBuilder::new(&ops, &witness);
         let trace = builder.build().expect("Failed to build trace");
 
-        assert_eq!(trace.len(), 1);
-        assert_eq!(trace.op_kind[0], AluOpKind::MulAdd);
-        assert_eq!(trace.values[0][0], a);
-        assert_eq!(trace.values[0][1], b);
-        assert_eq!(trace.values[0][2], c);
-        assert_eq!(trace.values[0][3], out);
+        assert_eq!(
+            trace,
+            AluTrace {
+                op_kind: vec![AluOpKind::MulAdd],
+                values: vec![[a, b, c, out]],
+                indices: vec![[WitnessId(0), WitnessId(1), WitnessId(2), WitnessId(3)]],
+            }
+        );
     }
 
     #[test]
@@ -256,12 +262,14 @@ mod tests {
         let builder = AluTraceBuilder::new(&ops, &witness);
         let trace = builder.build().expect("Failed to build trace");
 
-        assert_eq!(trace.len(), 1);
-        assert_eq!(trace.op_kind[0], AluOpKind::BoolCheck);
-        assert_eq!(trace.values[0][0], a);
-        assert_eq!(trace.values[0][1], F::ZERO);
-        assert_eq!(trace.values[0][2], F::ZERO);
-        assert_eq!(trace.values[0][3], a);
+        assert_eq!(
+            trace,
+            AluTrace {
+                op_kind: vec![AluOpKind::BoolCheck],
+                values: vec![[a, F::ZERO, F::ZERO, a]],
+                indices: vec![[WitnessId(0), WitnessId(1), WitnessId(0), WitnessId(0)]],
+            }
+        );
     }
 
     #[test]
@@ -291,9 +299,17 @@ mod tests {
         let builder = AluTraceBuilder::new(&ops, &witness);
         let trace = builder.build().expect("Failed to build trace");
 
-        assert_eq!(trace.len(), 2);
-        assert_eq!(trace.op_kind[0], AluOpKind::Add);
-        assert_eq!(trace.op_kind[1], AluOpKind::Mul);
+        assert_eq!(
+            trace,
+            AluTrace {
+                op_kind: vec![AluOpKind::Add, AluOpKind::Mul],
+                values: vec![[a1, b1, F::ZERO, out1], [a2, b2, F::ZERO, out2]],
+                indices: vec![
+                    [WitnessId(0), WitnessId(1), WitnessId(0), WitnessId(2)],
+                    [WitnessId(3), WitnessId(4), WitnessId(0), WitnessId(5)],
+                ],
+            }
+        );
     }
 
     #[test]
@@ -304,12 +320,14 @@ mod tests {
         let builder = AluTraceBuilder::new(&ops, &witness);
         let trace = builder.build().expect("Failed to build trace");
 
-        assert_eq!(trace.len(), 1);
-        assert_eq!(trace.op_kind[0], AluOpKind::Add);
-        assert_eq!(trace.values[0][0], F::ZERO);
-        assert_eq!(trace.values[0][1], F::ZERO);
-        assert_eq!(trace.values[0][2], F::ZERO);
-        assert_eq!(trace.values[0][3], F::ZERO);
+        assert_eq!(
+            trace,
+            AluTrace {
+                op_kind: vec![AluOpKind::Add],
+                values: vec![[F::ZERO, F::ZERO, F::ZERO, F::ZERO]],
+                indices: vec![[WitnessId(0), WitnessId(0), WitnessId(0), WitnessId(0)]],
+            }
+        );
     }
 
     #[cfg(debug_assertions)]

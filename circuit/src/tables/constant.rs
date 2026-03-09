@@ -9,7 +9,7 @@ use crate::types::WitnessId;
 /// Stores all compile-time known constant values used in the circuit.
 /// Each constant binds to a specific witness ID.
 /// Both prover and verifier know these values in advance.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ConstTrace<F> {
     /// Witness IDs that each constant binds to.
     ///
@@ -68,13 +68,13 @@ mod tests {
         let builder = ConstTraceBuilder::new(&ops);
         let trace = builder.build().expect("Failed to build trace");
 
-        // Verify the trace contains exactly one constant
-        assert_eq!(trace.index.len(), 1, "Should have one constant operation");
-        assert_eq!(trace.values.len(), 1, "Should have one constant value");
-
-        // Verify the constant is correctly recorded
-        assert_eq!(trace.index[0], out);
-        assert_eq!(trace.values[0], val);
+        assert_eq!(
+            trace,
+            ConstTrace {
+                index: vec![out],
+                values: vec![val],
+            }
+        );
     }
 
     #[test]
@@ -108,25 +108,13 @@ mod tests {
         let builder = ConstTraceBuilder::new(&ops);
         let trace = builder.build().expect("Failed to build trace");
 
-        // Verify we have exactly three constants
         assert_eq!(
-            trace.index.len(),
-            3,
-            "Should have three constant operations"
+            trace,
+            ConstTrace {
+                index: vec![out1, out2, out3],
+                values: vec![val1, val2, val3],
+            }
         );
-        assert_eq!(trace.values.len(), 3, "Should have three constant values");
-
-        // Verify first constant
-        assert_eq!(trace.index[0], out1);
-        assert_eq!(trace.values[0], val1);
-
-        // Verify second constant
-        assert_eq!(trace.index[1], out2);
-        assert_eq!(trace.values[1], val2);
-
-        // Verify third constant
-        assert_eq!(trace.index[2], out3);
-        assert_eq!(trace.values[2], val3);
     }
 
     #[test]
@@ -138,8 +126,12 @@ mod tests {
         let builder = ConstTraceBuilder::new(&ops);
         let trace = builder.build().expect("Failed to build trace");
 
-        // Verify the trace is empty
-        assert_eq!(trace.index.len(), 0, "Should have no constants");
-        assert_eq!(trace.values.len(), 0, "Should have no values");
+        assert_eq!(
+            trace,
+            ConstTrace {
+                index: vec![],
+                values: vec![],
+            }
+        );
     }
 }
