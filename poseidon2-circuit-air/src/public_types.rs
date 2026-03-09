@@ -277,11 +277,10 @@ pub type Poseidon2CircuitAirGoldilocksD2Width8 = Poseidon2CircuitAir<
 /// configuration using a fixed seed.
 pub fn goldilocks_d2_width8_round_constants() -> RoundConstants<Goldilocks, 8, 4, 22> {
     let mut rng = SmallRng::seed_from_u64(1);
-    RoundConstants::new(
-        rng.sample(StandardUniform),
-        rng.sample(StandardUniform),
-        rng.sample(StandardUniform),
-    )
+    let beginning_full = rng.sample(StandardUniform);
+    let ending_full = rng.sample(StandardUniform);
+    let partial = rng.sample(StandardUniform);
+    RoundConstants::new(beginning_full, partial, ending_full)
 }
 
 /// Create a Goldilocks width-8 AIR with deterministic round constants and
