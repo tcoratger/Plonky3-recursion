@@ -7,7 +7,7 @@ pub use std::sync::Arc;
 
 pub use clap::{Args as ClapArgs, Parser, ValueEnum};
 pub use p3_challenger::DuplexChallenger;
-pub use p3_circuit::ops::generate_poseidon2_trace;
+pub use p3_circuit::ops::{generate_poseidon2_trace, generate_recompose_trace};
 pub use p3_circuit::{CircuitBuilder, CircuitRunner, NonPrimitiveOpId};
 pub use p3_circuit_prover::batch_stark_prover::{
     poseidon2_air_builders_d2, poseidon2_air_builders_d4,
@@ -78,95 +78,6 @@ pub enum FieldOption {
     Goldilocks,
 }
 
-/// CLI arguments shared by all recursive examples.
-///
-/// Embed this in an example's `Args` struct with `#[command(flatten)]`.
-#[derive(ClapArgs, Debug, Clone)]
-pub struct CommonArgs {
-    #[arg(short, long, ignore_case = true, value_enum, default_value_t = FieldOption::KoalaBear)]
-    pub field: FieldOption,
-
-    #[arg(
-        long,
-        default_value_t = 3,
-        help = "Logarithmic blowup factor for the LDE"
-    )]
-    pub log_blowup: usize,
-
-    #[arg(
-        long,
-        default_value_t = 3,
-        help = "Maximum arity allowed during FRI folding phases"
-    )]
-    pub max_log_arity: usize,
-
-    #[arg(long, default_value_t = 2, help = "Height of the Merkle cap to open")]
-    pub cap_height: usize,
-
-    #[arg(
-        long,
-        default_value_t = 5,
-        help = "Log size of final polynomial after FRI folding"
-    )]
-    pub log_final_poly_len: usize,
-
-    #[arg(
-        long,
-        default_value_t = 0,
-        help = "PoW grinding bits during FRI commit phase"
-    )]
-    pub commit_pow_bits: usize,
-
-    #[arg(
-        long,
-        default_value_t = 18,
-        help = "PoW grinding bits during FRI query phase"
-    )]
-    pub query_pow_bits: usize,
-
-    #[arg(
-        long,
-        default_value_t = 2,
-        help = "Number of public lanes for the table packing in recursive layers"
-    )]
-    pub public_lanes: usize,
-
-    #[arg(
-        long,
-        default_value_t = 3,
-        help = "Number of ALU lanes for the table packing in recursive layers"
-    )]
-    pub alu_lanes: usize,
-
-    // TODO: Update once https://github.com/Plonky3/Plonky3/pull/1329 lands
-    #[arg(
-        long,
-        default_value_t = 124,
-        help = "Targeted security level (conjectured)"
-    )]
-    pub security_level: usize,
-
-    #[arg(long, default_value_t = false, help = "Enable ZK mode (HidingFriPcs)")]
-    pub zk: bool,
-}
-
-impl CommonArgs {
-    pub const fn to_fri_params(&self) -> FriParams {
-        FriParams {
-            log_blowup: self.log_blowup,
-            max_log_arity: self.max_log_arity,
-            cap_height: self.cap_height,
-            log_final_poly_len: self.log_final_poly_len,
-            commit_pow_bits: self.commit_pow_bits,
-            query_pow_bits: self.query_pow_bits,
-        }
-    }
-
-    pub fn table_packing(&self) -> TablePacking {
-        TablePacking::new(self.public_lanes, self.alu_lanes)
-    }
-}
-
 pub fn default_goldilocks_poseidon2_8() -> p3_goldilocks::Poseidon2Goldilocks<8> {
     use rand::SeedableRng;
     let mut rng = rand::rngs::SmallRng::seed_from_u64(1);
@@ -211,7 +122,8 @@ macro_rules! define_field_module_types {
         $poseidon2_air_builders_fn:ident,
         $backend_ctor:ident,
         $backend_width:expr,
-        $backend_rate:expr
+        $backend_rate:expr,
+        $enable_recompose_fn:ident
     ) => {
         pub type F = $field;
         pub const D: usize = $d;
@@ -363,6 +275,7 @@ macro_rules! define_field_module_types {
                     generate_poseidon2_trace::<Challenge, $poseidon2_circuit_config>,
                     perm,
                 );
+                circuit.$enable_recompose_fn::<F>(generate_recompose_trace::<F, Challenge>);
                 Ok(())
             }
 
@@ -438,6 +351,7 @@ macro_rules! define_field_module_types {
                     generate_poseidon2_trace::<Challenge, $poseidon2_circuit_config>,
                     perm,
                 );
+                circuit.$enable_recompose_fn::<F>(generate_recompose_trace::<F, Challenge>);
                 Ok(())
             }
 

@@ -46,45 +46,125 @@ struct Args {
     )]
     num_recursive_layers: usize,
 
-    #[command(flatten)]
-    common: CommonArgs,
+    #[arg(short, long, ignore_case = true, value_enum, default_value_t = FieldOption::KoalaBear)]
+    pub field: FieldOption,
+
+    #[arg(
+        long,
+        default_value_t = 3,
+        help = "Logarithmic blowup factor for the LDE"
+    )]
+    pub log_blowup: usize,
+
+    #[arg(
+        long,
+        default_value_t = 3,
+        help = "Maximum arity allowed during FRI folding phases"
+    )]
+    pub max_log_arity: usize,
+
+    #[arg(long, default_value_t = 2, help = "Height of the Merkle cap to open")]
+    pub cap_height: usize,
+
+    #[arg(
+        long,
+        default_value_t = 5,
+        help = "Log size of final polynomial after FRI folding"
+    )]
+    pub log_final_poly_len: usize,
+
+    #[arg(
+        long,
+        default_value_t = 0,
+        help = "PoW grinding bits during FRI commit phase"
+    )]
+    pub commit_pow_bits: usize,
+
+    #[arg(
+        long,
+        default_value_t = 18,
+        help = "PoW grinding bits during FRI query phase"
+    )]
+    pub query_pow_bits: usize,
+
+    #[arg(
+        long,
+        default_value_t = 2,
+        help = "Number of public lanes for the table packing in recursive layers"
+    )]
+    pub public_lanes: usize,
+
+    #[arg(
+        long,
+        default_value_t = 2,
+        help = "Number of ALU lanes for the table packing in recursive layers"
+    )]
+    pub alu_lanes: usize,
+
+    // TODO: Update once https://github.com/Plonky3/Plonky3/pull/1329 lands
+    #[arg(
+        long,
+        default_value_t = 124,
+        help = "Targeted security level (conjectured)"
+    )]
+    pub security_level: usize,
+
+    #[arg(long, default_value_t = false, help = "Enable ZK mode (HidingFriPcs)")]
+    pub zk: bool,
+}
+
+impl Args {
+    pub const fn to_fri_params(&self) -> FriParams {
+        FriParams {
+            log_blowup: self.log_blowup,
+            max_log_arity: self.max_log_arity,
+            cap_height: self.cap_height,
+            log_final_poly_len: self.log_final_poly_len,
+            commit_pow_bits: self.commit_pow_bits,
+            query_pow_bits: self.query_pow_bits,
+        }
+    }
+
+    pub fn table_packing(&self) -> TablePacking {
+        TablePacking::new(self.public_lanes, self.alu_lanes)
+    }
 }
 
 fn main() {
     init_logger();
 
     let args = Args::parse();
-    let fri_params = args.common.to_fri_params();
-    let table_packing = args.common.table_packing();
+    let fri_params = args.to_fri_params();
+    let table_packing = args.table_packing();
 
     assert!(args.num_recursive_layers >= 1);
 
     info!(
         "2-to-1 aggregation with field {:?}, {} aggregation recursive layers",
-        args.common.field, args.num_recursive_layers
+        args.field, args.num_recursive_layers
     );
 
-    match args.common.field {
+    match args.field {
         FieldOption::KoalaBear => koala_bear::run(
             args.num_recursive_layers,
             &fri_params,
             &table_packing,
-            args.common.security_level,
-            args.common.zk,
+            args.security_level,
+            args.zk,
         ),
         FieldOption::BabyBear => baby_bear::run(
             args.num_recursive_layers,
             &fri_params,
             &table_packing,
-            args.common.security_level,
-            args.common.zk,
+            args.security_level,
+            args.zk,
         ),
         FieldOption::Goldilocks => goldilocks::run(
             args.num_recursive_layers,
             &fri_params,
             &table_packing,
-            args.common.security_level,
-            args.common.zk,
+            args.security_level,
+            args.zk,
         ),
     }
 }
@@ -103,6 +183,7 @@ macro_rules! define_field_module {
         $digest_elems:expr,
         $enable_poseidon2_fn:ident,
         $register_poseidon2_fn:ident,
+        $register_recompose_fn:ident,
         $default_perm_circuit:path,
         $poseidon2_air_builders_fn:ident,
         $backend_ctor:ident,
@@ -130,7 +211,8 @@ macro_rules! define_field_module {
                 $poseidon2_air_builders_fn,
                 $backend_ctor,
                 $backend_width,
-                $backend_rate
+                $backend_rate,
+                enable_recompose
             );
 
             /// Build a dummy circuit with a single constant and prove it (non-ZK).
@@ -287,6 +369,7 @@ macro_rules! define_field_module {
                                 let mut verifier = BatchStarkProver::new(agg_config.clone())
                                     .with_table_packing(agg_params.table_packing);
                                 verifier.$register_poseidon2_fn($poseidon2_config);
+                                verifier.$register_recompose_fn();
                                 verifier
                                     .verify_all_tables(&out.0, out.1.common_data())
                                     .unwrap_or_else(|e| {
@@ -332,6 +415,7 @@ define_field_module!(
     8,
     enable_poseidon2_perm,
     register_poseidon2_table,
+    register_recompose_table,
     p3_koala_bear::default_koalabear_poseidon2_16,
     poseidon2_air_builders_d4,
     new_d4,
@@ -352,6 +436,7 @@ define_field_module!(
     8,
     enable_poseidon2_perm,
     register_poseidon2_table,
+    register_recompose_table,
     p3_baby_bear::default_babybear_poseidon2_16,
     poseidon2_air_builders_d4,
     new_d4,
@@ -372,6 +457,7 @@ define_field_module!(
     4,
     enable_poseidon2_perm_width_8,
     register_poseidon2_table_d2,
+    register_recompose_table_d2,
     default_goldilocks_poseidon2_8,
     poseidon2_air_builders_d2,
     new_d2,
