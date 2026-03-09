@@ -578,13 +578,14 @@ pub(crate) fn eval<
     // MMCS accumulator update.
     // When !new_start_{r+1} && merkle_path_{r+1}:
     //   mmcs_index_sum_{r+1} = mmcs_index_sum_r * 2 + mmcs_bit_{r+1}
-    let two = AB::Expr::ONE + AB::Expr::ONE;
     let not_next_new_start = AB::Expr::ONE - next_prep.new_start.into();
     builder
         .when_transition()
         .when(not_next_new_start)
         .when(next_prep.merkle_path)
-        .assert_zero(next.mmcs_index_sum - (local.mmcs_index_sum * two + next.mmcs_bit.into()));
+        .assert_zero(
+            next.mmcs_index_sum - (local.mmcs_index_sum * AB::Expr::TWO + next.mmcs_bit.into()),
+        );
 
     let p3_poseidon2_num_cols = p3_poseidon2_air::num_cols::<
         WIDTH,
@@ -1223,7 +1224,7 @@ mod test {
                 merkle_path: false,
                 mmcs_bit: false,
                 mmcs_index_sum: Val::ZERO,
-                input_values: vec![Val::ZERO; WIDTH],
+                input_values: Val::zero_vec(WIDTH),
                 in_ctl: vec![false; POSEIDON2_LIMBS],
                 input_indices: vec![0; POSEIDON2_LIMBS],
                 out_ctl: vec![false; POSEIDON2_PUBLIC_OUTPUT_LIMBS],
@@ -1266,5 +1267,402 @@ mod test {
 
         let air = Poseidon2CircuitAirBabyBearD4Width16::new(constants);
         p3_test_utils::assert_air_constraint_degree!(air, "Poseidon2CircuitAir");
+    }
+
+    /// Helper: set up STARK infrastructure and prove/verify a set of rows.
+    fn prove_and_verify(
+        rows: &[Poseidon2CircuitRow<BabyBear>],
+        constants: &RoundConstants<BabyBear, WIDTH, 4, 13>,
+        perm: &Poseidon2BabyBear<WIDTH>,
+    ) -> Result<
+        (),
+        p3_uni_stark::VerificationError<
+            p3_fri::verifier::FriError<
+                p3_merkle_tree::MerkleTreeError,
+                p3_merkle_tree::MerkleTreeError,
+            >,
+        >,
+    > {
+        let _ = perm; // used only by callers to build rows
+        type Val = BabyBear;
+        type Challenge = BinomialExtensionField<Val, 4>;
+        type ByteHash = Keccak256Hash;
+        let byte_hash = ByteHash {};
+        type U64Hash = PaddingFreeSponge<KeccakF, 25, 17, 4>;
+        let u64_hash = U64Hash::new(KeccakF {});
+        type FieldHash = SerializingHasher<U64Hash>;
+        let field_hash = FieldHash::new(u64_hash);
+        type MyCompress = CompressionFunctionFromHasher<U64Hash, 2, 4>;
+        let compress = MyCompress::new(u64_hash);
+        type MyMmcs = MerkleTreeHidingMmcs<
+            [Val; p3_keccak::VECTOR_LEN],
+            [u64; p3_keccak::VECTOR_LEN],
+            FieldHash,
+            MyCompress,
+            SmallRng,
+            2,
+            4,
+            4,
+        >;
+        let rng = SmallRng::seed_from_u64(1);
+        let val_mmcs = MyMmcs::new(field_hash, compress, 0, rng);
+        type ChallengeMmcs = ExtensionMmcs<Val, Challenge, MyMmcs>;
+        let challenge_mmcs = ChallengeMmcs::new(val_mmcs.clone());
+        type Challenger = SerializingChallenger32<Val, HashChallenger<u8, ByteHash, 32>>;
+        let challenger = Challenger::from_hasher(vec![], byte_hash);
+        let mut fri_params = create_benchmark_fri_params(challenge_mmcs);
+        fri_params.log_blowup = 4;
+
+        let degree_bits = 5;
+        let target_rows = 1usize << degree_bits;
+        let mut padded = rows.to_vec();
+        if padded.len() < target_rows {
+            let filler = Poseidon2CircuitRow {
+                new_start: true,
+                merkle_path: false,
+                mmcs_bit: false,
+                mmcs_index_sum: Val::ZERO,
+                input_values: Val::zero_vec(WIDTH),
+                in_ctl: vec![false; POSEIDON2_LIMBS],
+                input_indices: vec![0; POSEIDON2_LIMBS],
+                out_ctl: vec![false; POSEIDON2_PUBLIC_OUTPUT_LIMBS],
+                output_indices: vec![0; POSEIDON2_PUBLIC_OUTPUT_LIMBS],
+                mmcs_index_sum_idx: 0,
+                mmcs_ctl_enabled: false,
+            };
+            padded.resize(target_rows, filler);
+        }
+
+        let preprocessed = extract_preprocessed_from_operations::<Val, Val>(&padded, 4);
+        let air = Poseidon2CircuitAirBabyBearD4Width16::new_with_preprocessed(
+            constants.clone(),
+            preprocessed,
+        );
+        let trace = air.generate_trace_rows(&padded, constants, fri_params.log_blowup);
+
+        type Dft = p3_dft::Radix2Bowers;
+        let dft = Dft::default();
+        type Pcs = TwoAdicFriPcs<Val, Dft, MyMmcs, ChallengeMmcs>;
+        let pcs = Pcs::new(dft, val_mmcs, fri_params);
+        type MyConfig = StarkConfig<Pcs, Challenge, Challenger>;
+        let config = MyConfig::new(pcs, challenger);
+
+        let (preprocessed_prover, preprocessed_verifier) =
+            setup_preprocessed(&config, &air, degree_bits).unzip();
+        let proof =
+            prove_with_preprocessed(&config, &air, trace, &[], preprocessed_prover.as_ref());
+        verify_with_preprocessed(&config, &air, &proof, &[], preprocessed_verifier.as_ref())
+    }
+
+    fn make_constants_and_perm(
+        rng: &mut SmallRng,
+    ) -> (
+        RoundConstants<BabyBear, WIDTH, 4, 13>,
+        Poseidon2BabyBear<WIDTH>,
+    ) {
+        let beginning: [[BabyBear; WIDTH]; 4] = rng.random();
+        let partial: [BabyBear; 13] = rng.random();
+        let ending: [[BabyBear; WIDTH]; 4] = rng.random();
+        let constants = RoundConstants::new(beginning, partial, ending);
+        let perm = Poseidon2BabyBear::<WIDTH>::new(
+            ExternalLayerConstants::new(beginning.to_vec(), ending.to_vec()),
+            partial.to_vec(),
+        );
+        (constants, perm)
+    }
+
+    #[test]
+    fn prove_poseidon2_merkle_right() -> Result<
+        (),
+        p3_uni_stark::VerificationError<
+            p3_fri::verifier::FriError<
+                p3_merkle_tree::MerkleTreeError,
+                p3_merkle_tree::MerkleTreeError,
+            >,
+        >,
+    > {
+        type Val = BabyBear;
+        const D: usize = 4;
+        let mut rng = SmallRng::seed_from_u64(42);
+        let (constants, perm) = make_constants_and_perm(&mut rng);
+
+        // Row A: new_start, random state
+        let state_a: [Val; WIDTH] = core::array::from_fn(|_| rng.random());
+        let output_a = perm.permute(state_a);
+
+        let row_a = Poseidon2CircuitRow {
+            new_start: true,
+            merkle_path: false,
+            mmcs_bit: false,
+            mmcs_index_sum: Val::ZERO,
+            input_values: state_a.to_vec(),
+            in_ctl: vec![false; POSEIDON2_LIMBS],
+            input_indices: vec![0; POSEIDON2_LIMBS],
+            out_ctl: vec![false; POSEIDON2_PUBLIC_OUTPUT_LIMBS],
+            output_indices: vec![0; POSEIDON2_PUBLIC_OUTPUT_LIMBS],
+            mmcs_index_sum_idx: 0,
+            mmcs_ctl_enabled: false,
+        };
+
+        // Row B: merkle mode, mmcs_bit=true (right child).
+        // With mmcs_bit=1: prev output[0..D] → input[2D..3D], output[D..2D] → input[3D..4D].
+        // Limbs 0-1 are sibling data (random).
+        let sibling: [Val; 2 * D] = core::array::from_fn(|_| rng.random());
+        let mut state_b = [Val::ZERO; WIDTH];
+        state_b[0..2 * D].copy_from_slice(&sibling);
+        state_b[2 * D..3 * D].copy_from_slice(&output_a[0..D]);
+        state_b[3 * D..4 * D].copy_from_slice(&output_a[D..2 * D]);
+        let output_b = perm.permute(state_b);
+
+        let row_b = Poseidon2CircuitRow {
+            new_start: false,
+            merkle_path: true,
+            mmcs_bit: true,
+            mmcs_index_sum: Val::ZERO,
+            input_values: state_b.to_vec(),
+            in_ctl: vec![false; POSEIDON2_LIMBS],
+            input_indices: vec![0; POSEIDON2_LIMBS],
+            out_ctl: vec![false; POSEIDON2_PUBLIC_OUTPUT_LIMBS],
+            output_indices: vec![0; POSEIDON2_PUBLIC_OUTPUT_LIMBS],
+            mmcs_index_sum_idx: 0,
+            mmcs_ctl_enabled: false,
+        };
+
+        // Row C: chain from output_b in sponge mode
+        let row_c = Poseidon2CircuitRow {
+            new_start: false,
+            merkle_path: false,
+            mmcs_bit: false,
+            mmcs_index_sum: Val::ZERO,
+            input_values: output_b.to_vec(),
+            in_ctl: vec![false; POSEIDON2_LIMBS],
+            input_indices: vec![0; POSEIDON2_LIMBS],
+            out_ctl: vec![false; POSEIDON2_PUBLIC_OUTPUT_LIMBS],
+            output_indices: vec![0; POSEIDON2_PUBLIC_OUTPUT_LIMBS],
+            mmcs_index_sum_idx: 0,
+            mmcs_ctl_enabled: false,
+        };
+
+        prove_and_verify(&[row_a, row_b, row_c], &constants, &perm)
+    }
+
+    #[test]
+    fn prove_poseidon2_mmcs_accumulator() -> Result<
+        (),
+        p3_uni_stark::VerificationError<
+            p3_fri::verifier::FriError<
+                p3_merkle_tree::MerkleTreeError,
+                p3_merkle_tree::MerkleTreeError,
+            >,
+        >,
+    > {
+        type Val = BabyBear;
+        const D: usize = 4;
+        let mut rng = SmallRng::seed_from_u64(99);
+        let (constants, perm) = make_constants_and_perm(&mut rng);
+
+        // Build a 3-row Merkle chain that exercises the MMCS accumulator:
+        //   Row 0: new_start=true,  merkle, mmcs_bit=1 → mmcs_index_sum = 0 (reset)
+        //   Row 1: new_start=false, merkle, mmcs_bit=0 → mmcs_index_sum = 0*2+0 = 0
+        //   Row 2: new_start=false, merkle, mmcs_bit=1 → mmcs_index_sum = 0*2+1 = 1
+        // Expected final accumulator = 1.
+        let bits = [true, false, true];
+
+        let state_0: [Val; WIDTH] = core::array::from_fn(|_| rng.random());
+        let output_0 = perm.permute(state_0);
+        let row_0 = Poseidon2CircuitRow {
+            new_start: true,
+            merkle_path: true,
+            mmcs_bit: bits[0],
+            mmcs_index_sum: Val::ZERO,
+            input_values: state_0.to_vec(),
+            in_ctl: vec![false; POSEIDON2_LIMBS],
+            input_indices: vec![0; POSEIDON2_LIMBS],
+            out_ctl: vec![false; POSEIDON2_PUBLIC_OUTPUT_LIMBS],
+            output_indices: vec![0; POSEIDON2_PUBLIC_OUTPUT_LIMBS],
+            mmcs_index_sum_idx: 0,
+            mmcs_ctl_enabled: true,
+        };
+
+        // Row 1: left child (mmcs_bit=0), chain output[0..2D] → input[0..2D]
+        let mut state_1 = [Val::ZERO; WIDTH];
+        state_1[0..D].copy_from_slice(&output_0[0..D]);
+        state_1[D..2 * D].copy_from_slice(&output_0[D..2 * D]);
+        let output_1 = perm.permute(state_1);
+        let row_1 = Poseidon2CircuitRow {
+            new_start: false,
+            merkle_path: true,
+            mmcs_bit: bits[1],
+            mmcs_index_sum: Val::ZERO, // will be computed by generate_trace_rows
+            input_values: state_1.to_vec(),
+            in_ctl: vec![false; POSEIDON2_LIMBS],
+            input_indices: vec![0; POSEIDON2_LIMBS],
+            out_ctl: vec![false; POSEIDON2_PUBLIC_OUTPUT_LIMBS],
+            output_indices: vec![0; POSEIDON2_PUBLIC_OUTPUT_LIMBS],
+            mmcs_index_sum_idx: 0,
+            mmcs_ctl_enabled: true,
+        };
+
+        // Row 2: right child (mmcs_bit=1), chain output[0..D]→input[2D..3D], output[D..2D]→input[3D..4D]
+        let sibling: [Val; 2 * D] = core::array::from_fn(|_| rng.random());
+        let mut state_2 = [Val::ZERO; WIDTH];
+        state_2[0..2 * D].copy_from_slice(&sibling);
+        state_2[2 * D..3 * D].copy_from_slice(&output_1[0..D]);
+        state_2[3 * D..4 * D].copy_from_slice(&output_1[D..2 * D]);
+        let _output_2 = perm.permute(state_2);
+        let row_2 = Poseidon2CircuitRow {
+            new_start: false,
+            merkle_path: true,
+            mmcs_bit: bits[2],
+            mmcs_index_sum: Val::ZERO,
+            input_values: state_2.to_vec(),
+            in_ctl: vec![false; POSEIDON2_LIMBS],
+            input_indices: vec![0; POSEIDON2_LIMBS],
+            out_ctl: vec![false; POSEIDON2_PUBLIC_OUTPUT_LIMBS],
+            output_indices: vec![0; POSEIDON2_PUBLIC_OUTPUT_LIMBS],
+            mmcs_index_sum_idx: 0,
+            mmcs_ctl_enabled: true,
+        };
+
+        prove_and_verify(&[row_0, row_1, row_2], &constants, &perm)
+    }
+
+    /// Build an AIR with the given preprocessed data and optional minimum
+    /// height, then return the materialized preprocessed trace matrix.
+    fn build_preprocessed_trace(
+        preprocessed: Vec<BabyBear>,
+        min_height: usize,
+    ) -> RowMajorMatrix<BabyBear> {
+        let mut rng = SmallRng::seed_from_u64(1);
+        let constants = RoundConstants::new(rng.random(), rng.random(), rng.random());
+
+        Poseidon2CircuitAirBabyBearD4Width16::new_with_preprocessed(constants, preprocessed)
+            .with_min_height(min_height)
+            .preprocessed_trace()
+            .expect("preprocessed_trace returned None")
+    }
+
+    /// The preprocessed width for BabyBear width-16 is 24 columns.
+    ///
+    /// 4 input limbs × 4 fields each  = 16
+    /// 2 output limbs × 2 fields each =  4
+    /// 4 scalar fields                =  4
+    ///                           total = 24
+    const PREP_WIDTH: usize = 24;
+
+    #[test]
+    fn preprocessed_trace_pads_to_power_of_two() {
+        // Feed 3 rows of data. That's 3 × 24 = 72 field elements.
+        //
+        // 3 is not a power of two, so the method must round up to 4 rows.
+        let three_rows = vec![BabyBear::ONE; 3 * PREP_WIDTH];
+        let trace = build_preprocessed_trace(three_rows, 1);
+
+        // The matrix should have 4 rows and 24 columns.
+        assert_eq!(trace.height(), 4);
+        assert_eq!(trace.width(), PREP_WIDTH);
+    }
+
+    #[test]
+    fn preprocessed_trace_respects_min_height() {
+        // Feed 2 rows of data (already a power of two).
+        //
+        // But request a minimum height of 8.
+        //
+        // The result must have 8 rows, not 2.
+        let two_rows = vec![BabyBear::ONE; 2 * PREP_WIDTH];
+        let trace = build_preprocessed_trace(two_rows, 8);
+
+        assert_eq!(trace.height(), 8);
+        assert_eq!(trace.width(), PREP_WIDTH);
+    }
+
+    #[test]
+    fn preprocessed_trace_preserves_original_data() {
+        // Fill one row with all-twos.
+        //
+        // After padding the result must still have those values in the
+        // first row.
+        let one_row = vec![BabyBear::TWO; PREP_WIDTH];
+        let trace = build_preprocessed_trace(one_row.clone(), 1);
+
+        // The first row should be exactly what we put in.
+        let values = trace.values.as_slice();
+        assert_eq!(&values[..PREP_WIDTH], &one_row[..]);
+    }
+
+    #[test]
+    fn preprocessed_trace_sets_chain_boundary_on_first_padding_row() {
+        // Feed 3 rows. The method pads to 4 rows (next power of two).
+        //
+        // The first padding row (row index 3) must have its chain-start
+        // flag set to one. That flag is the second-to-last column.
+        //
+        // This prevents the chaining constraint from connecting the
+        // last real row to the first padding row.
+        let three_rows = vec![BabyBear::ZERO; 3 * PREP_WIDTH];
+        let trace = build_preprocessed_trace(three_rows, 1);
+
+        assert_eq!(trace.height(), 4);
+
+        // Row 3 (first padding row): second-to-last column = 1.
+        let values = trace.values.as_slice();
+        let padding_row = &values[3 * PREP_WIDTH..4 * PREP_WIDTH];
+        let chain_start_flag = padding_row[PREP_WIDTH - 2];
+        assert_eq!(chain_start_flag, BabyBear::ONE);
+
+        // All other columns in the padding row should be zero.
+        for (i, &val) in padding_row.iter().enumerate() {
+            if i != PREP_WIDTH - 2 {
+                assert_eq!(val, BabyBear::ZERO, "padding row column {i} should be zero");
+            }
+        }
+    }
+
+    #[test]
+    fn preprocessed_trace_no_padding_when_exact_power_of_two() {
+        // Feed exactly 4 rows. Already a power of two.
+        //
+        // No padding should occur, so no chain-boundary flag is set on
+        // any extra row.
+        let four_rows = vec![BabyBear::ONE; 4 * PREP_WIDTH];
+        let trace = build_preprocessed_trace(four_rows, 1);
+
+        // Height should be exactly 4 — no extra rows.
+        assert_eq!(trace.height(), 4);
+
+        // All 4 rows should contain the original data (all ones).
+        let values = trace.values.as_slice();
+        for row_idx in 0..4 {
+            let start = row_idx * PREP_WIDTH;
+            let row = &values[start..start + PREP_WIDTH];
+            assert!(
+                row.iter().all(|&v| v == BabyBear::ONE),
+                "row {row_idx} should be all ones"
+            );
+        }
+    }
+
+    #[test]
+    fn preprocessed_trace_padding_rows_beyond_first_are_all_zero() {
+        // Feed 1 row. Request minimum height of 8.
+        //
+        // Rows 1..8 are padding. Row 1 has the chain-boundary flag.
+        // Rows 2..8 should be entirely zero.
+        let one_row = vec![BabyBear::ONE; PREP_WIDTH];
+        let trace = build_preprocessed_trace(one_row, 8);
+
+        assert_eq!(trace.height(), 8);
+
+        // Rows 2 through 7 should be completely zero.
+        let values = trace.values.as_slice();
+        for row_idx in 2..8 {
+            let start = row_idx * PREP_WIDTH;
+            let row = &values[start..start + PREP_WIDTH];
+            assert!(
+                row.iter().all(|&v| v == BabyBear::ZERO),
+                "padding row {row_idx} should be all zeros"
+            );
+        }
     }
 }
