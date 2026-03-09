@@ -68,7 +68,9 @@ mod tests {
     use p3_symmetric::CryptographicHasher;
     use p3_test_utils::baby_bear_params::*;
 
-    use crate::ops::{Poseidon2Config, Poseidon2Params, generate_poseidon2_trace, generate_recompose_trace};
+    use crate::ops::{
+        Poseidon2Config, Poseidon2Params, generate_poseidon2_trace, generate_recompose_trace,
+    };
     use crate::{CircuitBuilder, ExprId};
 
     type CF = Challenge;

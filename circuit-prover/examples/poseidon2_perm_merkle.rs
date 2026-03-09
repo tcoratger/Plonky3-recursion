@@ -2,7 +2,9 @@ use std::error::Error;
 
 use p3_batch_stark::ProverData;
 use p3_circuit::op::{NonPrimitiveOpPrivateData, NpoTypeId};
-use p3_circuit::ops::{Poseidon2PermPrivateData, generate_poseidon2_trace, generate_recompose_trace};
+use p3_circuit::ops::{
+    Poseidon2PermPrivateData, generate_poseidon2_trace, generate_recompose_trace,
+};
 use p3_circuit::{CircuitBuilder, ExprId};
 use p3_circuit_prover::batch_stark_prover::{poseidon2_air_builders_d4, recompose_air_builders};
 use p3_circuit_prover::common::{NpoPreprocessor, get_airs_and_degrees_with_prep};
