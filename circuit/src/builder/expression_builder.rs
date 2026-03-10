@@ -24,6 +24,15 @@ use crate::types::{ExprId, NonPrimitiveOpId};
 #[cfg(feature = "debugging")]
 use crate::{AllocationEntry, AllocationType};
 
+/// Discriminant for binary operations used as CSE pool keys.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum BinOpKind {
+    Add,
+    Mul,
+    Sub,
+    Div,
+}
+
 /// Per-operation counters for profiling expression allocations.
 ///
 /// This is only compiled when the `profiling` feature is enabled on the `p3-circuit` crate.
@@ -152,12 +161,10 @@ pub struct ExpressionBuilder<F> {
 
     /// Common sub-expression elimination pool for binary operations.
     ///
-    /// Maps `(op_discriminant, lhs, rhs)` to the existing [`ExprId`] that computes
+    /// Maps `(op_kind, lhs, rhs)` to the existing [`ExprId`] that computes
     /// the same result. For commutative operations (Add, Mul) the operands are
     /// sorted so that `add(a,b)` and `add(b,a)` share the same key.
-    ///
-    /// Discriminants: 0 = Add, 1 = Mul, 2 = Sub, 3 = Div.
-    cse_pool: HashMap<(u8, ExprId, ExprId), ExprId>,
+    cse_pool: HashMap<(BinOpKind, ExprId, ExprId), ExprId>,
 
     /// Pending equality constraints.
     ///
@@ -381,9 +388,9 @@ where
 
         // CSE: commutative, so normalize operand order.
         let key = if lhs.0 <= rhs.0 {
-            (0u8, lhs, rhs)
+            (BinOpKind::Add, lhs, rhs)
         } else {
-            (0u8, rhs, lhs)
+            (BinOpKind::Add, rhs, lhs)
         };
         if let Some(&existing) = self.cse_pool.get(&key) {
             return existing;
@@ -436,7 +443,7 @@ where
         }
 
         // CSE: non-commutative, operand order matters.
-        let key = (2u8, lhs, rhs);
+        let key = (BinOpKind::Sub, lhs, rhs);
         if let Some(&existing) = self.cse_pool.get(&key) {
             return existing;
         }
@@ -490,9 +497,9 @@ where
 
         // CSE: commutative, so normalize operand order.
         let key = if lhs.0 <= rhs.0 {
-            (1u8, lhs, rhs)
+            (BinOpKind::Mul, lhs, rhs)
         } else {
-            (1u8, rhs, lhs)
+            (BinOpKind::Mul, rhs, lhs)
         };
         if let Some(&existing) = self.cse_pool.get(&key) {
             return existing;
@@ -544,7 +551,7 @@ where
         }
 
         // CSE: non-commutative, operand order matters.
-        let key = (3u8, lhs, rhs);
+        let key = (BinOpKind::Div, lhs, rhs);
         if let Some(&existing) = self.cse_pool.get(&key) {
             return existing;
         }
