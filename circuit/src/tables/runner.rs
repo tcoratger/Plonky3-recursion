@@ -487,7 +487,6 @@ impl<F: Field> CircuitRunner<F> {
 
 #[cfg(test)]
 mod tests {
-
     use p3_test_utils::baby_bear_params::{
         BabyBear, BasedVectorSpace, BinomialExtensionField, Field, PrimeCharacteristicRing,
     };
@@ -500,6 +499,7 @@ mod tests {
     use super::*;
     use crate::builder::CircuitBuilder;
     use crate::op::HintExecutor;
+    use crate::tables::{ConstTrace, PublicTrace};
     use crate::types::WitnessId;
 
     /// Initializes a global logger with default parameters.
@@ -531,20 +531,28 @@ mod tests {
 
         let traces = runner.run().unwrap();
 
-        // Check witness trace
+        let f = BabyBear::from_u64;
         assert_eq!(
-            traces.witness_trace.index.len(),
-            traces.witness_trace.num_rows()
+            traces,
+            Traces {
+                witness_trace: WitnessTrace::new(vec![f(0), f(5), f(3), f(8)]),
+                const_trace: ConstTrace {
+                    index: vec![WitnessId(0), WitnessId(1)],
+                    values: vec![f(0), f(5)],
+                },
+                public_trace: PublicTrace {
+                    index: vec![WitnessId(2)],
+                    values: vec![f(3)],
+                },
+                alu_trace: AluTrace {
+                    op_kind: vec![AluOpKind::Add],
+                    values: vec![[f(3), f(5), f(0), f(8)]],
+                    indices: vec![[WitnessId(2), WitnessId(1), WitnessId(0), WitnessId(3)]],
+                },
+                non_primitive_traces: HashMap::new(),
+                tag_to_witness: HashMap::new(),
+            }
         );
-
-        // Check that we have const trace entries
-        assert!(!traces.const_trace.values.is_empty());
-
-        // Check that we have public trace entries
-        assert!(!traces.public_trace.values.is_empty());
-
-        // Check that we have ALU trace entries
-        assert!(!traces.alu_trace.values.is_empty());
     }
 
     #[derive(Debug, Clone)]
@@ -643,33 +651,38 @@ mod tests {
 
         let circuit = builder.build().unwrap();
 
-        let witness_count = circuit.witness_count;
         let runner = circuit.runner();
 
         let traces = runner.run().unwrap();
 
         traces.dump_primitive_traces_log();
 
-        // Verify trace structure
-        assert_eq!(traces.witness_trace.index.len(), witness_count as usize);
-
-        // Should have constants: 0, 37, 111 and -111 (introduced by algebraic rewrite)
-        assert_eq!(traces.const_trace.values.len(), 4);
-
-        // Should have no public input
-        assert!(traces.public_trace.values.is_empty());
-
-        // Should store the value of the hint (3) at `WitnessId(3)``
-        assert_eq!(traces.witness_trace.index[3], WitnessId(3));
+        let f = BabyBear::from_u64;
+        let neg_111 = -f(111);
         assert_eq!(
-            traces.witness_trace.get_value(WitnessId(3)).unwrap(),
-            &BabyBear::from_usize(3)
+            traces,
+            Traces {
+                witness_trace: WitnessTrace::new(vec![f(0), f(37), f(111), f(3), f(111), neg_111]),
+                const_trace: ConstTrace {
+                    index: vec![WitnessId(0), WitnessId(1), WitnessId(2), WitnessId(5)],
+                    values: vec![f(0), f(37), f(111), neg_111],
+                },
+                public_trace: PublicTrace {
+                    index: vec![],
+                    values: vec![],
+                },
+                alu_trace: AluTrace {
+                    op_kind: vec![AluOpKind::Mul, AluOpKind::Add],
+                    values: vec![[f(37), f(3), f(0), f(111)], [f(111), neg_111, f(0), f(0)]],
+                    indices: vec![
+                        [WitnessId(1), WitnessId(3), WitnessId(0), WitnessId(4)],
+                        [WitnessId(4), WitnessId(5), WitnessId(0), WitnessId(0)],
+                    ],
+                },
+                non_primitive_traces: HashMap::new(),
+                tag_to_witness: HashMap::new(),
+            }
         );
-
-        // Should have one mul operation: 37 * x
-        // And one add operation for sub: result + rhs = lhs
-        // Total 2 ALU operations
-        assert_eq!(traces.alu_trace.values.len(), 2);
     }
 
     #[test]
@@ -715,22 +728,36 @@ mod tests {
         runner.set_public_inputs(&[x_val, y_val, z_val]).unwrap();
         let traces = runner.run().unwrap();
 
-        // Verify extension field traces were generated correctly
-        assert_eq!(traces.public_trace.values.len(), 3);
-        assert_eq!(traces.public_trace.values[0], x_val);
-        assert_eq!(traces.public_trace.values[1], y_val);
-        assert_eq!(traces.public_trace.values[2], z_val);
-
-        // Should have one MulAdd operation (fused from y * z + x)
-        assert_eq!(traces.alu_trace.values.len(), 1);
-
-        // Verify MulAdd operation: y * z + x
-        let expected_yz = y_val * z_val;
-        let expected_result = expected_yz + x_val;
-        assert_eq!(traces.alu_trace.values[0][0], y_val);
-        assert_eq!(traces.alu_trace.values[0][1], z_val);
-        assert_eq!(traces.alu_trace.values[0][2], x_val);
-        assert_eq!(traces.alu_trace.values[0][3], expected_result);
+        let yz = y_val * z_val;
+        let result = yz + x_val;
+        assert_eq!(
+            traces,
+            Traces {
+                witness_trace: WitnessTrace::new(vec![
+                    ExtField::ZERO,
+                    x_val,
+                    y_val,
+                    z_val,
+                    yz,
+                    result,
+                ]),
+                const_trace: ConstTrace {
+                    index: vec![WitnessId(0)],
+                    values: vec![ExtField::ZERO],
+                },
+                public_trace: PublicTrace {
+                    index: vec![WitnessId(1), WitnessId(2), WitnessId(3)],
+                    values: vec![x_val, y_val, z_val],
+                },
+                alu_trace: AluTrace {
+                    op_kind: vec![AluOpKind::MulAdd],
+                    values: vec![[y_val, z_val, x_val, result]],
+                    indices: vec![[WitnessId(2), WitnessId(3), WitnessId(1), WitnessId(5)]],
+                },
+                non_primitive_traces: HashMap::new(),
+                tag_to_witness: HashMap::new(),
+            }
+        );
     }
 
     #[test]
