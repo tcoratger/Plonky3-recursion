@@ -1344,7 +1344,6 @@ mod tests {
     use p3_test_utils::baby_bear_params::{BabyBear, BinomialExtensionField};
 
     use super::*;
-    use crate::op::{NpoConfig, NpoTypeId};
 
     #[test]
     fn test_new_builder_initialization() {
