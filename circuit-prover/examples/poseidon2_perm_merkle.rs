@@ -5,7 +5,7 @@ use p3_circuit::op::{NonPrimitiveOpPrivateData, NpoTypeId};
 use p3_circuit::ops::{
     Poseidon2PermPrivateData, generate_poseidon2_trace, generate_recompose_trace,
 };
-use p3_circuit::{CircuitBuilder, ExprId, Poseidon2PermOps};
+use p3_circuit::{CircuitBuilder, ExprId};
 use p3_circuit_prover::batch_stark_prover::{poseidon2_air_builders_d4, recompose_air_builders};
 use p3_circuit_prover::common::{NpoPreprocessor, get_airs_and_degrees_with_prep};
 use p3_circuit_prover::config::KoalaBearConfig;
@@ -171,7 +171,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     ];
 
     let (_row0_op_id, _row0_outputs) =
-        builder.add_poseidon2_perm(p3_circuit::ops::Poseidon2PermCall {
+        builder.add_poseidon2_perm(&p3_circuit::ops::Poseidon2PermCall {
             config: Poseidon2Config::KoalaBearD4Width16,
             new_start: true,
             merkle_path: true,
@@ -189,7 +189,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mmcs_bit_row1 = builder.alloc_const(Ext4::from_prime_subfield(Base::ONE), "mmcs_bit_row1");
     let (row1_op_id, _row1_outputs) =
-        builder.add_poseidon2_perm(p3_circuit::ops::Poseidon2PermCall {
+        builder.add_poseidon2_perm(&p3_circuit::ops::Poseidon2PermCall {
             config: Poseidon2Config::KoalaBearD4Width16,
             new_start: false,
             merkle_path: true,
@@ -203,7 +203,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mmcs_bit_row2 = builder.alloc_const(Ext4::from_prime_subfield(Base::ZERO), "mmcs_bit_row2");
     let sibling2_inputs: Vec<Option<ExprId>> = vec![None; 4];
     let (row2_op_id, row2_outputs) =
-        builder.add_poseidon2_perm(p3_circuit::ops::Poseidon2PermCall {
+        builder.add_poseidon2_perm(&p3_circuit::ops::Poseidon2PermCall {
             config: Poseidon2Config::KoalaBearD4Width16,
             new_start: false,
             merkle_path: true,

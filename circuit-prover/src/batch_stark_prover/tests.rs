@@ -1,6 +1,5 @@
 use p3_baby_bear::BabyBear;
 use p3_circuit::builder::CircuitBuilder;
-use p3_circuit::ops::hash::add_hash_slice;
 use p3_circuit::ops::poseidon2_perm::GoldilocksD2Width8;
 use p3_circuit::ops::{Poseidon2Config, generate_poseidon2_trace, generate_recompose_trace};
 use p3_field::PrimeCharacteristicRing;
@@ -572,7 +571,9 @@ fn test_goldilocks_poseidon2_circuit_build_and_run() {
     builder.enable_recompose::<Goldilocks>(generate_recompose_trace::<Goldilocks, Ext2>);
     let poseidon2_config = Poseidon2Config::GoldilocksD2Width8;
     let inputs = [builder.public_input(), builder.public_input()];
-    let hash_outputs = add_hash_slice(&mut builder, &poseidon2_config, &inputs, true).unwrap();
+    let hash_outputs = builder
+        .add_hash_slice(&poseidon2_config, &inputs, true)
+        .unwrap();
     let expected0 = builder.public_input();
     let expected1 = builder.public_input();
     let sub0 = builder.sub(hash_outputs[0], expected0);

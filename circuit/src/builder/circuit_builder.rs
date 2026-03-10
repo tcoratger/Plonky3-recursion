@@ -23,7 +23,7 @@ use crate::ops::{
 };
 use crate::tables::TraceGeneratorFn;
 use crate::types::{ExprId, NonPrimitiveOpId, WitnessAllocator, WitnessId};
-use crate::{CircuitBuilderError, CircuitError, Poseidon2PermOps};
+use crate::{CircuitBuilderError, CircuitError};
 
 /// Builder for constructing circuits.
 pub struct CircuitBuilder<F: Field> {
@@ -1195,7 +1195,7 @@ where
         // - Outputs 0-1 are CTL-verified (rate elements)
         // - Outputs 2-3 are returned but NOT CTL-verified (capacity elements)
         let width_ext = config.width_ext();
-        let (_op_id, outputs) = self.add_poseidon2_perm(Poseidon2PermCall {
+        let (_op_id, outputs) = self.add_poseidon2_perm(&Poseidon2PermCall {
             config,
             new_start: true, // Each challenger permutation is independent
             merkle_path: false,
@@ -1244,7 +1244,7 @@ where
         // - All 16 inputs are CTL-verified
         // - Outputs 0-7 are CTL-verified (rate elements)
         // - Outputs 8-15 are returned but NOT CTL-verified (capacity elements)
-        let (_op_id, outputs) = self.add_poseidon2_perm_base(Poseidon2PermCallBase {
+        let (_op_id, outputs) = self.add_poseidon2_perm_base(&Poseidon2PermCallBase {
             config,
             new_start: true,          // Each challenger permutation is independent
             inputs: inputs.map(Some), // All 16 inputs are CTL-verified
@@ -1714,7 +1714,7 @@ mod tests {
     #[test]
     fn test_non_primitive_outputs_ordering_and_dedup() {
         use crate::op::Poseidon2Config;
-        use crate::ops::{Poseidon2PermCall, Poseidon2PermOps};
+        use crate::ops::Poseidon2PermCall;
 
         type Ext4 = BinomialExtensionField<BabyBear, 4>;
 
@@ -1726,7 +1726,7 @@ mod tests {
 
         let z = builder.define_const(Ext4::ZERO);
         let (op_id, outputs) = builder
-            .add_poseidon2_perm(Poseidon2PermCall {
+            .add_poseidon2_perm(&Poseidon2PermCall {
                 config: Poseidon2Config::BabyBearD4Width16,
                 new_start: true,
                 merkle_path: false,
