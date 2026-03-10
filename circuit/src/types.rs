@@ -8,7 +8,7 @@ pub struct WitnessId(pub u32);
 
 impl WitnessId {
     /// Follow rewrite chains to find the canonical witness ID.
-    pub fn resolve(self, rewrite: &hashbrown::HashMap<WitnessId, WitnessId>) -> Self {
+    pub fn resolve(self, rewrite: &hashbrown::HashMap<Self, Self>) -> Self {
         let mut cur = self;
         while let Some(&next) = rewrite.get(&cur) {
             cur = next;
