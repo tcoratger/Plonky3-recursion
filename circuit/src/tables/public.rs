@@ -8,7 +8,7 @@ use crate::types::WitnessId;
 ///
 /// Unlike compile-time `Const` values, these inputs are provided at runtime
 /// and are known to both the prover and the verifier.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PublicTrace<F> {
     /// Witness IDs of each public input.
     ///
@@ -84,13 +84,13 @@ mod tests {
         let builder = PublicTraceBuilder::new(&ops, &witness);
         let trace = builder.build().expect("Failed to build trace");
 
-        // Verify the trace contains exactly one public input
-        assert_eq!(trace.index.len(), 1, "Should have one public input");
-        assert_eq!(trace.values.len(), 1, "Should have one public value");
-
-        // Verify the public input is correctly recorded
-        assert_eq!(trace.index[0], out);
-        assert_eq!(trace.values[0], val);
+        assert_eq!(
+            trace,
+            PublicTrace {
+                index: vec![out],
+                values: vec![val],
+            }
+        );
     }
 
     #[test]
@@ -120,17 +120,13 @@ mod tests {
         let builder = PublicTraceBuilder::new(&ops, &witness);
         let trace = builder.build().expect("Failed to build trace");
 
-        // Verify we have exactly two public inputs
-        assert_eq!(trace.index.len(), 2, "Should have two public inputs");
-        assert_eq!(trace.values.len(), 2, "Should have two public values");
-
-        // Verify first public input
-        assert_eq!(trace.index[0], out1);
-        assert_eq!(trace.values[0], val1);
-
-        // Verify second public input
-        assert_eq!(trace.index[1], out2);
-        assert_eq!(trace.values[1], val2);
+        assert_eq!(
+            trace,
+            PublicTrace {
+                index: vec![out1, out2],
+                values: vec![val1, val2],
+            }
+        );
     }
 
     #[test]
@@ -143,9 +139,13 @@ mod tests {
         let builder = PublicTraceBuilder::new(&ops, &witness);
         let trace = builder.build().expect("Failed to build trace");
 
-        // Verify the trace is empty
-        assert_eq!(trace.index.len(), 0, "Should have no public inputs");
-        assert_eq!(trace.values.len(), 0, "Should have no values");
+        assert_eq!(
+            trace,
+            PublicTrace {
+                index: vec![],
+                values: vec![],
+            }
+        );
     }
 
     #[test]
