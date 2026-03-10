@@ -9,7 +9,7 @@ use core::fmt;
 use hashbrown::HashMap;
 
 use crate::CircuitError;
-use crate::op::{NpoTypeId, OpStateMap};
+use crate::ops::{NpoTypeId, OpStateMap};
 use crate::types::WitnessId;
 
 mod alu;

@@ -3,8 +3,9 @@ use alloc::vec::Vec;
 use core::cmp::{Reverse, min};
 
 use itertools::Itertools;
-use p3_circuit::op::{NonPrimitiveOpPrivateData, Poseidon2Config};
-use p3_circuit::ops::{Poseidon2PermCall, Poseidon2PermPrivateData};
+use p3_circuit::ops::{
+    NonPrimitiveOpPrivateData, Poseidon2Config, Poseidon2PermCall, Poseidon2PermPrivateData,
+};
 use p3_circuit::{CircuitBuilder, CircuitBuilderError, CircuitRunner, NonPrimitiveOpId};
 use p3_commit::{BatchOpening, Mmcs, OpenedValues};
 use p3_field::{BasedVectorSpace, ExtensionField, Field, PrimeField64, TwoAdicField};

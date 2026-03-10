@@ -6,7 +6,7 @@ use hashbrown::HashMap;
 use p3_field::Field;
 
 use crate::CircuitBuilderError;
-use crate::op::{HintExecutor, NpoConfig, NpoTypeId, Op};
+use crate::ops::{HintExecutor, NpoConfig, NpoTypeId, Op};
 use crate::tables::TraceGeneratorFn;
 use crate::types::{ExprId, NonPrimitiveOpId, WitnessId};
 

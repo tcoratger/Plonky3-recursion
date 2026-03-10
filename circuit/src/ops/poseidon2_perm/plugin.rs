@@ -11,12 +11,12 @@ use p3_field::Field;
 
 use crate::CircuitBuilderError;
 use crate::builder::{NonPrimitiveOpParams, NpoCircuitPlugin, NpoLoweringContext};
-use crate::op::{NpoTypeId, Op};
 use crate::ops::poseidon2_perm::config::{
     Poseidon2Config, Poseidon2PermBaseConfigData, Poseidon2PermConfigData, Poseidon2PermExec,
     Poseidon2PermExecBase,
 };
 use crate::ops::poseidon2_perm::executor::Poseidon2PermExecutor;
+use crate::ops::{NpoTypeId, Op};
 use crate::tables::TraceGeneratorFn;
 use crate::types::{ExprId, WitnessId};
 
@@ -266,10 +266,10 @@ impl<F: Field> NpoCircuitPlugin<F> for Poseidon2CircuitPlugin<F> {
         self.trace_gen
     }
 
-    fn config(&self) -> crate::op::NpoConfig {
+    fn config(&self) -> crate::ops::NpoConfig {
         match &self.config_payload {
-            Poseidon2PluginConfig::Ext(d) => crate::op::NpoConfig::new(d.clone()),
-            Poseidon2PluginConfig::Base(d) => crate::op::NpoConfig::new(d.clone()),
+            Poseidon2PluginConfig::Ext(d) => crate::ops::NpoConfig::new(d.clone()),
+            Poseidon2PluginConfig::Base(d) => crate::ops::NpoConfig::new(d.clone()),
         }
     }
 }

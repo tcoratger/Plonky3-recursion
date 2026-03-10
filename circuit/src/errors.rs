@@ -3,7 +3,7 @@ use alloc::vec::Vec;
 
 use thiserror::Error;
 
-use crate::op::NpoTypeId;
+use crate::ops::NpoTypeId;
 use crate::types::NonPrimitiveOpId;
 use crate::{CircuitBuilderError, ExprId, WitnessId};
 

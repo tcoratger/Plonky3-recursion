@@ -1,6 +1,6 @@
 use hashbrown::HashSet;
 
-use crate::op::NpoTypeId;
+use crate::ops::NpoTypeId;
 
 /// Policy trait to gate non-primitive ops availability.
 pub trait NonPrimPolicy {

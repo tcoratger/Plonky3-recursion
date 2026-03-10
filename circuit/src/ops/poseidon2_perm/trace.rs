@@ -9,7 +9,7 @@ use core::any::Any;
 use p3_field::{ExtensionField, Field, PrimeCharacteristicRing, PrimeField};
 
 use crate::CircuitError;
-use crate::op::NpoTypeId;
+use crate::ops::NpoTypeId;
 use crate::ops::poseidon2_perm::config::Poseidon2Config;
 use crate::ops::poseidon2_perm::state::Poseidon2ExecutionState;
 use crate::tables::NonPrimitiveTrace;
@@ -161,7 +161,7 @@ pub fn generate_poseidon2_trace<
     F: Field + ExtensionField<Config::BaseField>,
     Config: Poseidon2Params,
 >(
-    op_states: &crate::op::OpStateMap,
+    op_states: &crate::ops::OpStateMap,
 ) -> Result<Option<Box<dyn NonPrimitiveTrace<F>>>, CircuitError> {
     let op_type = NpoTypeId::poseidon2_perm(Config::CONFIG);
     let Some(state) = op_states

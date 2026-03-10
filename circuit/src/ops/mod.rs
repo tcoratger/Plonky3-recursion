@@ -1,8 +1,17 @@
+mod context;
+mod executor;
+mod npo;
+mod op;
+
 pub mod hash;
 pub mod mmcs;
 pub mod poseidon2_perm;
 pub mod recompose;
 
+pub use context::*;
+pub use executor::*;
+pub use npo::*;
+pub use op::*;
 pub use poseidon2_perm::{
     // D=1 configurations for base field challenges
     BabyBearD1Width16,
@@ -17,6 +26,7 @@ pub use poseidon2_perm::{
     Poseidon2PermCallBase,
     // Configuration
     Poseidon2PermExec,
+    Poseidon2PermExecBase,
     Poseidon2PermPrivateData,
     Poseidon2Trace,
     generate_poseidon2_trace,

@@ -6,7 +6,7 @@ use alloc::vec::Vec;
 use p3_field::Field;
 
 use crate::CircuitError;
-use crate::op::ExecutionContext;
+use crate::ops::ExecutionContext;
 use crate::types::WitnessId;
 
 /// Build the complete resolved input array for a Poseidon2 permutation.

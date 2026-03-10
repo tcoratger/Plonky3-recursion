@@ -4,7 +4,7 @@ use p3_air::{Air, AirBuilder, BaseAir, WindowAccess};
 use p3_circuit::builder::{
     CircuitBuilder, NonPrimitiveOperationData, NpoCircuitPlugin, NpoLoweringContext,
 };
-use p3_circuit::op::{
+use p3_circuit::ops::{
     ExecutionContext, NonPrimitiveExecutor, NpoConfig, NpoTypeId, Op, OpStateMap,
 };
 use p3_circuit::tables::{NonPrimitiveTrace, TraceGeneratorFn};

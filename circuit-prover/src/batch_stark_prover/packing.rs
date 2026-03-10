@@ -1,6 +1,6 @@
 use alloc::vec::Vec;
 
-use p3_circuit::op::NpoTypeId;
+use p3_circuit::ops::NpoTypeId;
 use p3_circuit::tables::Traces;
 use p3_field::Field;
 use p3_matrix::Matrix;

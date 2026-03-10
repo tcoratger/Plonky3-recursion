@@ -9,7 +9,7 @@ use alloc::vec::Vec;
 use hashbrown::HashSet;
 
 use crate::ExprId;
-use crate::op::NpoTypeId;
+use crate::ops::NpoTypeId;
 
 /// Type of allocation for debugging purposes
 #[derive(Debug, Clone)]

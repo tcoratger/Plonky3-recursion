@@ -7,7 +7,6 @@ pub mod builder;
 pub mod circuit;
 pub mod errors;
 pub mod expr;
-pub mod op;
 pub mod ops;
 pub mod policy;
 pub mod tables;
@@ -25,6 +24,6 @@ pub use builder::{
 pub use circuit::{Circuit, PreprocessedColumns};
 pub use errors::CircuitError;
 pub use expr::{Expr, ExpressionGraph};
-pub use op::{AluOpKind, HintExecutor, NonPrimitiveOpPrivateData, NpoPrivateData, NpoTypeId, Op};
+pub use ops::{AluOpKind, HintExecutor, NonPrimitiveOpPrivateData, NpoPrivateData, NpoTypeId, Op};
 pub use tables::{CircuitRunner, Traces};
 pub use types::{ExprId, NonPrimitiveOpId, WitnessAllocator, WitnessId};

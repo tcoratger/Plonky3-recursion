@@ -8,8 +8,7 @@ use p3_field::Field;
 use p3_matrix::Dimensions;
 
 use crate::builder::{CircuitBuilder, CircuitBuilderError};
-use crate::op::{NpoTypeId, Poseidon2Config};
-use crate::ops::Poseidon2PermCall;
+use crate::ops::{NpoTypeId, Poseidon2Config, Poseidon2PermCall};
 use crate::types::ExprId;
 use crate::{CircuitError, NonPrimitiveOpId};
 

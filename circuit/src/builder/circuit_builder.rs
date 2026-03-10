@@ -17,10 +17,10 @@ use super::compiler::{ExpressionLowerer, Optimizer};
 use super::npo::{NonPrimitiveOpParams, NonPrimitiveOperationData, NpoCircuitPlugin};
 use super::{BuilderConfig, ExpressionBuilder, PublicInputTracker};
 use crate::circuit::Circuit;
-use crate::op::{HintExecutor, NpoConfig, NpoRegistry, NpoTypeId};
 use crate::ops::poseidon2_perm::Poseidon2CircuitPlugin;
 use crate::ops::{
-    Poseidon2Params, Poseidon2PermCall, Poseidon2PermCallBase, RecomposeCircuitPlugin,
+    HintExecutor, NpoConfig, NpoRegistry, NpoTypeId, Poseidon2Params, Poseidon2PermCall,
+    Poseidon2PermCallBase, RecomposeCircuitPlugin,
 };
 use crate::tables::TraceGeneratorFn;
 use crate::types::{ExprId, NonPrimitiveOpId, WitnessAllocator, WitnessId};
@@ -138,7 +138,7 @@ where
         let d = Config::D;
         let width_ext = Config::WIDTH_EXT;
         let width = Config::WIDTH;
-        let exec: crate::op::Poseidon2PermExec<F> = Arc::new(move |input: &[F]| {
+        let exec: crate::ops::Poseidon2PermExec<F> = Arc::new(move |input: &[F]| {
             let mut base_input = vec![Config::BaseField::ZERO; width];
             for (i, ext_elem) in input.iter().enumerate() {
                 let coeffs = ext_elem.as_basis_coefficients_slice();
@@ -180,7 +180,7 @@ where
         );
         let d = Config::D;
         let width_ext = Config::WIDTH_EXT;
-        let exec: crate::op::Poseidon2PermExec<F> = Arc::new(move |input: &[F]| {
+        let exec: crate::ops::Poseidon2PermExec<F> = Arc::new(move |input: &[F]| {
             let mut base_input = vec![Config::BaseField::ZERO; 8];
             for (i, ext_elem) in input.iter().enumerate() {
                 let coeffs = ext_elem.as_basis_coefficients_slice();
@@ -232,7 +232,7 @@ where
         );
 
         // For D=1, the exec closure operates directly on 16 base field elements
-        let exec: crate::op::Poseidon2PermExecBase<F> =
+        let exec: crate::ops::Poseidon2PermExecBase<F> =
             Arc::new(move |input: &[F; 16]| perm.permute(*input));
 
         let plugin = Poseidon2CircuitPlugin::new_base(Config::CONFIG, exec, trace_generator);
@@ -1468,7 +1468,7 @@ mod tests {
         assert!(circuit.enabled_ops.is_empty());
 
         match &circuit.ops[0] {
-            crate::op::Op::Const { out, val } => {
+            crate::ops::Op::Const { out, val } => {
                 assert_eq!(*out, WitnessId(0));
                 assert_eq!(*val, BabyBear::ZERO);
             }
@@ -1491,7 +1491,7 @@ mod tests {
         assert_eq!(circuit.ops.len(), 3);
 
         match &circuit.ops[0] {
-            crate::op::Op::Const { out, val } => {
+            crate::ops::Op::Const { out, val } => {
                 assert_eq!(*out, WitnessId(0));
                 assert_eq!(*val, BabyBear::ZERO);
             }
@@ -1499,7 +1499,7 @@ mod tests {
         }
 
         match &circuit.ops[1] {
-            crate::op::Op::Public { out, public_pos } => {
+            crate::ops::Op::Public { out, public_pos } => {
                 assert_eq!(*out, WitnessId(1));
                 assert_eq!(*public_pos, 0);
             }
@@ -1507,7 +1507,7 @@ mod tests {
         }
 
         match &circuit.ops[2] {
-            crate::op::Op::Public { out, public_pos } => {
+            crate::ops::Op::Public { out, public_pos } => {
                 assert_eq!(*out, WitnessId(2));
                 assert_eq!(*public_pos, 1);
             }
@@ -1533,7 +1533,7 @@ mod tests {
         assert_eq!(circuit.ops.len(), 3);
 
         match &circuit.ops[0] {
-            crate::op::Op::Const { out, val } => {
+            crate::ops::Op::Const { out, val } => {
                 assert_eq!(*out, WitnessId(0));
                 assert_eq!(*val, BabyBear::ZERO);
             }
@@ -1541,7 +1541,7 @@ mod tests {
         }
 
         match &circuit.ops[1] {
-            crate::op::Op::Const { out, val } => {
+            crate::ops::Op::Const { out, val } => {
                 assert_eq!(*out, WitnessId(1));
                 assert_eq!(*val, BabyBear::from_u64(1));
             }
@@ -1549,7 +1549,7 @@ mod tests {
         }
 
         match &circuit.ops[2] {
-            crate::op::Op::Const { out, val } => {
+            crate::ops::Op::Const { out, val } => {
                 assert_eq!(*out, WitnessId(2));
                 assert_eq!(*val, BabyBear::from_u64(2));
             }
@@ -1575,8 +1575,8 @@ mod tests {
         let has_alu_add = circuit.ops.iter().any(|op| {
             matches!(
                 op,
-                crate::op::Op::Alu {
-                    kind: crate::op::AluOpKind::Add,
+                crate::ops::Op::Alu {
+                    kind: crate::ops::AluOpKind::Add,
                     ..
                 }
             )
@@ -1615,8 +1615,7 @@ mod tests {
 
     #[test]
     fn test_non_primitive_outputs_ordering_and_dedup() {
-        use crate::op::Poseidon2Config;
-        use crate::ops::Poseidon2PermCall;
+        use crate::ops::{Poseidon2Config, Poseidon2PermCall};
 
         type Ext4 = BinomialExtensionField<BabyBear, 4>;
 
@@ -1654,7 +1653,7 @@ mod tests {
             .iter()
             .enumerate()
             .filter_map(|(i, op)| match op {
-                crate::op::Op::NonPrimitiveOpWithExecutor { op_id: oid, .. } if *oid == op_id => {
+                crate::ops::Op::NonPrimitiveOpWithExecutor { op_id: oid, .. } if *oid == op_id => {
                     Some(i)
                 }
                 _ => None,
@@ -1674,8 +1673,8 @@ mod tests {
             .ops
             .iter()
             .position(|op| match op {
-                crate::op::Op::Alu {
-                    kind: crate::op::AluOpKind::Add,
+                crate::ops::Op::Alu {
+                    kind: crate::ops::AluOpKind::Add,
                     a,
                     b,
                     out,
@@ -1692,8 +1691,8 @@ mod tests {
             .ops
             .iter()
             .position(|op| match op {
-                crate::op::Op::Alu {
-                    kind: crate::op::AluOpKind::Add,
+                crate::ops::Op::Alu {
+                    kind: crate::ops::AluOpKind::Add,
                     a,
                     b,
                     out,
