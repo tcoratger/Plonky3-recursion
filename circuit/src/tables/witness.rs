@@ -6,7 +6,7 @@ use crate::types::WitnessId;
 ///
 /// Holds all intermediate computation values produced during circuit execution.
 /// It exists only as a convenient value store for inspection.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WitnessTrace<F> {
     /// Sequential witness IDs: WitnessId(0), WitnessId(1), WitnessId(2), ...
     ///

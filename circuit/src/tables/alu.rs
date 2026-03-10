@@ -36,7 +36,7 @@ pub struct AluOpRecord<F> {
 /// - Mul: a * b = out
 /// - BoolCheck: a * (a - 1) = 0, out = a
 /// - MulAdd: a * b + c = out
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AluTrace<F> {
     /// Operation kind for each row
     pub op_kind: Vec<AluOpKind>,

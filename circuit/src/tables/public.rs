@@ -8,7 +8,7 @@ use crate::types::WitnessId;
 ///
 /// Unlike compile-time `Const` values, these inputs are provided at runtime
 /// and are known to both the prover and the verifier.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PublicTrace<F> {
     /// Witness IDs of each public input.
     ///

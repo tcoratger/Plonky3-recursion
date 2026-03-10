@@ -9,7 +9,7 @@ use crate::types::WitnessId;
 /// Stores all compile-time known constant values used in the circuit.
 /// Each constant binds to a specific witness ID.
 /// Both prover and verifier know these values in advance.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConstTrace<F> {
     /// Witness IDs that each constant binds to.
     ///
