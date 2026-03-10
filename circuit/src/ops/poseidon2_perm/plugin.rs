@@ -2,7 +2,6 @@
 
 use alloc::boxed::Box;
 use alloc::string::ToString;
-use alloc::sync::Arc;
 use alloc::vec::Vec;
 use alloc::{format, vec};
 
@@ -13,18 +12,11 @@ use crate::CircuitBuilderError;
 use crate::builder::{NonPrimitiveOpParams, NpoCircuitPlugin, NpoLoweringContext};
 use crate::op::{NpoTypeId, Op};
 use crate::ops::poseidon2_perm::config::{
-    Poseidon2Config, Poseidon2PermBaseConfigData, Poseidon2PermConfigData, Poseidon2PermExec,
-    Poseidon2PermExecBase,
+    Poseidon2Config, Poseidon2PermConfigData, Poseidon2PermExec,
 };
 use crate::ops::poseidon2_perm::executor::Poseidon2PermExecutor;
 use crate::tables::TraceGeneratorFn;
 use crate::types::{ExprId, WitnessId};
-
-/// Internal enum to hold either extension or base-field config payload.
-enum Poseidon2PluginConfig<F> {
-    Ext(Poseidon2PermConfigData<F>),
-    Base(Poseidon2PermBaseConfigData<F>),
-}
 
 /// Resolve an `ExprId` to its `WitnessId`, returning an error with context on failure.
 fn resolve_witness_id(
@@ -77,37 +69,22 @@ fn lower_expr_slots(
 pub struct Poseidon2CircuitPlugin<F: Field> {
     type_id: NpoTypeId,
     poseidon2_config: Poseidon2Config,
-    config_payload: Poseidon2PluginConfig<F>,
+    npo_config: crate::op::NpoConfig,
     trace_gen: TraceGeneratorFn<F>,
 }
 
 impl<F: Field> Poseidon2CircuitPlugin<F> {
-    pub fn new_ext(
+    pub fn new(
         config: Poseidon2Config,
         exec: Poseidon2PermExec<F>,
         trace_gen: TraceGeneratorFn<F>,
     ) -> Self {
         let type_id = NpoTypeId::poseidon2_perm(config);
-        let payload = Poseidon2PluginConfig::Ext(Poseidon2PermConfigData { config, exec });
+        let npo_config = crate::op::NpoConfig::new(Poseidon2PermConfigData { config, exec });
         Self {
             type_id,
             poseidon2_config: config,
-            config_payload: payload,
-            trace_gen,
-        }
-    }
-
-    pub fn new_base(
-        config: Poseidon2Config,
-        exec: Poseidon2PermExecBase<F>,
-        trace_gen: TraceGeneratorFn<F>,
-    ) -> Self {
-        let type_id = NpoTypeId::poseidon2_perm(config);
-        let payload = Poseidon2PluginConfig::Base(Poseidon2PermBaseConfigData { config, exec });
-        Self {
-            type_id,
-            poseidon2_config: config,
-            config_payload: payload,
+            npo_config,
             trace_gen,
         }
     }
@@ -116,19 +93,9 @@ impl<F: Field> Poseidon2CircuitPlugin<F> {
     ///
     /// The executor will panic if actually invoked.
     pub fn new_config_only(config: Poseidon2Config) -> Self {
-        let type_id = NpoTypeId::poseidon2_perm(config);
         let dummy_exec: Poseidon2PermExec<F> =
-            Arc::new(|_| panic!("Poseidon2PermExec used without proper registration"));
-        let payload = Poseidon2PluginConfig::Ext(Poseidon2PermConfigData {
-            config,
-            exec: dummy_exec,
-        });
-        Self {
-            type_id,
-            poseidon2_config: config,
-            config_payload: payload,
-            trace_gen: |_| Ok(None),
-        }
+            Box::new(|_| panic!("Poseidon2PermExec used without proper registration"));
+        Self::new(config, dummy_exec, |_| Ok(None))
     }
 }
 
@@ -267,9 +234,6 @@ impl<F: Field> NpoCircuitPlugin<F> for Poseidon2CircuitPlugin<F> {
     }
 
     fn config(&self) -> crate::op::NpoConfig {
-        match &self.config_payload {
-            Poseidon2PluginConfig::Ext(d) => crate::op::NpoConfig::new(d.clone()),
-            Poseidon2PluginConfig::Base(d) => crate::op::NpoConfig::new(d.clone()),
-        }
+        self.npo_config.clone()
     }
 }

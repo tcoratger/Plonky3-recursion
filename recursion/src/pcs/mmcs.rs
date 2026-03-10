@@ -3,7 +3,7 @@ use alloc::vec::Vec;
 use core::cmp::{Reverse, min};
 
 use itertools::Itertools;
-use p3_circuit::op::{NonPrimitiveOpPrivateData, Poseidon2Config};
+use p3_circuit::op::{NpoPrivateData, Poseidon2Config};
 use p3_circuit::ops::{Poseidon2PermCall, Poseidon2PermPrivateData};
 use p3_circuit::{CircuitBuilder, CircuitBuilderError, CircuitRunner, NonPrimitiveOpId};
 use p3_commit::{BatchOpening, Mmcs, OpenedValues};
@@ -522,7 +522,7 @@ where
                 runner
                     .set_private_data(
                         op_ids[op_idx],
-                        NonPrimitiveOpPrivateData::new(Poseidon2PermPrivateData { sibling }),
+                        NpoPrivateData::new(Poseidon2PermPrivateData { sibling }),
                     )
                     .map_err(|_| "Failed to set private data for input batch MMCS")?;
                 op_idx += 1;
@@ -541,7 +541,7 @@ where
                 runner
                     .set_private_data(
                         op_ids[op_idx],
-                        NonPrimitiveOpPrivateData::new(Poseidon2PermPrivateData { sibling }),
+                        NpoPrivateData::new(Poseidon2PermPrivateData { sibling }),
                     )
                     .map_err(|_| "Failed to set private data for commit-phase MMCS")?;
                 op_idx += 1;
@@ -746,7 +746,7 @@ mod test {
                 runner
                     .set_private_data(
                         op_id,
-                        NonPrimitiveOpPrivateData::new(Poseidon2PermPrivateData {
+                        NpoPrivateData::new(Poseidon2PermPrivateData {
                             sibling: sibling_arr,
                         }),
                     )
@@ -1044,7 +1044,7 @@ mod test {
             runner
                 .set_private_data(
                     op_id,
-                    NonPrimitiveOpPrivateData::new(Poseidon2PermPrivateData { sibling }),
+                    NpoPrivateData::new(Poseidon2PermPrivateData { sibling }),
                 )
                 .unwrap();
         }
@@ -1221,7 +1221,7 @@ mod test {
                 runner
                     .set_private_data(
                         op_id,
-                        NonPrimitiveOpPrivateData::new(Poseidon2PermPrivateData {
+                        NpoPrivateData::new(Poseidon2PermPrivateData {
                             sibling: sibling_arr,
                         }),
                     )
@@ -1379,7 +1379,7 @@ mod test {
                 runner
                     .set_private_data(
                         op_id,
-                        NonPrimitiveOpPrivateData::new(Poseidon2PermPrivateData {
+                        NpoPrivateData::new(Poseidon2PermPrivateData {
                             sibling: sibling_arr,
                         }),
                     )

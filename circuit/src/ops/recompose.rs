@@ -29,10 +29,11 @@ use crate::{CircuitError, PreprocessedColumns};
 // ============================================================================
 
 /// Config payload stored in `NpoConfig` for recompose tables.
+///
+/// Currently unused by downstream consumers, but required by the
+/// `NpoCircuitPlugin::config()` trait method.
 #[derive(Debug, Clone)]
-pub struct RecomposeConfig {
-    pub d: usize,
-}
+pub(crate) struct RecomposeConfig;
 
 // ============================================================================
 // Execution State
@@ -70,7 +71,7 @@ impl<F: Send + Sync + Debug + 'static> OpExecutionState for RecomposeExecutionSt
 
 /// Type-erased recompose function: takes D extension-field values (each embedding
 /// a base-field coefficient) and returns the properly recomposed extension-field value.
-pub type RecomposeFn<F> = Arc<dyn Fn(&[F]) -> F + Send + Sync>;
+pub(crate) type RecomposeFn<F> = Arc<dyn Fn(&[F]) -> F + Send + Sync>;
 
 /// Executor for recompose operations.
 ///
@@ -198,7 +199,7 @@ impl<F: Field + Send + Sync + 'static> NonPrimitiveExecutor<F> for RecomposeExec
 // ============================================================================
 
 /// Circuit-layer plugin for recompose non-primitive operations.
-pub struct RecomposeCircuitPlugin<F: Field> {
+pub(crate) struct RecomposeCircuitPlugin<F: Field> {
     d: usize,
     trace_gen: TraceGeneratorFn<F>,
     recompose_fn: RecomposeFn<F>,
@@ -310,7 +311,7 @@ where
     }
 
     fn config(&self) -> crate::op::NpoConfig {
-        crate::op::NpoConfig::new(RecomposeConfig { d: self.d })
+        crate::op::NpoConfig::new(RecomposeConfig)
     }
 }
 

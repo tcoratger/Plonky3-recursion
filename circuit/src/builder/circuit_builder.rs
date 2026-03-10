@@ -18,9 +18,8 @@ use super::{BuilderConfig, ExpressionBuilder, PublicInputTracker};
 use crate::circuit::Circuit;
 use crate::op::{HintExecutor, NpoConfig, NpoRegistry, NpoTypeId, Op, Poseidon2Config};
 use crate::ops::poseidon2_perm::Poseidon2CircuitPlugin;
-use crate::ops::{
-    Poseidon2Params, Poseidon2PermCall, Poseidon2PermCallBase, RecomposeCircuitPlugin,
-};
+use crate::ops::recompose::RecomposeCircuitPlugin;
+use crate::ops::{Poseidon2Params, Poseidon2PermCall, Poseidon2PermCallBase};
 use crate::tables::TraceGeneratorFn;
 use crate::types::{ExprId, NonPrimitiveOpId, WitnessAllocator, WitnessId};
 use crate::{CircuitBuilderError, CircuitError};
@@ -235,29 +234,30 @@ where
         let d = Config::D;
         let width_ext = Config::WIDTH_EXT;
         let width = Config::WIDTH;
-        let exec: crate::op::Poseidon2PermExec<F> = Arc::new(move |input: &[F]| {
-            let mut base_input = vec![Config::BaseField::ZERO; width];
-            for (i, ext_elem) in input.iter().enumerate() {
-                let coeffs = ext_elem.as_basis_coefficients_slice();
-                base_input[i * d..(i + 1) * d].copy_from_slice(coeffs);
-            }
-            let base_output = perm.permute(
-                base_input
-                    .try_into()
-                    .expect("base_input length must equal WIDTH"),
-            );
-            let mut output = Vec::with_capacity(width_ext);
-            for i in 0..width_ext {
-                let coeffs = &base_output[i * d..(i + 1) * d];
-                output.push(
-                    F::from_basis_coefficients_slice(coeffs)
-                        .expect("basis coefficients should be valid"),
+        let exec: crate::ops::poseidon2_perm::Poseidon2PermExec<F> =
+            Box::new(move |input: &[F]| {
+                let mut base_input = vec![Config::BaseField::ZERO; width];
+                for (i, ext_elem) in input.iter().enumerate() {
+                    let coeffs = ext_elem.as_basis_coefficients_slice();
+                    base_input[i * d..(i + 1) * d].copy_from_slice(coeffs);
+                }
+                let base_output = perm.permute(
+                    base_input
+                        .try_into()
+                        .expect("base_input length must equal WIDTH"),
                 );
-            }
-            output
-        });
+                let mut output = Vec::with_capacity(width_ext);
+                for i in 0..width_ext {
+                    let coeffs = &base_output[i * d..(i + 1) * d];
+                    output.push(
+                        F::from_basis_coefficients_slice(coeffs)
+                            .expect("basis coefficients should be valid"),
+                    );
+                }
+                output
+            });
 
-        let plugin = Poseidon2CircuitPlugin::new_ext(Config::CONFIG, exec, trace_generator);
+        let plugin = Poseidon2CircuitPlugin::new(Config::CONFIG, exec, trace_generator);
         self.register_npo(plugin);
     }
 
@@ -277,28 +277,29 @@ where
         );
         let d = Config::D;
         let width_ext = Config::WIDTH_EXT;
-        let exec: crate::op::Poseidon2PermExec<F> = Arc::new(move |input: &[F]| {
-            let mut base_input = vec![Config::BaseField::ZERO; 8];
-            for (i, ext_elem) in input.iter().enumerate() {
-                let coeffs = ext_elem.as_basis_coefficients_slice();
-                base_input[i * d..(i + 1) * d].copy_from_slice(coeffs);
-            }
-            let base_output = perm.permute(
-                base_input
-                    .try_into()
-                    .expect("base_input length must equal 8"),
-            );
-            let mut output = Vec::with_capacity(width_ext);
-            for i in 0..width_ext {
-                let coeffs = &base_output[i * d..(i + 1) * d];
-                output.push(
-                    F::from_basis_coefficients_slice(coeffs)
-                        .expect("basis coefficients should be valid"),
+        let exec: crate::ops::poseidon2_perm::Poseidon2PermExec<F> =
+            Box::new(move |input: &[F]| {
+                let mut base_input = vec![Config::BaseField::ZERO; 8];
+                for (i, ext_elem) in input.iter().enumerate() {
+                    let coeffs = ext_elem.as_basis_coefficients_slice();
+                    base_input[i * d..(i + 1) * d].copy_from_slice(coeffs);
+                }
+                let base_output = perm.permute(
+                    base_input
+                        .try_into()
+                        .expect("base_input length must equal 8"),
                 );
-            }
-            output
-        });
-        let plugin = Poseidon2CircuitPlugin::new_ext(Config::CONFIG, exec, trace_generator);
+                let mut output = Vec::with_capacity(width_ext);
+                for i in 0..width_ext {
+                    let coeffs = &base_output[i * d..(i + 1) * d];
+                    output.push(
+                        F::from_basis_coefficients_slice(coeffs)
+                            .expect("basis coefficients should be valid"),
+                    );
+                }
+                output
+            });
+        let plugin = Poseidon2CircuitPlugin::new(Config::CONFIG, exec, trace_generator);
         self.register_npo(plugin);
     }
 
@@ -328,11 +329,14 @@ where
             "enable_poseidon2_perm_base only supports WIDTH=16"
         );
 
-        // For D=1, the exec closure operates directly on 16 base field elements
-        let exec: crate::op::Poseidon2PermExecBase<F> =
-            Arc::new(move |input: &[F; 16]| perm.permute(*input));
+        // For D=1, the exec closure converts slice to/from [F; 16]
+        let exec: crate::ops::poseidon2_perm::Poseidon2PermExec<F> =
+            Box::new(move |input: &[F]| {
+                let arr: [F; 16] = input.try_into().expect("D=1 input must have 16 elements");
+                perm.permute(arr).to_vec()
+            });
 
-        let plugin = Poseidon2CircuitPlugin::new_base(Config::CONFIG, exec, trace_generator);
+        let plugin = Poseidon2CircuitPlugin::new(Config::CONFIG, exec, trace_generator);
         self.register_npo(plugin);
     }
 

@@ -86,23 +86,20 @@ impl<F: Field> CircuitBuilder<F> {
             });
         }
 
-        let mut input_exprs: Vec<Vec<ExprId>> = Vec::with_capacity(16);
-        for element in &call.inputs {
-            input_exprs.push(element.map_or_else(Vec::new, |v| vec![v]));
-        }
+        let input_exprs: [Vec<ExprId>; 16] = call
+            .inputs
+            .map(|opt| opt.map_or_else(Vec::new, |v| vec![v]));
 
-        let output_labels: Vec<Option<&'static str>> = (0..16)
-            .map(|i| match i {
-                0..8 if call.out_ctl[i] => Some("poseidon2_perm_base_out"),
-                8..16 if call.return_all_outputs => Some("poseidon2_perm_base_out_capacity"),
-                _ => None,
-            })
-            .collect();
+        let output_labels: [Option<&'static str>; 16] = core::array::from_fn(|i| match i {
+            0..8 if call.out_ctl[i] => Some("poseidon2_perm_base_out"),
+            8..16 if call.return_all_outputs => Some("poseidon2_perm_base_out_capacity"),
+            _ => None,
+        });
 
         let (op_id, _call_expr_id, outputs) = self.push_non_primitive_op_with_outputs(
             op_type,
-            input_exprs,
-            output_labels,
+            input_exprs.into(),
+            output_labels.into(),
             Some(NonPrimitiveOpParams::Poseidon2Perm {
                 new_start: call.new_start,
                 merkle_path: false,

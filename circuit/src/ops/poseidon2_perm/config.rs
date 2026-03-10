@@ -1,6 +1,6 @@
 //! Poseidon2 configuration types and execution closures.
 
-use alloc::sync::Arc;
+use alloc::boxed::Box;
 use alloc::vec::Vec;
 
 use serde::{Deserialize, Serialize};
@@ -141,25 +141,16 @@ impl Poseidon2Config {
     }
 }
 
-/// Poseidon2 permutation execution closure (extension field mode).
-/// Takes width_ext extension field limbs and returns width_ext output limbs.
-pub type Poseidon2PermExec<F> = Arc<dyn Fn(&[F]) -> Vec<F> + Send + Sync>;
-
-/// Type alias for the Poseidon2 permutation execution closure for D=1 (base field).
+/// Poseidon2 permutation execution closure.
 ///
-/// The closure takes 16 base field elements and returns 16 base field elements.
-pub type Poseidon2PermExecBase<F> = Arc<dyn Fn(&[F; 16]) -> [F; 16] + Send + Sync>;
+/// Takes `width_ext` field elements and returns `width_ext` output elements.
+/// For D=1 mode, `width_ext == width` and the elements are base field values.
+pub type Poseidon2PermExec<F> = Box<dyn Fn(&[F]) -> Vec<F> + Send + Sync>;
 
-/// Config data stored inside `NpoConfig` for Poseidon2 D>=2 (extension field) mode.
-#[derive(Clone)]
+/// Config data stored inside `NpoConfig` for Poseidon2 operations.
+///
+/// Stored behind `NpoConfig(Arc<dyn Any>)`, so cloning happens at the Arc level.
 pub struct Poseidon2PermConfigData<F> {
     pub config: Poseidon2Config,
     pub exec: Poseidon2PermExec<F>,
-}
-
-/// Config data stored inside `NpoConfig` for Poseidon2 D=1 (base field) mode.
-#[derive(Clone)]
-pub struct Poseidon2PermBaseConfigData<F> {
-    pub config: Poseidon2Config,
-    pub exec: Poseidon2PermExecBase<F>,
 }

@@ -12,8 +12,8 @@ use p3_field::{Field, PrimeCharacteristicRing};
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumCount;
 
-// Re-export Poseidon2 config types from their canonical location
-pub use crate::ops::poseidon2_perm::{Poseidon2Config, Poseidon2PermExec, Poseidon2PermExecBase};
+// Re-export Poseidon2 config type from its canonical location.
+pub use crate::ops::poseidon2_perm::Poseidon2Config;
 use crate::types::{NonPrimitiveOpId, WitnessId};
 use crate::{CircuitError, NpoCircuitPlugin, PreprocessedColumns};
 
@@ -455,9 +455,6 @@ pub type NpoRegistry<F> = HashMap<NpoTypeId, Arc<dyn NpoCircuitPlugin<F>>>;
 /// this wrapper. The core infrastructure never inspects the contents.
 pub struct NpoConfig(pub(crate) Arc<dyn Any + Send + Sync>);
 
-/// Backward-compatible alias during migration.
-pub type NonPrimitiveOpConfig = NpoConfig;
-
 impl NpoConfig {
     /// Wrap a concrete config value.
     pub fn new<T: Any + Send + Sync>(val: T) -> Self {
@@ -509,9 +506,6 @@ impl Debug for NpoConfig {
 /// Each NPO plugin both produces and consumes its own typed data through
 /// this wrapper. The core infrastructure never inspects the contents.
 pub struct NpoPrivateData(pub(crate) Box<dyn Any + Send + Sync>);
-
-/// Backward-compatible alias during migration.
-pub type NonPrimitiveOpPrivateData = NpoPrivateData;
 
 impl NpoPrivateData {
     /// Wrap concrete private data.
