@@ -277,7 +277,7 @@ where
         );
         let d = Config::D;
         let width_ext = Config::WIDTH_EXT;
-        let exec: crate::ops::poseidon2_perm::Poseidon2PermExec<F> =
+        let exec: Poseidon2PermExec<F> =
             Box::new(move |input: &[F]| {
                 let mut base_input = vec![Config::BaseField::ZERO; 8];
                 for (i, ext_elem) in input.iter().enumerate() {
