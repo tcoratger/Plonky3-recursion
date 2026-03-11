@@ -12,6 +12,7 @@ use crate::types::{ExprId, NonPrimitiveOpId, WitnessId};
 use crate::{AluOpKind, CircuitError};
 
 /// Preprocessed data for primitive and non-primitive operation tables.
+#[derive(Debug)]
 pub struct PreprocessedColumns<F> {
     pub primitive: Vec<Vec<F>>,
     pub non_primitive: NonPrimitivePreprocessedMap<F>,
@@ -29,6 +30,18 @@ pub struct PreprocessedColumns<F> {
     /// a reader, not the creator. Populated by `generate_preprocessed_columns`.
     pub dup_npo_outputs: HashMap<NpoTypeId, Vec<bool>>,
 }
+
+impl<F: PartialEq> PartialEq for PreprocessedColumns<F> {
+    fn eq(&self, other: &Self) -> bool {
+        self.primitive == other.primitive
+            && self.d == other.d
+            && self.ext_reads == other.ext_reads
+            && self.non_primitive == other.non_primitive
+            && self.dup_npo_outputs == other.dup_npo_outputs
+    }
+}
+
+impl<F: Eq> Eq for PreprocessedColumns<F> {}
 
 impl<F: Field + Clone> Clone for PreprocessedColumns<F> {
     fn clone(&self) -> Self {
@@ -491,12 +504,16 @@ mod tests {
         circuit.witness_count = 1;
         let result = circuit.generate_preprocessed_columns(1).unwrap();
 
-        assert_eq!(result.primitive.len(), PrimitiveOpType::COUNT);
-        assert!(result.primitive[PrimitiveOpType::Const as usize].is_empty());
-        assert!(result.primitive[PrimitiveOpType::Public as usize].is_empty());
-        assert!(result.primitive[PrimitiveOpType::Alu as usize].is_empty());
-        // ext_reads sized to at least witness_count
-        assert_eq!(result.ext_reads.len(), 1);
+        assert_eq!(
+            result,
+            PreprocessedColumns {
+                primitive: vec![vec![]; PrimitiveOpType::COUNT],
+                non_primitive: HashMap::new(),
+                d: 1,
+                ext_reads: vec![0],
+                dup_npo_outputs: HashMap::new(),
+            }
+        );
     }
 
     #[test]
@@ -526,91 +543,74 @@ mod tests {
         let circuit = make_circuit(ops);
         let result = circuit.generate_preprocessed_columns(1).unwrap();
 
-        // Const column: D-scaled output indices in order (D=1, no scaling)
+        let f = F::from_u32;
         assert_eq!(
-            result.primitive[PrimitiveOpType::Const as usize],
-            vec![F::ZERO, F::from_u32(2)]
+            result,
+            PreprocessedColumns {
+                primitive: vec![
+                    // Const: D-scaled output indices
+                    vec![F::ZERO, f(2)],
+                    // Public: D-scaled output index
+                    vec![f(1)],
+                    // ALU: [sel_add_vs_mul, sel_bool, sel_muladd, sel_horner, a, b, c, out,
+                    //       a_is_reader, b_is_creator, c_is_reader, out_is_creator] per op
+                    vec![
+                        // add(0, 1, 3): forward, a=0(defined), c=0(defined)
+                        F::ONE,
+                        F::ZERO,
+                        F::ZERO,
+                        F::ZERO,
+                        F::ZERO,
+                        f(1),
+                        F::ZERO,
+                        f(3),
+                        F::ONE,
+                        F::ZERO,
+                        F::ONE,
+                        F::ONE,
+                        // add(3, 2, 4): forward, a=3(defined), c=0(defined)
+                        F::ONE,
+                        F::ZERO,
+                        F::ZERO,
+                        F::ZERO,
+                        f(3),
+                        f(2),
+                        F::ZERO,
+                        f(4),
+                        F::ONE,
+                        F::ZERO,
+                        F::ONE,
+                        F::ONE,
+                        // mul(4, 2, 5): forward, a=4(defined), c=0(defined)
+                        F::ZERO,
+                        F::ZERO,
+                        F::ZERO,
+                        F::ZERO,
+                        f(4),
+                        f(2),
+                        F::ZERO,
+                        f(5),
+                        F::ONE,
+                        F::ZERO,
+                        F::ONE,
+                        F::ONE,
+                    ],
+                ],
+                non_primitive: HashMap::new(),
+                d: 1,
+                // ext_reads: wid0=4 (a+c in op1, c in op2, c in op3),
+                //            wid1=1, wid2=2 (b in op2+op3), wid3=1, wid4=1
+                ext_reads: vec![4, 1, 2, 1, 1],
+                dup_npo_outputs: HashMap::new(),
+            }
         );
-
-        // Public column: D-scaled output index
-        assert_eq!(
-            result.primitive[PrimitiveOpType::Public as usize],
-            vec![F::from_u32(1)]
-        );
-
-        // ALU column: [sel1, sel2, sel3, sel4, a, b, c, out, a_is_reader, b_is_creator, c_is_reader, out_is_creator] per op
-        // All operands are Const/Public defined: a_is_reader=1, c_is_reader=1. All forward: out_is_creator=1.
-        let expected_alu = vec![
-            // add(0, 1, 3): forward, a=0(defined), c=0(defined) → a_is_reader=1, c_is_reader=1
-            F::ONE,
-            F::ZERO,
-            F::ZERO,
-            F::ZERO,
-            F::ZERO,
-            F::from_u32(1),
-            F::ZERO,
-            F::from_u32(3),
-            F::ONE,
-            F::ZERO,
-            F::ONE,
-            F::ONE,
-            // add(3, 2, 4): forward, a=3(defined by prev ALU), c=0(defined) → a_is_reader=1, c_is_reader=1
-            F::ONE,
-            F::ZERO,
-            F::ZERO,
-            F::ZERO,
-            F::from_u32(3),
-            F::from_u32(2),
-            F::ZERO,
-            F::from_u32(4),
-            F::ONE,
-            F::ZERO,
-            F::ONE,
-            F::ONE,
-            // mul(4, 2, 5): forward, a=4(defined by prev ALU), c=0(defined) → a_is_reader=1, c_is_reader=1
-            F::ZERO,
-            F::ZERO,
-            F::ZERO,
-            F::ZERO, // sel_horner
-            F::from_u32(4),
-            F::from_u32(2),
-            F::ZERO,
-            F::from_u32(5),
-            F::ONE,
-            F::ZERO,
-            F::ONE,
-            F::ONE,
-        ];
-        assert_eq!(
-            result.primitive[PrimitiveOpType::Alu as usize],
-            expected_alu
-        );
-
-        // ext_reads[i] = number of times WitnessId(i) is read by ALU inputs (a, b, c).
-        // Const/Public outputs are NOT reads. ALU outputs are NOT reads.
-        // add(0, 1, 3): reads 0(a), 1(b), 0(c=default)
-        // add(3, 2, 4): reads 3(a), 2(b), 0(c=default)
-        // mul(4, 2, 5): reads 4(a), 2(b), 0(c=default)
-        // Index 0: 1(a) + 1(c_default) + 1(c_default) + 1(c_default) = 4? Wait:
-        // add(0,1,3): a=0, b=1, c=WitnessId(0) → reads 0,1,0
-        // add(3,2,4): a=3, b=2, c=WitnessId(0) → reads 3,2,0
-        // mul(4,2,5): a=4, b=2, c=WitnessId(0) → reads 4,2,0
-        // Index 0: 3 reads (a from op1 + c_default from all 3 ops = 1+3=4? No: a=0 for op1, plus c=0 for ops 1,2,3)
-        // Actually op1: a=WitnessId(0), c=WitnessId(0) → 2 reads for wid 0
-        // op2: a=WitnessId(3), c=WitnessId(0) → 1 read for wid 0
-        // op3: a=WitnessId(4), c=WitnessId(0) → 1 read for wid 0
-        // Total reads for wid 0: 2 + 1 + 1 = 4
-        assert_eq!(result.ext_reads[0], 4); // WitnessId(0): a in op1, c-default in all 3 ops
-        assert_eq!(result.ext_reads[1], 1); // WitnessId(1): b in op1
-        assert_eq!(result.ext_reads[2], 2); // WitnessId(2): b in op2, b in op3
-        assert_eq!(result.ext_reads[3], 1); // WitnessId(3): a in op2
-        assert_eq!(result.ext_reads[4], 1); // WitnessId(4): a in op3
-        // WitnessId(5) is created by mul output - not read
     }
 
     #[test]
     fn test_input_indices_contribute_to_ext_reads() {
         // Ensures input indices are tracked for ext_reads
+        // add(0, 15, 5): a=0 (undefined), c=0 (undefined) → a_is_reader=0, c_is_reader=0
+        // Only b=15 is counted (always a reader in forward case).
         let ops = vec![Op::add(
             WitnessId(0),
             WitnessId(15), // Highest index is an input, not output
@@ -621,17 +621,41 @@ mod tests {
         circuit.witness_count = 16;
         let result = circuit.generate_preprocessed_columns(1).unwrap();
 
-        // add(0, 15, 5): a=WitnessId(0) (undefined), c=WitnessId(0) (undefined) → a_is_reader=0, c_is_reader=0
-        // Only b=WitnessId(15) is counted (always a reader in forward case).
-        assert_eq!(result.ext_reads[0], 0); // a and c_default: undefined → no ext_reads increment
-        assert_eq!(result.ext_reads[15], 1); // b: always counted as reader
-        // output (5) is not a read
-        assert_eq!(result.ext_reads[5], 0);
+        let f = F::from_u32;
+        assert_eq!(
+            result,
+            PreprocessedColumns {
+                primitive: vec![
+                    vec![],
+                    vec![],
+                    // add(0, 15, 5): forward, a undefined, c undefined
+                    vec![
+                        F::ONE,
+                        F::ZERO,
+                        F::ZERO,
+                        F::ZERO,
+                        F::ZERO,
+                        f(15),
+                        F::ZERO,
+                        f(5),
+                        F::ZERO,
+                        F::ZERO,
+                        F::ZERO,
+                        F::ONE,
+                    ],
+                ],
+                non_primitive: HashMap::new(),
+                d: 1,
+                //                    0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15
+                ext_reads: vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                dup_npo_outputs: HashMap::new(),
+            }
+        );
     }
 
     #[test]
     fn test_muladd_operation() {
-        // Test the MulAdd operation preprocessed format
+        // Test the MulAdd operation preprocessed format: 3*5+7=22
         let ops = vec![
             Op::Const {
                 out: WitnessId(0),
@@ -645,37 +669,43 @@ mod tests {
                 out: WitnessId(2),
                 val: F::from_u64(7),
             },
-            Op::mul_add(WitnessId(0), WitnessId(1), WitnessId(2), WitnessId(3)), // 3*5+7=22
+            Op::mul_add(WitnessId(0), WitnessId(1), WitnessId(2), WitnessId(3)),
         ];
 
         let circuit = make_circuit(ops);
         let result = circuit.generate_preprocessed_columns(1).unwrap();
 
-        // ALU column for MulAdd (forward): [sel1, sel2, sel3, sel_horner, a, b, c, out, a_is_reader, b_is_creator, c_is_reader, out_is_creator]
-        // a=0(defined), c=2(defined) → a_is_reader=1, c_is_reader=1
-        let expected_alu = vec![
-            F::ZERO,
-            F::ZERO,
-            F::ONE,
-            F::ZERO, // sel_horner
-            F::ZERO,
-            F::from_u32(1),
-            F::from_u32(2),
-            F::from_u32(3),
-            F::ONE,
-            F::ZERO,
-            F::ONE,
-            F::ONE, // a_is_reader=1, b_is_creator=0, c_is_reader=1, out_is_creator=1
-        ];
+        let f = F::from_u32;
         assert_eq!(
-            result.primitive[PrimitiveOpType::Alu as usize],
-            expected_alu
+            result,
+            PreprocessedColumns {
+                primitive: vec![
+                    // Const: D-scaled output indices
+                    vec![F::ZERO, f(1), f(2)],
+                    // Public: none
+                    vec![],
+                    // ALU: mul_add(0, 1, 2, 3) forward, a=0(defined), c=2(defined)
+                    vec![
+                        F::ZERO,
+                        F::ZERO,
+                        F::ONE,
+                        F::ZERO,
+                        F::ZERO,
+                        f(1),
+                        f(2),
+                        f(3),
+                        F::ONE,
+                        F::ZERO,
+                        F::ONE,
+                        F::ONE,
+                    ],
+                ],
+                non_primitive: HashMap::new(),
+                d: 1,
+                // ext_reads: 0(a)=1, 1(b)=1, 2(c)=1
+                ext_reads: vec![1, 1, 1],
+                dup_npo_outputs: HashMap::new(),
+            }
         );
-
-        // ext_reads: mul_add(0,1,2,3) reads 0(a), 1(b), 2(c); creates 3(out).
-        assert_eq!(result.ext_reads[0], 1); // WitnessId(0): a
-        assert_eq!(result.ext_reads[1], 1); // WitnessId(1): b
-        assert_eq!(result.ext_reads[2], 1); // WitnessId(2): c
-        // WitnessId(3) is created (out), not read
     }
 }
