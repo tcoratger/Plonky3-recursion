@@ -88,7 +88,6 @@ impl<F: Field> Poseidon2CircuitPlugin<F> {
             trace_gen,
         }
     }
-
 }
 
 impl<F: Field> NpoCircuitPlugin<F> for Poseidon2CircuitPlugin<F> {

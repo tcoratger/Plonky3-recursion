@@ -1618,8 +1618,8 @@ mod tests {
     #[test]
     fn test_non_primitive_outputs_ordering_and_dedup() {
         use crate::op::Poseidon2Config;
-        use crate::ops::poseidon2_perm::Poseidon2PermExec;
         use crate::ops::Poseidon2PermCall;
+        use crate::ops::poseidon2_perm::Poseidon2PermExec;
 
         type Ext4 = BinomialExtensionField<BabyBear, 4>;
 
