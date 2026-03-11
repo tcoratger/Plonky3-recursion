@@ -8,10 +8,10 @@ use hashbrown::{HashMap, HashSet};
 use p3_field::{Field, PrimeCharacteristicRing};
 
 use crate::builder::CircuitBuilderError;
-use crate::builder::circuit_builder::{
+use crate::builder::compiler::get_witness_id;
+use crate::builder::npo::{
     NonPrimitiveOpParams, NonPrimitiveOperationData, NpoCircuitPlugin, NpoLoweringContext,
 };
-use crate::builder::compiler::get_witness_id;
 use crate::expr::{Expr, ExpressionGraph};
 use crate::op::{NpoTypeId, Op};
 use crate::types::{ExprId, NonPrimitiveOpId, WitnessAllocator, WitnessId};
