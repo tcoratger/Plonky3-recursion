@@ -1618,13 +1618,19 @@ mod tests {
     #[test]
     fn test_non_primitive_outputs_ordering_and_dedup() {
         use crate::op::Poseidon2Config;
+        use crate::ops::poseidon2_perm::Poseidon2PermExec;
         use crate::ops::Poseidon2PermCall;
 
         type Ext4 = BinomialExtensionField<BabyBear, 4>;
 
         let mut builder = CircuitBuilder::<Ext4>::new();
-        let plugin =
-            Poseidon2CircuitPlugin::<Ext4>::new_config_only(Poseidon2Config::BabyBearD4Width16);
+        let dummy_exec: Poseidon2PermExec<Ext4> =
+            Box::new(|_| panic!("should not be called in this test"));
+        let plugin = Poseidon2CircuitPlugin::<Ext4>::new(
+            Poseidon2Config::BabyBearD4Width16,
+            dummy_exec,
+            |_| Ok(None),
+        );
         builder.register_npo(plugin);
 
         let z = builder.define_const(Ext4::ZERO);

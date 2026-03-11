@@ -89,14 +89,6 @@ impl<F: Field> Poseidon2CircuitPlugin<F> {
         }
     }
 
-    /// Minimal plugin for tests that never execute the circuit.
-    ///
-    /// The executor will panic if actually invoked.
-    pub fn new_config_only(config: Poseidon2Config) -> Self {
-        let dummy_exec: Poseidon2PermExec<F> =
-            Box::new(|_| panic!("Poseidon2PermExec used without proper registration"));
-        Self::new(config, dummy_exec, |_| Ok(None))
-    }
 }
 
 impl<F: Field> NpoCircuitPlugin<F> for Poseidon2CircuitPlugin<F> {
