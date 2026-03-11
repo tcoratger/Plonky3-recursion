@@ -80,7 +80,7 @@ impl<F: Field> Poseidon2CircuitPlugin<F> {
         trace_gen: TraceGeneratorFn<F>,
     ) -> Self {
         let type_id = NpoTypeId::poseidon2_perm(config);
-        let npo_config = crate::op::NpoConfig::new(Poseidon2PermConfigData { config, exec });
+        let npo_config = NpoConfig::new(Poseidon2PermConfigData { config, exec });
         Self {
             type_id,
             poseidon2_config: config,
