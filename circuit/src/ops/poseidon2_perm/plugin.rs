@@ -10,7 +10,7 @@ use p3_field::Field;
 
 use crate::CircuitBuilderError;
 use crate::builder::{NonPrimitiveOpParams, NpoCircuitPlugin, NpoLoweringContext};
-use crate::op::{NpoTypeId, Op};
+use crate::op::{NpoConfig, NpoTypeId, Op};
 use crate::ops::poseidon2_perm::config::{
     Poseidon2Config, Poseidon2PermConfigData, Poseidon2PermExec,
 };

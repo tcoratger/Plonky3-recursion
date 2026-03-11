@@ -18,7 +18,7 @@ use super::npo::{NonPrimitiveOpParams, NonPrimitiveOperationData, NpoCircuitPlug
 use super::{BuilderConfig, ExpressionBuilder, PublicInputTracker};
 use crate::circuit::Circuit;
 use crate::op::{HintExecutor, NpoConfig, NpoRegistry, NpoTypeId};
-use crate::ops::poseidon2_perm::Poseidon2CircuitPlugin;
+use crate::ops::poseidon2_perm::{Poseidon2CircuitPlugin, Poseidon2PermExec};
 use crate::ops::recompose::RecomposeCircuitPlugin;
 use crate::ops::{Poseidon2Params, Poseidon2PermCall, Poseidon2PermCallBase};
 use crate::tables::TraceGeneratorFn;
@@ -137,28 +137,27 @@ where
         let d = Config::D;
         let width_ext = Config::WIDTH_EXT;
         let width = Config::WIDTH;
-        let exec: Poseidon2PermExec<F> =
-            Box::new(move |input: &[F]| {
-                let mut base_input = vec![Config::BaseField::ZERO; width];
-                for (i, ext_elem) in input.iter().enumerate() {
-                    let coeffs = ext_elem.as_basis_coefficients_slice();
-                    base_input[i * d..(i + 1) * d].copy_from_slice(coeffs);
-                }
-                let base_output = perm.permute(
-                    base_input
-                        .try_into()
-                        .expect("base_input length must equal WIDTH"),
+        let exec: Poseidon2PermExec<F> = Box::new(move |input: &[F]| {
+            let mut base_input = vec![Config::BaseField::ZERO; width];
+            for (i, ext_elem) in input.iter().enumerate() {
+                let coeffs = ext_elem.as_basis_coefficients_slice();
+                base_input[i * d..(i + 1) * d].copy_from_slice(coeffs);
+            }
+            let base_output = perm.permute(
+                base_input
+                    .try_into()
+                    .expect("base_input length must equal WIDTH"),
+            );
+            let mut output = Vec::with_capacity(width_ext);
+            for i in 0..width_ext {
+                let coeffs = &base_output[i * d..(i + 1) * d];
+                output.push(
+                    F::from_basis_coefficients_slice(coeffs)
+                        .expect("basis coefficients should be valid"),
                 );
-                let mut output = Vec::with_capacity(width_ext);
-                for i in 0..width_ext {
-                    let coeffs = &base_output[i * d..(i + 1) * d];
-                    output.push(
-                        F::from_basis_coefficients_slice(coeffs)
-                            .expect("basis coefficients should be valid"),
-                    );
-                }
-                output
-            });
+            }
+            output
+        });
 
         let plugin = Poseidon2CircuitPlugin::new(Config::CONFIG, exec, trace_generator);
         self.register_npo(plugin);
@@ -180,28 +179,27 @@ where
         );
         let d = Config::D;
         let width_ext = Config::WIDTH_EXT;
-        let exec: Poseidon2PermExec<F> =
-            Box::new(move |input: &[F]| {
-                let mut base_input = vec![Config::BaseField::ZERO; 8];
-                for (i, ext_elem) in input.iter().enumerate() {
-                    let coeffs = ext_elem.as_basis_coefficients_slice();
-                    base_input[i * d..(i + 1) * d].copy_from_slice(coeffs);
-                }
-                let base_output = perm.permute(
-                    base_input
-                        .try_into()
-                        .expect("base_input length must equal 8"),
+        let exec: Poseidon2PermExec<F> = Box::new(move |input: &[F]| {
+            let mut base_input = vec![Config::BaseField::ZERO; 8];
+            for (i, ext_elem) in input.iter().enumerate() {
+                let coeffs = ext_elem.as_basis_coefficients_slice();
+                base_input[i * d..(i + 1) * d].copy_from_slice(coeffs);
+            }
+            let base_output = perm.permute(
+                base_input
+                    .try_into()
+                    .expect("base_input length must equal 8"),
+            );
+            let mut output = Vec::with_capacity(width_ext);
+            for i in 0..width_ext {
+                let coeffs = &base_output[i * d..(i + 1) * d];
+                output.push(
+                    F::from_basis_coefficients_slice(coeffs)
+                        .expect("basis coefficients should be valid"),
                 );
-                let mut output = Vec::with_capacity(width_ext);
-                for i in 0..width_ext {
-                    let coeffs = &base_output[i * d..(i + 1) * d];
-                    output.push(
-                        F::from_basis_coefficients_slice(coeffs)
-                            .expect("basis coefficients should be valid"),
-                    );
-                }
-                output
-            });
+            }
+            output
+        });
         let plugin = Poseidon2CircuitPlugin::new(Config::CONFIG, exec, trace_generator);
         self.register_npo(plugin);
     }
