@@ -69,7 +69,7 @@ fn lower_expr_slots(
 pub struct Poseidon2CircuitPlugin<F: Field> {
     type_id: NpoTypeId,
     poseidon2_config: Poseidon2Config,
-    npo_config: crate::op::NpoConfig,
+    npo_config: NpoConfig,
     trace_gen: TraceGeneratorFn<F>,
 }
 
