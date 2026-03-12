@@ -1,6 +1,6 @@
 use hashbrown::HashMap;
 
-use crate::op::{NpoConfig, NpoTypeId};
+use crate::ops::{NpoConfig, NpoTypeId};
 
 /// Configuration for the circuit builder.
 #[derive(Debug)]
@@ -47,7 +47,7 @@ impl BuilderConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::op::Poseidon2Config;
+    use crate::ops::Poseidon2Config;
 
     #[test]
     fn test_builder_config_default() {

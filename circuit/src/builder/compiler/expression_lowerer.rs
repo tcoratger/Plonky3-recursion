@@ -13,7 +13,7 @@ use crate::builder::npo::{
     NonPrimitiveOpParams, NonPrimitiveOperationData, NpoCircuitPlugin, NpoLoweringContext,
 };
 use crate::expr::{Expr, ExpressionGraph};
-use crate::op::{NpoTypeId, Op};
+use crate::ops::{NpoTypeId, Op};
 use crate::types::{ExprId, NonPrimitiveOpId, WitnessAllocator, WitnessId};
 
 /// Sparse disjoint-set "find" with path compression over a HashMap (iterative).

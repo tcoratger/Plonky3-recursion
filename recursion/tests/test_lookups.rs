@@ -3,8 +3,9 @@ mod common;
 use p3_baby_bear::default_babybear_poseidon2_16;
 use p3_batch_stark::{CommonData, ProverData};
 use p3_circuit::CircuitBuilder;
-use p3_circuit::op::PrimitiveOpType;
-use p3_circuit::ops::{Poseidon2PermCall, generate_poseidon2_trace, generate_recompose_trace};
+use p3_circuit::ops::{
+    Poseidon2PermCall, PrimitiveOpType, generate_poseidon2_trace, generate_recompose_trace,
+};
 use p3_circuit_prover::air::{AluAir, ConstAir, PublicAir};
 use p3_circuit_prover::batch_stark_prover::{
     PrimitiveTable, poseidon2_air_builders_d4, poseidon2_table_provers_d4, recompose_air_builders,

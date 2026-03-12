@@ -3,7 +3,7 @@ use alloc::string::String;
 use thiserror::Error;
 
 use crate::ExprId;
-use crate::op::NpoTypeId;
+use crate::ops::NpoTypeId;
 use crate::types::NonPrimitiveOpId;
 
 /// Errors that can occur during circuit building/lowering.

@@ -818,7 +818,7 @@ where
     pub fn log_non_primitive_op(
         &mut self,
         op_id: crate::types::NonPrimitiveOpId,
-        op_type: crate::op::NpoTypeId,
+        op_type: crate::ops::NpoTypeId,
         input_deps: Vec<Vec<ExprId>>,
         output_deps: Vec<Vec<ExprId>>,
         label: &'static str,

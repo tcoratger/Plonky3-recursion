@@ -45,7 +45,7 @@ use alloc::vec::Vec;
 use core::marker::PhantomData;
 
 use p3_air::{Air, AirBuilder, BaseAir, WindowAccess};
-use p3_circuit::op::AluOpKind;
+use p3_circuit::ops::AluOpKind;
 use p3_circuit::tables::AluTrace;
 use p3_field::{BasedVectorSpace, Field, PrimeCharacteristicRing};
 use p3_lookup::LookupAir;

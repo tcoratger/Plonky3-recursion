@@ -12,8 +12,10 @@ use p3_air::DebugConstraintBuilder;
 use p3_air::{Air, AirBuilder, BaseAir, WindowAccess};
 use p3_baby_bear::{BabyBear, GenericPoseidon2LinearLayersBabyBear};
 use p3_batch_stark::{StarkGenericConfig, Val};
-use p3_circuit::op::{NonPrimitivePreprocessedMap, NpoTypeId, Poseidon2Config};
-use p3_circuit::ops::{GoldilocksD2Width8, Poseidon2CircuitRow, Poseidon2Params, Poseidon2Trace};
+use p3_circuit::ops::{
+    GoldilocksD2Width8, NonPrimitivePreprocessedMap, NpoTypeId, Poseidon2CircuitRow,
+    Poseidon2Config, Poseidon2Params, Poseidon2Trace,
+};
 use p3_circuit::tables::Traces;
 use p3_circuit::{CircuitError, PreprocessedColumns};
 use p3_field::extension::{BinomialExtensionField, BinomiallyExtendable};

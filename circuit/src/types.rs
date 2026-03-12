@@ -6,6 +6,17 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct WitnessId(pub u32);
 
+impl WitnessId {
+    /// Follow rewrite chains to find the canonical witness ID.
+    pub fn resolve(self, rewrite: &hashbrown::HashMap<Self, Self>) -> Self {
+        let mut cur = self;
+        while let Some(&next) = rewrite.get(&cur) {
+            cur = next;
+        }
+        cur
+    }
+}
+
 impl fmt::Display for WitnessId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "w{}", self.0)
@@ -83,6 +94,35 @@ mod tests {
         assert_eq!(w1, WitnessId(1));
         assert_eq!(w2, WitnessId(2));
         assert_eq!(allocator.witness_count(), 3);
+    }
+
+    #[test]
+    fn test_witness_id_resolve_empty_rewrite() {
+        let rewrite = hashbrown::HashMap::new();
+        assert_eq!(WitnessId(5).resolve(&rewrite), WitnessId(5));
+    }
+
+    #[test]
+    fn test_witness_id_resolve_single_step() {
+        let mut rewrite = hashbrown::HashMap::new();
+        rewrite.insert(WitnessId(1), WitnessId(2));
+        assert_eq!(WitnessId(1).resolve(&rewrite), WitnessId(2));
+    }
+
+    #[test]
+    fn test_witness_id_resolve_chain() {
+        let mut rewrite = hashbrown::HashMap::new();
+        rewrite.insert(WitnessId(0), WitnessId(1));
+        rewrite.insert(WitnessId(1), WitnessId(2));
+        rewrite.insert(WitnessId(2), WitnessId(3));
+        assert_eq!(WitnessId(0).resolve(&rewrite), WitnessId(3));
+    }
+
+    #[test]
+    fn test_witness_id_resolve_no_match() {
+        let mut rewrite = hashbrown::HashMap::new();
+        rewrite.insert(WitnessId(10), WitnessId(20));
+        assert_eq!(WitnessId(5).resolve(&rewrite), WitnessId(5));
     }
 
     #[cfg(test)]

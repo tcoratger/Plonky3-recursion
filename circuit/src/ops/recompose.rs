@@ -19,7 +19,7 @@ use p3_field::{ExtensionField, Field, PrimeField64};
 use crate::builder::{
     CircuitBuilderError, NonPrimitiveOpParams, NpoCircuitPlugin, NpoLoweringContext,
 };
-use crate::op::{ExecutionContext, NonPrimitiveExecutor, NpoTypeId, Op, OpExecutionState};
+use crate::ops::{ExecutionContext, NonPrimitiveExecutor, NpoTypeId, Op, OpExecutionState};
 use crate::tables::{NonPrimitiveTrace, TraceGeneratorFn};
 use crate::types::{ExprId, WitnessId};
 use crate::{CircuitError, PreprocessedColumns};
@@ -309,8 +309,8 @@ where
         self.trace_gen
     }
 
-    fn config(&self) -> crate::op::NpoConfig {
-        crate::op::NpoConfig::new(RecomposeConfig { d: self.d })
+    fn config(&self) -> crate::ops::NpoConfig {
+        crate::ops::NpoConfig::new(RecomposeConfig { d: self.d })
     }
 }
 
@@ -362,7 +362,7 @@ impl<TraceF: Clone + Send + Sync + 'static, CF> NonPrimitiveTrace<CF> for Recomp
 /// Since the circuit operates on extension-field values, each BF coefficient is stored as
 /// an extension element `(c_j, 0, 0, 0)`. We extract just the 0th basis coefficient.
 pub fn generate_recompose_trace<BF, EF>(
-    op_states: &crate::op::OpStateMap,
+    op_states: &crate::ops::OpStateMap,
 ) -> Result<Option<Box<dyn NonPrimitiveTrace<EF>>>, CircuitError>
 where
     BF: PrimeField64,
