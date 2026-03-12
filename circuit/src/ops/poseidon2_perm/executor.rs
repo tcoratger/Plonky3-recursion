@@ -7,11 +7,11 @@ use alloc::{format, vec};
 
 use p3_field::Field;
 
-use crate::op::{ExecutionContext, NonPrimitiveExecutor, NpoTypeId};
 use crate::ops::poseidon2_perm::config::{Poseidon2Config, Poseidon2PermConfigData};
 use crate::ops::poseidon2_perm::input_resolver::resolve_all_inputs;
 use crate::ops::poseidon2_perm::state::{Poseidon2ExecutionState, Poseidon2PermPrivateData};
 use crate::ops::poseidon2_perm::trace::Poseidon2CircuitRow;
+use crate::ops::{ExecutionContext, NonPrimitiveExecutor, NpoTypeId};
 use crate::types::WitnessId;
 use crate::{CircuitError, PreprocessedColumns};
 

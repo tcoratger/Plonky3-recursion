@@ -6,7 +6,7 @@ use hashbrown::HashMap;
 use p3_field::Field;
 use strum::EnumCount;
 
-use crate::op::{NonPrimitivePreprocessedMap, NpoConfig, NpoTypeId, Op, PrimitiveOpType};
+use crate::ops::{NonPrimitivePreprocessedMap, NpoConfig, NpoTypeId, Op, PrimitiveOpType};
 use crate::tables::{CircuitRunner, TraceGeneratorFn};
 use crate::types::{ExprId, NonPrimitiveOpId, WitnessId};
 use crate::{AluOpKind, CircuitError};
@@ -487,7 +487,7 @@ mod tests {
     use strum::EnumCount;
 
     use super::*;
-    use crate::op::PrimitiveOpType;
+    use crate::ops::PrimitiveOpType;
     use crate::types::WitnessId;
 
     type F = BabyBear;

@@ -1,4 +1,4 @@
-use p3_circuit::op::Poseidon2Config;
+use p3_circuit::ops::Poseidon2Config;
 use p3_fri::FriParameters;
 
 /// FRI verifier parameters (subset needed for verification).

@@ -6,7 +6,7 @@ use alloc::vec::Vec;
 use p3_air::DebugConstraintBuilder;
 use p3_air::{Air, AirBuilder, BaseAir};
 use p3_batch_stark::{StarkGenericConfig, Val};
-use p3_circuit::op::NpoTypeId;
+use p3_circuit::ops::NpoTypeId;
 use p3_circuit::tables::Traces;
 use p3_field::extension::BinomialExtensionField;
 use p3_field::{Algebra, PrimeField};

@@ -8,7 +8,7 @@ use alloc::{format, vec};
 use core::iter;
 
 use hashbrown::HashMap;
-use p3_circuit::op::Poseidon2Config;
+use p3_circuit::ops::Poseidon2Config;
 use p3_circuit::{CircuitBuilder, NonPrimitiveOpId};
 use p3_field::coset::TwoAdicMultiplicativeCoset;
 use p3_field::{BasedVectorSpace, ExtensionField, Field, PrimeField64, TwoAdicField};

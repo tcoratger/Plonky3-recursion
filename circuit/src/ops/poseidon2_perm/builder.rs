@@ -8,7 +8,7 @@ use p3_field::Field;
 
 use crate::CircuitBuilderError;
 use crate::builder::{CircuitBuilder, NonPrimitiveOpParams};
-use crate::op::NpoTypeId;
+use crate::ops::NpoTypeId;
 use crate::ops::poseidon2_perm::call::{Poseidon2PermCall, Poseidon2PermCallBase};
 use crate::types::{ExprId, NonPrimitiveOpId};
 

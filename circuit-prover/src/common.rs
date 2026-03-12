@@ -3,7 +3,7 @@ use alloc::vec::Vec;
 use core::any::Any;
 
 use hashbrown::HashMap;
-use p3_circuit::op::{NonPrimitivePreprocessedMap, NpoTypeId, PrimitiveOpType};
+use p3_circuit::ops::{NonPrimitivePreprocessedMap, NpoTypeId, PrimitiveOpType};
 use p3_circuit::{Circuit, CircuitError, PreprocessedColumns};
 use p3_field::{Algebra, ExtensionField, Field, PrimeCharacteristicRing, PrimeField64};
 use p3_uni_stark::{StarkGenericConfig, SymbolicExpression, SymbolicExpressionExt, Val};

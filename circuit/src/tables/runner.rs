@@ -14,7 +14,7 @@ use super::public::PublicTraceBuilder;
 use super::witness::WitnessTrace;
 use super::{NonPrimitiveTrace, Traces};
 use crate::circuit::Circuit;
-use crate::op::{ExecutionContext, NpoPrivateData, NpoTypeId, Op, OpStateMap};
+use crate::ops::{ExecutionContext, NpoPrivateData, NpoTypeId, Op, OpStateMap};
 use crate::types::{NonPrimitiveOpId, WitnessId};
 use crate::{AluOpKind, CircuitError};
 
@@ -498,7 +498,7 @@ mod tests {
 
     use super::*;
     use crate::builder::CircuitBuilder;
-    use crate::op::HintExecutor;
+    use crate::ops::HintExecutor;
     use crate::tables::{ConstTrace, PublicTrace};
     use crate::types::WitnessId;
 
@@ -774,7 +774,7 @@ mod tests {
 
         let result = runner.set_private_data_by_tag(
             "nonexistent-tag",
-            crate::op::NpoPrivateData::new(private_data),
+            crate::ops::NpoPrivateData::new(private_data),
         );
 
         assert!(matches!(

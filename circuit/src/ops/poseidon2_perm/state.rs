@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 use core::any::Any;
 use core::fmt::Debug;
 
-use crate::op::OpExecutionState;
+use crate::ops::OpExecutionState;
 use crate::ops::poseidon2_perm::trace::Poseidon2CircuitRow;
 
 /// Private data for Poseidon2 permutation.

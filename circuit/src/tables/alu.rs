@@ -2,7 +2,7 @@ use alloc::vec::Vec;
 
 use p3_field::Field;
 
-use crate::op::AluOpKind;
+use crate::ops::AluOpKind;
 use crate::types::WitnessId;
 
 /// Record of an ALU operation captured during execution (avoids re-reading witness).

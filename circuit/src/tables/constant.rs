@@ -1,7 +1,7 @@
 use alloc::vec::Vec;
 
 use crate::CircuitError;
-use crate::op::Op;
+use crate::ops::Op;
 use crate::types::WitnessId;
 
 /// Constant values table.

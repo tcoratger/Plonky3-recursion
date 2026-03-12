@@ -3,7 +3,7 @@ use alloc::vec::Vec;
 use hashbrown::HashMap;
 use p3_field::Field;
 
-use crate::op::{AluOpKind, Op};
+use crate::ops::{AluOpKind, Op};
 use crate::types::WitnessId;
 
 /// Responsible for performing optimization passes on primitive operations.
@@ -642,7 +642,7 @@ mod tests {
 
     use super::*;
     use crate::CircuitBuilder;
-    use crate::op::AluOpKind;
+    use crate::ops::AluOpKind;
 
     type F = BabyBear;
 

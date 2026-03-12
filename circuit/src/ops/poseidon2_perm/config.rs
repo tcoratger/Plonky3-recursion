@@ -1,6 +1,6 @@
 //! Poseidon2 configuration types and execution closures.
 
-use alloc::boxed::Box;
+use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use serde::{Deserialize, Serialize};
@@ -145,7 +145,7 @@ impl Poseidon2Config {
 ///
 /// Takes `width_ext` field elements and returns `width_ext` output elements.
 /// For D=1 mode, `width_ext == width` and the elements are base field values.
-pub type Poseidon2PermExec<F> = Box<dyn Fn(&[F]) -> Vec<F> + Send + Sync>;
+pub type Poseidon2PermExec<F> = Arc<dyn Fn(&[F]) -> Vec<F> + Send + Sync>;
 
 /// Config data stored inside `NpoConfig` for Poseidon2 operations.
 ///

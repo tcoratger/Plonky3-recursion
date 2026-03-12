@@ -11,7 +11,7 @@ use p3_air::DebugConstraintBuilder;
 use p3_air::{Air, BaseAir};
 use p3_batch_stark::{BatchProof, CommonData, ProverData, StarkGenericConfig, StarkInstance, Val};
 use p3_circuit::PreprocessedColumns;
-use p3_circuit::op::{NpoTypeId, Poseidon2Config, PrimitiveOpType};
+use p3_circuit::ops::{NpoTypeId, Poseidon2Config, PrimitiveOpType};
 use p3_circuit::tables::Traces;
 use p3_field::extension::{BinomialExtensionField, BinomiallyExtendable};
 use p3_field::{Algebra, BasedVectorSpace, Field, PrimeField};

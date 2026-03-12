@@ -1,8 +1,17 @@
+mod context;
+mod executor;
+mod npo;
+mod op;
+
 pub mod hash;
 pub mod mmcs;
 pub mod poseidon2_perm;
 pub mod recompose;
 
+pub use context::*;
+pub use executor::*;
+pub use npo::*;
+pub use op::*;
 pub use poseidon2_perm::{
     // Preset configurations
     BabyBearD1Width16,

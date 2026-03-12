@@ -5,8 +5,7 @@ use core::iter;
 
 use p3_field::Field;
 
-use crate::op::Poseidon2Config;
-use crate::ops::Poseidon2PermCall;
+use crate::ops::{Poseidon2Config, Poseidon2PermCall};
 use crate::{CircuitBuilder, CircuitBuilderError, ExprId, NonPrimitiveOpId};
 
 impl<F: Field> CircuitBuilder<F> {
