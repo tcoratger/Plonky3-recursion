@@ -2,15 +2,12 @@
 
 use alloc::boxed::Box;
 use alloc::string::ToString;
-use alloc::sync::Arc;
 use alloc::vec::Vec;
 use alloc::{format, vec};
 
 use p3_field::Field;
 
-use crate::ops::poseidon2_perm::config::{
-    Poseidon2Config, Poseidon2PermBaseConfigData, Poseidon2PermConfigData, Poseidon2PermExecBase,
-};
+use crate::ops::poseidon2_perm::config::{Poseidon2Config, Poseidon2PermConfigData};
 use crate::ops::poseidon2_perm::input_resolver::resolve_all_inputs;
 use crate::ops::poseidon2_perm::state::{Poseidon2ExecutionState, Poseidon2PermPrivateData};
 use crate::ops::poseidon2_perm::trace::Poseidon2CircuitRow;
@@ -128,7 +125,7 @@ impl Poseidon2PermExecutor {
         inputs: &[Vec<WitnessId>],
         outputs: &[Vec<WitnessId>],
         ctx: &mut ExecutionContext<'_, F>,
-        exec: &Poseidon2PermExecBase<F>,
+        exec: &dyn Fn(&[F]) -> Vec<F>,
     ) -> Result<(), CircuitError> {
         // D=1 mode: Input layout: [in0, in1, ..., in15]
         // Output layout: [out0, ..., out7] (rate) or [out0, ..., out15] (with capacity)
@@ -232,19 +229,20 @@ impl<F: Field + Send + Sync + 'static> NonPrimitiveExecutor<F> for Poseidon2Perm
         outputs: &[Vec<WitnessId>],
         ctx: &mut ExecutionContext<'_, F>,
     ) -> Result<(), CircuitError> {
-        let config = ctx.get_config(&self.op_type)?;
+        // Clone NpoConfig (Arc refcount bump) so `cfg` doesn't borrow from `ctx`.
+        let config = ctx.get_config(&self.op_type)?.clone();
 
-        if let Some(base_cfg) = config.downcast_ref::<Poseidon2PermBaseConfigData<F>>() {
-            return self.execute_base(inputs, outputs, ctx, &Arc::clone(&base_cfg.exec));
-        }
-
-        let ext_cfg = config
+        let cfg = config
             .downcast_ref::<Poseidon2PermConfigData<F>>()
             .ok_or_else(|| CircuitError::InvalidNonPrimitiveOpConfiguration {
                 op: self.op_type.clone(),
             })?;
-        let poseidon2_config = ext_cfg.config;
-        let exec = Arc::clone(&ext_cfg.exec);
+
+        if self.config.d() == 1 {
+            return self.execute_base(inputs, outputs, ctx, &*cfg.exec);
+        }
+
+        let poseidon2_config = cfg.config;
 
         let width_ext = poseidon2_config.width_ext();
         let rate_ext = poseidon2_config.rate_ext();
@@ -319,7 +317,7 @@ impl<F: Field + Send + Sync + 'static> NonPrimitiveExecutor<F> for Poseidon2Perm
             rate_ext,
         )?;
 
-        let output = exec(&resolved_inputs);
+        let output = (cfg.exec)(&resolved_inputs);
 
         let (in_ctl, input_indices) = inputs[..width_ext].iter().enumerate().fold(
             (vec![false; width_ext], vec![0u32; width_ext]),

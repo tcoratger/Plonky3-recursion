@@ -21,19 +21,17 @@
 
 mod builder;
 pub mod call;
-pub mod config;
+pub(crate) mod config;
 pub(crate) mod executor;
 mod input_resolver;
-pub mod plugin;
+pub(crate) mod plugin;
 pub mod state;
 pub mod trace;
 
 pub use call::{Poseidon2PermCall, Poseidon2PermCallBase};
-pub use config::{
-    Poseidon2Config, Poseidon2PermBaseConfigData, Poseidon2PermConfigData, Poseidon2PermExec,
-    Poseidon2PermExecBase,
-};
-pub use plugin::Poseidon2CircuitPlugin;
+pub use config::Poseidon2Config;
+pub(crate) use config::Poseidon2PermExec;
+pub(crate) use plugin::Poseidon2CircuitPlugin;
 pub use state::Poseidon2PermPrivateData;
 pub use trace::{
     BabyBearD1Width16, GoldilocksD2Width8, KoalaBearD1Width16, Poseidon2CircuitRow,

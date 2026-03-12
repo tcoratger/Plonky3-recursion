@@ -17,10 +17,11 @@ use super::compiler::{ExpressionLowerer, Optimizer};
 use super::npo::{NonPrimitiveOpParams, NonPrimitiveOperationData, NpoCircuitPlugin};
 use super::{BuilderConfig, ExpressionBuilder, PublicInputTracker};
 use crate::circuit::Circuit;
-use crate::ops::poseidon2_perm::Poseidon2CircuitPlugin;
+use crate::ops::poseidon2_perm::{Poseidon2CircuitPlugin, Poseidon2PermExec};
+use crate::ops::recompose::RecomposeCircuitPlugin;
 use crate::ops::{
     HintExecutor, NpoConfig, NpoRegistry, NpoTypeId, Poseidon2Params, Poseidon2PermCall,
-    Poseidon2PermCallBase, RecomposeCircuitPlugin,
+    Poseidon2PermCallBase,
 };
 use crate::tables::TraceGeneratorFn;
 use crate::types::{ExprId, NonPrimitiveOpId, WitnessAllocator, WitnessId};
@@ -138,7 +139,7 @@ where
         let d = Config::D;
         let width_ext = Config::WIDTH_EXT;
         let width = Config::WIDTH;
-        let exec: crate::ops::Poseidon2PermExec<F> = Arc::new(move |input: &[F]| {
+        let exec: Poseidon2PermExec<F> = Arc::new(move |input: &[F]| {
             let mut base_input = vec![Config::BaseField::ZERO; width];
             for (i, ext_elem) in input.iter().enumerate() {
                 let coeffs = ext_elem.as_basis_coefficients_slice();
@@ -160,7 +161,7 @@ where
             output
         });
 
-        let plugin = Poseidon2CircuitPlugin::new_ext(Config::CONFIG, exec, trace_generator);
+        let plugin = Poseidon2CircuitPlugin::new(Config::CONFIG, exec, trace_generator);
         self.register_npo(plugin);
     }
 
@@ -180,7 +181,7 @@ where
         );
         let d = Config::D;
         let width_ext = Config::WIDTH_EXT;
-        let exec: crate::ops::Poseidon2PermExec<F> = Arc::new(move |input: &[F]| {
+        let exec: Poseidon2PermExec<F> = Arc::new(move |input: &[F]| {
             let mut base_input = vec![Config::BaseField::ZERO; 8];
             for (i, ext_elem) in input.iter().enumerate() {
                 let coeffs = ext_elem.as_basis_coefficients_slice();
@@ -201,7 +202,7 @@ where
             }
             output
         });
-        let plugin = Poseidon2CircuitPlugin::new_ext(Config::CONFIG, exec, trace_generator);
+        let plugin = Poseidon2CircuitPlugin::new(Config::CONFIG, exec, trace_generator);
         self.register_npo(plugin);
     }
 
@@ -231,11 +232,13 @@ where
             "enable_poseidon2_perm_base only supports WIDTH=16"
         );
 
-        // For D=1, the exec closure operates directly on 16 base field elements
-        let exec: crate::ops::Poseidon2PermExecBase<F> =
-            Arc::new(move |input: &[F; 16]| perm.permute(*input));
+        // For D=1, the exec closure converts slice to/from [F; 16]
+        let exec: Poseidon2PermExec<F> = Arc::new(move |input: &[F]| {
+            let arr: [F; 16] = input.try_into().expect("D=1 input must have 16 elements");
+            perm.permute(arr).to_vec()
+        });
 
-        let plugin = Poseidon2CircuitPlugin::new_base(Config::CONFIG, exec, trace_generator);
+        let plugin = Poseidon2CircuitPlugin::new(Config::CONFIG, exec, trace_generator);
         self.register_npo(plugin);
     }
 
@@ -1615,13 +1618,19 @@ mod tests {
 
     #[test]
     fn test_non_primitive_outputs_ordering_and_dedup() {
+        use crate::ops::poseidon2_perm::Poseidon2PermExec;
         use crate::ops::{Poseidon2Config, Poseidon2PermCall};
 
         type Ext4 = BinomialExtensionField<BabyBear, 4>;
 
         let mut builder = CircuitBuilder::<Ext4>::new();
-        let plugin =
-            Poseidon2CircuitPlugin::<Ext4>::new_config_only(Poseidon2Config::BabyBearD4Width16);
+        let dummy_exec: Poseidon2PermExec<Ext4> =
+            Arc::new(|_| panic!("should not be called in this test"));
+        let plugin = Poseidon2CircuitPlugin::<Ext4>::new(
+            Poseidon2Config::BabyBearD4Width16,
+            dummy_exec,
+            |_| Ok(None),
+        );
         builder.register_npo(plugin);
 
         let z = builder.define_const(Ext4::ZERO);

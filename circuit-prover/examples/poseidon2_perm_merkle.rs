@@ -2,7 +2,7 @@ use std::error::Error;
 
 use p3_batch_stark::ProverData;
 use p3_circuit::ops::{
-    NonPrimitiveOpPrivateData, NpoTypeId, Poseidon2PermPrivateData, generate_poseidon2_trace,
+    NpoPrivateData, NpoTypeId, Poseidon2PermPrivateData, generate_poseidon2_trace,
     generate_recompose_trace,
 };
 use p3_circuit::{CircuitBuilder, ExprId};
@@ -250,7 +250,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // For Merkle mode, provide the sibling (2 limbs). Internal logic handles placement.
     runner.set_private_data(
         row1_op_id,
-        NonPrimitiveOpPrivateData::new(Poseidon2PermPrivateData {
+        NpoPrivateData::new(Poseidon2PermPrivateData {
             sibling: [sibling1_limb2, sibling1_limb3],
         }),
     )?;
@@ -260,7 +260,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // For Merkle mode, provide the sibling (2 limbs). Internal logic handles placement.
     runner.set_private_data(
         row2_op_id,
-        NonPrimitiveOpPrivateData::new(Poseidon2PermPrivateData {
+        NpoPrivateData::new(Poseidon2PermPrivateData {
             sibling: [sibling2_limb2, sibling2_limb3],
         }),
     )?;

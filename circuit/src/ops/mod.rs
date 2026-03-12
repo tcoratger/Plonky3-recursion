@@ -13,7 +13,7 @@ pub use executor::*;
 pub use npo::*;
 pub use op::*;
 pub use poseidon2_perm::{
-    // D=1 configurations for base field challenges
+    // Preset configurations
     BabyBearD1Width16,
     GoldilocksD2Width8,
     KoalaBearD1Width16,
@@ -25,13 +25,8 @@ pub use poseidon2_perm::{
     Poseidon2PermCall,
     Poseidon2PermCallBase,
     // Configuration
-    Poseidon2PermExec,
-    Poseidon2PermExecBase,
     Poseidon2PermPrivateData,
     Poseidon2Trace,
     generate_poseidon2_trace,
 };
-pub use recompose::{
-    RecomposeCircuitPlugin, RecomposeCircuitRow, RecomposeConfig, RecomposeFn, RecomposeTrace,
-    generate_recompose_trace,
-};
+pub use recompose::{RecomposeCircuitRow, RecomposeTrace, generate_recompose_trace};

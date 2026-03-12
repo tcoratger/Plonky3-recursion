@@ -6,9 +6,7 @@ use hashbrown::HashMap;
 use p3_field::Field;
 use strum::EnumCount;
 
-use crate::ops::{
-    NonPrimitiveOpConfig, NonPrimitivePreprocessedMap, NpoTypeId, Op, PrimitiveOpType,
-};
+use crate::ops::{NonPrimitivePreprocessedMap, NpoConfig, NpoTypeId, Op, PrimitiveOpType};
 use crate::tables::{CircuitRunner, TraceGeneratorFn};
 use crate::types::{ExprId, NonPrimitiveOpId, WitnessId};
 use crate::{AluOpKind, CircuitError};
@@ -207,7 +205,7 @@ pub struct Circuit<F> {
     /// Total number of public field elements
     pub public_flat_len: usize,
     /// Enabled non-primitive operation types with their respective configuration
-    pub enabled_ops: HashMap<NpoTypeId, NonPrimitiveOpConfig>,
+    pub enabled_ops: HashMap<NpoTypeId, NpoConfig>,
     /// Expression to witness index map
     pub expr_to_widx: HashMap<ExprId, WitnessId>,
     /// Registered non-primitive trace generators.

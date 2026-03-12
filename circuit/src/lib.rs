@@ -8,7 +8,6 @@ pub mod circuit;
 pub mod errors;
 pub mod expr;
 pub mod ops;
-pub mod policy;
 pub mod tables;
 pub mod test_utils;
 pub mod types;

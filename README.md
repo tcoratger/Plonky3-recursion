@@ -185,7 +185,7 @@ The `CircuitBuilder<F>` provides a modular API for building circuits:
 
 **Non-primitive Operations** (require explicit enablement):
 - `enable_poseidon2_perm()` - Enable Poseidon2 permutation operations
-- Operations are controlled by a runtime policy (`DefaultProfile` disables all, `AllowAllProfile` enables all)
+- Operations must be explicitly enabled via `enable_poseidon2_perm()` before use
 
 ### Public Inputs
 
@@ -255,13 +255,11 @@ Documentation is still incomplete and will be improved over time.
 - **API Documentation**: `cargo doc --open` for full API reference
 - **Examples**: See `recursion/examples/` for working code
 
-## Modular Circuit Builder & Runtime Policy
+## Modular Circuit Builder
 
-The `CircuitBuilder<F>` uses a runtime policy to control which non-primitive operations (MMCS, FRI, etc.) are allowed. Primitive ops like `Const`, `Public`, `Add` are always available.
+The `CircuitBuilder<F>` supports both primitive and non-primitive operations. Primitive ops like `Const`, `Public`, `Add` are always available.
 
-By default, all non-primitive ops are disabled with `DefaultProfile`. Define a custom policy to enable them, or use `AllowAllProfile` to activate them all.
-
-Trying to access an op not supported by the selected policy in the circuit builder will result in a runtime error.
+Non-primitive operations (e.g. Poseidon2 permutations) must be explicitly enabled on the builder before use. Attempting to use a non-primitive operation that hasn't been enabled will result in a runtime error.
 
 ## License
 
