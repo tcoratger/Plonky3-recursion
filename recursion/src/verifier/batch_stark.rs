@@ -8,7 +8,7 @@ use alloc::{format, vec};
 use hashbrown::HashMap;
 use p3_air::{Air as P3Air, BaseAir as P3BaseAir, SymbolicAirBuilder};
 use p3_batch_stark::CommonData;
-use p3_circuit::utils::ColumnsTargets;
+use p3_circuit::symbolic::ColumnsTargets;
 use p3_circuit::{CircuitBuilder, NonPrimitiveOpId};
 use p3_circuit_prover::air::{AluAir, ConstAir, PublicAir};
 use p3_circuit_prover::batch_stark_prover::{

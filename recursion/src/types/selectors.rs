@@ -1,6 +1,6 @@
 //! Lagrange selector structures for constraint evaluation.
 
-use p3_circuit::utils::RowSelectorsTargets;
+use p3_circuit::symbolic::RowSelectorsTargets;
 
 use crate::Target;
 

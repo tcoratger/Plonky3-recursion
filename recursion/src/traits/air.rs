@@ -5,7 +5,7 @@ use p3_air::symbolic::AirLayout;
 use p3_air::{Air, SymbolicExpressionExt};
 use p3_batch_stark::symbolic::{get_log_num_quotient_chunks, get_symbolic_constraints};
 use p3_circuit::CircuitBuilder;
-use p3_circuit::utils::{ColumnsTargets, symbolic_ext_expr_to_circuit, symbolic_to_circuit_base};
+use p3_circuit::symbolic::{ColumnsTargets, SymbolicCompiler};
 use p3_field::{Algebra, ExtensionField, Field};
 use p3_lookup::lookup_traits::{Kind, Lookup, LookupData, LookupGadget};
 use p3_uni_stark::{SymbolicAirBuilder, SymbolicExpression};
@@ -131,31 +131,19 @@ where
         //
         // Additionally, the cache is shared across all constraint calls to reuse circuit
         // operations for sub-expressions shared between different constraints.
+        let compiler = SymbolicCompiler::new(sels.row_selectors, &columns);
         let mut acc = builder.define_const(EF::ZERO);
         let mut base_cache = HashMap::new();
         for s_c in &base_symbolic_constraints {
             let mul_prev = builder.mul(acc, *alpha);
-            let constraints = symbolic_to_circuit_base(
-                sels.row_selectors,
-                &columns,
-                s_c,
-                builder,
-                &mut base_cache,
-            );
+            let constraints = compiler.compile_base(s_c, builder, &mut base_cache);
             acc = builder.add(mul_prev, constraints);
         }
 
         let mut ext_cache = HashMap::new();
         for s_c in &extension_symbolic_constraints {
             let mul_prev = builder.mul(acc, *alpha);
-            let constraints = symbolic_ext_expr_to_circuit(
-                sels.row_selectors,
-                &columns,
-                s_c,
-                builder,
-                &mut base_cache,
-                &mut ext_cache,
-            );
+            let constraints = compiler.compile_ext(s_c, builder, &mut base_cache, &mut ext_cache);
             acc = builder.add(mul_prev, constraints);
         }
 

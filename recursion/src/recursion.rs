@@ -7,8 +7,8 @@ use alloc::vec::Vec;
 
 use p3_air::{SymbolicExpression, SymbolicExpressionExt};
 use p3_batch_stark::{CommonData, ProverData};
+use p3_circuit::symbolic::ColumnsTargets;
 use p3_circuit::tables::Traces;
-use p3_circuit::utils::ColumnsTargets;
 use p3_circuit::{Circuit, CircuitBuilder, CircuitRunner, NonPrimitiveOpId};
 use p3_circuit_prover::batch_stark_prover::TableProver;
 use p3_circuit_prover::common::{NpoAirBuilder, NpoPreprocessor, get_airs_and_degrees_with_prep};

@@ -4,7 +4,7 @@ use alloc::{format, vec};
 use core::marker::PhantomData;
 
 use p3_challenger::{CanObserve, GrindingChallenger};
-use p3_circuit::utils::RowSelectorsTargets;
+use p3_circuit::symbolic::RowSelectorsTargets;
 use p3_circuit::{CircuitBuilder, CircuitBuilderError, NonPrimitiveOpId};
 use p3_commit::{BatchOpening, ExtensionMmcs, Mmcs, OpenedValues, PolynomialSpace};
 use p3_field::coset::TwoAdicMultiplicativeCoset;
