@@ -1,4 +1,5 @@
 use alloc::boxed::Box;
+use alloc::vec;
 use alloc::vec::Vec;
 
 use hashbrown::HashMap;
@@ -6,6 +7,8 @@ use p3_field::Field;
 use strum_macros::EnumCount;
 
 use super::executor::{HintExecutor, NonPrimitiveExecutor};
+use crate::CircuitError;
+use crate::circuit::PreprocessedColumns;
 use crate::types::{NonPrimitiveOpId, WitnessId};
 
 /// ALU operation kinds for the unified arithmetic table.
@@ -29,6 +32,22 @@ pub enum AluOpKind {
     /// HornerAcc ops within the same chain must be placed in consecutive ALU rows
     /// of the same lane.
     HornerAcc,
+}
+
+impl AluOpKind {
+    /// Returns the four ALU selector values:
+    /// ```text
+    ///     [sel_add_vs_mul, sel_bool, sel_muladd, sel_horner]
+    /// ```
+    pub const fn selectors<F: Field>(&self) -> [F; 4] {
+        match self {
+            Self::Add => [F::ONE, F::ZERO, F::ZERO, F::ZERO],
+            Self::Mul => [F::ZERO; 4],
+            Self::BoolCheck => [F::ZERO, F::ONE, F::ZERO, F::ZERO],
+            Self::MulAdd => [F::ZERO, F::ZERO, F::ONE, F::ZERO],
+            Self::HornerAcc => [F::ZERO, F::ZERO, F::ZERO, F::ONE],
+        }
+    }
 }
 
 /// Circuit operations.
@@ -237,6 +256,127 @@ impl<F> Op<F> {
             }
         }
     }
+
+    /// Preprocess a single operation, updating `defined` and `preprocessed`.
+    ///
+    /// Each variant handles its own column layout and reader/creator tracking:
+    /// - `Const`/`Public`: store D-scaled output index, mark output as defined.
+    /// - `Alu`: store selectors + operand indices + reader/creator flags.
+    /// - `NonPrimitiveOpWithExecutor`: delegate to executor, track duplicate outputs.
+    /// - `Hint`: no-op (hints have no tables or AIR).
+    pub(crate) fn preprocess(
+        &self,
+        defined: &mut Vec<bool>,
+        preprocessed: &mut PreprocessedColumns<F>,
+    ) -> Result<(), CircuitError>
+    where
+        F: Field,
+    {
+        match self {
+            Self::Const { out, .. } => {
+                let idx = preprocessed.witness_index_as_field(*out);
+                preprocessed.primitive[PrimitiveOpType::Const as usize].push(idx);
+                out.mark_defined(defined);
+            }
+            Self::Public { out, .. } => {
+                let idx = preprocessed.witness_index_as_field(*out);
+                preprocessed.primitive[PrimitiveOpType::Public as usize].push(idx);
+                out.mark_defined(defined);
+            }
+            Self::Alu {
+                kind, a, b, c, out, ..
+            } => {
+                let [sel_add_vs_mul, sel_bool, sel_muladd, sel_horner] = kind.selectors();
+                let c_wid = c.unwrap_or(WitnessId(0));
+                let d_u32 = preprocessed.d as u32;
+
+                let out_already_defined = out.is_defined(defined);
+                let b_already_defined = b.is_defined(defined);
+                let a_is_reader = a.is_defined(defined);
+                let c_is_reader = c_wid.is_defined(defined);
+
+                let (b_is_creator, out_is_creator) = if !out_already_defined {
+                    (false, true) // forward: out is new creator
+                } else if !b_already_defined {
+                    (true, false) // backward: b is new creator
+                } else {
+                    (false, false) // all-reader: no new creator
+                };
+
+                preprocessed.primitive[PrimitiveOpType::Alu as usize].extend([
+                    sel_add_vs_mul,
+                    sel_bool,
+                    sel_muladd,
+                    sel_horner,
+                    F::from_u32(a.0 * d_u32),
+                    F::from_u32(b.0 * d_u32),
+                    F::from_u32(c_wid.0 * d_u32),
+                    F::from_u32(out.0 * d_u32),
+                    if a_is_reader { F::ONE } else { F::ZERO },
+                    if b_is_creator { F::ONE } else { F::ZERO },
+                    if c_is_reader { F::ONE } else { F::ZERO },
+                    if out_is_creator { F::ONE } else { F::ZERO },
+                ]);
+
+                // Mark the new creator as defined.
+                if out_is_creator {
+                    out.mark_defined(defined);
+                } else if b_is_creator {
+                    b.mark_defined(defined);
+                }
+
+                // Collect readers: non-creator operands that are constrained witnesses.
+                // - b is a reader unless it's the creator (forward + all-reader cases).
+                // - out is a reader unless it's the creator (backward + all-reader cases).
+                // - a and c are readers only if they were previously defined.
+                let mut readers = vec![];
+                if !b_is_creator {
+                    readers.push(*b);
+                }
+                if !out_is_creator && out_already_defined {
+                    readers.push(*out);
+                }
+                if a_is_reader {
+                    readers.push(*a);
+                }
+                if c_is_reader {
+                    readers.push(c_wid);
+                }
+                preprocessed.increment_ext_reads(&readers);
+            }
+            Self::NonPrimitiveOpWithExecutor {
+                executor,
+                inputs,
+                outputs,
+                ..
+            } => {
+                executor.preprocess(inputs, outputs, preprocessed)?;
+
+                // Track duplicate non-primitive outputs: first occurrence is a creator,
+                // subsequent occurrences are treated as readers on WitnessChecks.
+                let op_type = executor.op_type();
+                let n_exposed = executor.num_exposed_outputs().unwrap_or(outputs.len());
+                for wid in outputs.iter().take(n_exposed).flatten() {
+                    if wid.is_defined(defined) {
+                        let dup = preprocessed
+                            .dup_npo_outputs
+                            .entry(op_type.clone())
+                            .or_default();
+                        let wid_idx = wid.0 as usize;
+                        if wid_idx >= dup.len() {
+                            dup.resize(wid_idx + 1, false);
+                        }
+                        dup[wid_idx] = true;
+                        preprocessed.increment_ext_reads(&[*wid]);
+                    } else {
+                        wid.mark_defined(defined);
+                    }
+                }
+            }
+            Self::Hint { .. } => {}
+        }
+        Ok(())
+    }
 }
 
 #[derive(EnumCount, Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -379,7 +519,10 @@ impl<F: Field + PartialEq> PartialEq for Op<F> {
 
 #[cfg(test)]
 mod tests {
+    use alloc::vec;
+
     use p3_test_utils::baby_bear_params::{BabyBear, PrimeCharacteristicRing};
+    use strum::EnumCount;
 
     use super::*;
 
@@ -508,5 +651,270 @@ mod tests {
     #[should_panic(expected = "Invalid PrimitiveOpType value")]
     fn test_primitive_op_type_invalid_conversion() {
         let _ = PrimitiveOpType::from(999);
+    }
+
+    #[test]
+    fn test_preprocess_const_stores_index_and_marks_defined() {
+        let op: Op<F> = Op::Const {
+            out: WitnessId(3),
+            val: F::from_u64(42),
+        };
+        let mut defined = vec![false; 4];
+        let mut prep = PreprocessedColumns::new();
+
+        op.preprocess(&mut defined, &mut prep).unwrap();
+
+        assert_eq!(
+            prep.primitive[PrimitiveOpType::Const as usize],
+            vec![F::from_u32(3)]
+        );
+        assert_eq!(defined, vec![false, false, false, true]);
+        // Other primitive columns untouched.
+        assert!(prep.primitive[PrimitiveOpType::Public as usize].is_empty());
+        assert!(prep.primitive[PrimitiveOpType::Alu as usize].is_empty());
+    }
+
+    #[test]
+    fn test_preprocess_const_with_d_scaling() {
+        let op: Op<F> = Op::Const {
+            out: WitnessId(2),
+            val: F::from_u64(7),
+        };
+        let mut defined = vec![];
+        let mut prep = PreprocessedColumns::new_with_d(4);
+
+        op.preprocess(&mut defined, &mut prep).unwrap();
+
+        // WitnessId(2) * d=4 → 8
+        assert_eq!(
+            prep.primitive[PrimitiveOpType::Const as usize],
+            vec![F::from_u32(8)]
+        );
+        assert_eq!(defined, vec![false, false, true]);
+    }
+
+    #[test]
+    fn test_preprocess_public_stores_index_and_marks_defined() {
+        let op: Op<F> = Op::Public {
+            out: WitnessId(1),
+            public_pos: 0,
+        };
+        let mut defined = vec![false; 2];
+        let mut prep = PreprocessedColumns::new();
+
+        op.preprocess(&mut defined, &mut prep).unwrap();
+
+        assert_eq!(
+            prep.primitive[PrimitiveOpType::Public as usize],
+            vec![F::from_u32(1)]
+        );
+        assert_eq!(defined, vec![false, true]);
+        assert!(prep.primitive[PrimitiveOpType::Const as usize].is_empty());
+    }
+
+    #[test]
+    fn test_preprocess_alu_forward_add() {
+        // Forward case: out not yet defined → out_is_creator=1, b_is_creator=0.
+        // - a(0) defined,
+        // - b(1) undefined,
+        // - out(2) undefined.
+        let op: Op<F> = Op::add(WitnessId(0), WitnessId(1), WitnessId(2));
+        let mut defined = vec![true, false, false];
+        let mut prep = PreprocessedColumns::new();
+
+        op.preprocess(&mut defined, &mut prep).unwrap();
+
+        let f = F::from_u32;
+        assert_eq!(
+            prep.primitive[PrimitiveOpType::Alu as usize],
+            vec![
+                F::ONE,  // sel_add_vs_mul
+                F::ZERO, // sel_bool
+                F::ZERO, // sel_muladd
+                F::ZERO, // sel_horner
+                f(0),    // a_idx
+                f(1),    // b_idx
+                f(0),    // c_idx (None → WitnessId(0))
+                f(2),    // out_idx
+                F::ONE,  // a_is_reader (a=0 defined)
+                F::ZERO, // b_is_creator
+                F::ONE,  // c_is_reader (c defaults to WitnessId(0), which is defined)
+                F::ONE,  // out_is_creator
+            ]
+        );
+        // out(2) now defined.
+        assert_eq!(defined, vec![true, false, true]);
+        // Readers: b(1), a(0), c(0).
+        assert_eq!(prep.ext_reads, vec![2, 1]);
+    }
+
+    #[test]
+    fn test_preprocess_alu_forward_mul() {
+        // Forward Mul: all selectors zero.
+        let op: Op<F> = Op::mul(WitnessId(0), WitnessId(1), WitnessId(2));
+        let mut defined = vec![false; 3];
+        let mut prep = PreprocessedColumns::new();
+
+        op.preprocess(&mut defined, &mut prep).unwrap();
+
+        let alu = &prep.primitive[PrimitiveOpType::Alu as usize];
+        // First 4 values are selectors — all zero for Mul.
+        assert_eq!(&alu[..4], &[F::ZERO; 4]);
+        assert_eq!(defined, vec![false, false, true]);
+    }
+
+    #[test]
+    fn test_preprocess_alu_backward() {
+        // Backward case: out(2) already defined, b(1) not yet defined.
+        // → b_is_creator=1, out_is_creator=0.
+        let op: Op<F> = Op::add(WitnessId(0), WitnessId(1), WitnessId(2));
+        let mut defined = vec![false, false, true];
+        let mut prep = PreprocessedColumns::new();
+
+        op.preprocess(&mut defined, &mut prep).unwrap();
+
+        let alu = &prep.primitive[PrimitiveOpType::Alu as usize];
+        // b_is_creator=1 (index 9), out_is_creator=0 (index 11).
+        assert_eq!(alu[9], F::ONE);
+        assert_eq!(alu[11], F::ZERO);
+        // b(1) now defined.
+        assert_eq!(defined, vec![false, true, true]);
+        // Readers: out(2) always, a(0) not defined → not a reader.
+        assert_eq!(prep.ext_reads, vec![0, 0, 1]);
+    }
+
+    #[test]
+    fn test_preprocess_alu_all_reader() {
+        // All-reader case: both out(2) and b(1) already defined.
+        // → b_is_creator=0, out_is_creator=0.
+        let op: Op<F> = Op::add(WitnessId(0), WitnessId(1), WitnessId(2));
+        let mut defined = vec![true, true, true];
+        let mut prep = PreprocessedColumns::new();
+
+        op.preprocess(&mut defined, &mut prep).unwrap();
+
+        let alu = &prep.primitive[PrimitiveOpType::Alu as usize];
+        // b_is_creator=0 (index 9), out_is_creator=0 (index 11).
+        assert_eq!(alu[9], F::ZERO);
+        assert_eq!(alu[11], F::ZERO);
+        // a_is_reader=1 (index 8), c_is_reader=1 (index 10, c defaults to WitnessId(0) which is defined).
+        assert_eq!(alu[8], F::ONE);
+        assert_eq!(alu[10], F::ONE);
+        // defined unchanged.
+        assert_eq!(defined, vec![true, true, true]);
+        // Readers: b(1), out(2), a(0), c(0).
+        assert_eq!(prep.ext_reads, vec![2, 1, 1]);
+    }
+
+    #[test]
+    fn test_preprocess_alu_muladd_selectors() {
+        let op: Op<F> = Op::mul_add(WitnessId(0), WitnessId(1), WitnessId(2), WitnessId(3));
+        let mut defined = vec![false; 4];
+        let mut prep = PreprocessedColumns::new();
+
+        op.preprocess(&mut defined, &mut prep).unwrap();
+
+        let alu = &prep.primitive[PrimitiveOpType::Alu as usize];
+        assert_eq!(
+            &alu[..4],
+            &[F::ZERO, F::ZERO, F::ONE, F::ZERO] // sel_muladd=1
+        );
+        // c_idx = WitnessId(2) * d=1 → 2.
+        assert_eq!(alu[6], F::from_u32(2));
+    }
+
+    #[test]
+    fn test_preprocess_alu_bool_check_selectors() {
+        let op: Op<F> = Op::bool_check(WitnessId(0), WitnessId(1), WitnessId(2));
+        let mut defined = vec![false; 3];
+        let mut prep = PreprocessedColumns::new();
+
+        op.preprocess(&mut defined, &mut prep).unwrap();
+
+        let alu = &prep.primitive[PrimitiveOpType::Alu as usize];
+        assert_eq!(
+            &alu[..4],
+            &[F::ZERO, F::ONE, F::ZERO, F::ZERO] // sel_bool=1
+        );
+    }
+
+    #[test]
+    fn test_preprocess_alu_d_scaling() {
+        // With d=4, witness indices are multiplied by 4.
+        let op: Op<F> = Op::add(WitnessId(2), WitnessId(3), WitnessId(5));
+        let mut defined = vec![false; 6];
+        let mut prep = PreprocessedColumns::new_with_d(4);
+
+        op.preprocess(&mut defined, &mut prep).unwrap();
+
+        let alu = &prep.primitive[PrimitiveOpType::Alu as usize];
+        let f = F::from_u32;
+        assert_eq!(alu[4], f(8)); // a=2*4
+        assert_eq!(alu[5], f(12)); // b=3*4
+        assert_eq!(alu[6], f(0)); // c=0*4
+        assert_eq!(alu[7], f(20)); // out=5*4
+    }
+
+    #[test]
+    fn test_preprocess_alu_a_and_c_undefined_not_readers() {
+        // a(10) and c not defined → a_is_reader=0, c_is_reader=0.
+        // Only b is a reader in forward case.
+        let op: Op<F> = Op::add(WitnessId(10), WitnessId(5), WitnessId(3));
+        let mut defined = vec![false; 11];
+        let mut prep = PreprocessedColumns::new();
+
+        op.preprocess(&mut defined, &mut prep).unwrap();
+
+        let alu = &prep.primitive[PrimitiveOpType::Alu as usize];
+        assert_eq!(alu[8], F::ZERO); // a_is_reader=0
+        assert_eq!(alu[10], F::ZERO); // c_is_reader=0
+        // Only b(5) is a reader.
+        assert_eq!(prep.ext_reads, vec![0, 0, 0, 0, 0, 1]);
+    }
+
+    #[test]
+    fn test_preprocess_selectors_all_kinds() {
+        let cases: [(AluOpKind, [F; 4]); 5] = [
+            (AluOpKind::Add, [F::ONE, F::ZERO, F::ZERO, F::ZERO]),
+            (AluOpKind::Mul, [F::ZERO, F::ZERO, F::ZERO, F::ZERO]),
+            (AluOpKind::BoolCheck, [F::ZERO, F::ONE, F::ZERO, F::ZERO]),
+            (AluOpKind::MulAdd, [F::ZERO, F::ZERO, F::ONE, F::ZERO]),
+            (AluOpKind::HornerAcc, [F::ZERO, F::ZERO, F::ZERO, F::ONE]),
+        ];
+        for (kind, expected) in &cases {
+            assert_eq!(
+                kind.selectors::<F>(),
+                *expected,
+                "selectors mismatch for {kind:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_preprocess_preserves_other_primitive_columns() {
+        // Preprocessing a Const should not touch Public or Alu columns, and vice versa.
+        let mut defined = vec![false; 3];
+        let mut prep = PreprocessedColumns::new();
+
+        Op::<F>::Const {
+            out: WitnessId(0),
+            val: F::from_u64(1),
+        }
+        .preprocess(&mut defined, &mut prep)
+        .unwrap();
+        Op::<F>::Public {
+            out: WitnessId(1),
+            public_pos: 0,
+        }
+        .preprocess(&mut defined, &mut prep)
+        .unwrap();
+        Op::<F>::add(WitnessId(0), WitnessId(1), WitnessId(2))
+            .preprocess(&mut defined, &mut prep)
+            .unwrap();
+
+        assert_eq!(prep.primitive.len(), PrimitiveOpType::COUNT);
+        assert_eq!(prep.primitive[PrimitiveOpType::Const as usize].len(), 1);
+        assert_eq!(prep.primitive[PrimitiveOpType::Public as usize].len(), 1);
+        assert_eq!(prep.primitive[PrimitiveOpType::Alu as usize].len(), 12);
     }
 }

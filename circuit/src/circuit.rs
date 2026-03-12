@@ -6,10 +6,10 @@ use hashbrown::HashMap;
 use p3_field::Field;
 use strum::EnumCount;
 
+use crate::CircuitError;
 use crate::ops::{NonPrimitivePreprocessedMap, NpoConfig, NpoTypeId, Op, PrimitiveOpType};
 use crate::tables::{CircuitRunner, TraceGeneratorFn};
 use crate::types::{ExprId, NonPrimitiveOpId, WitnessId};
-use crate::{AluOpKind, CircuitError};
 
 /// Preprocessed data for primitive and non-primitive operation tables.
 #[derive(Debug)]
@@ -265,7 +265,7 @@ impl<F: Field> Circuit<F> {
     /// |-------|-----------|----------------------------------------------------------------------------|----------------|
     /// | 0     | Const     | `[out_0, out_1, ...]` (D-scaled indices)                                   | 1              |
     /// | 1     | Public    | `[out_0, out_1, ...]` (D-scaled indices)                                   | 1              |
-    /// | 2     | Alu       | `[sel_add_vs_mul, sel_bool, sel_muladd, a_idx, b_idx, c_idx, out_idx, a_is_reader, b_is_creator, c_is_reader, out_is_creator]` | 11 |
+    /// | 2     | Alu       | `[sel_add_vs_mul, sel_bool, sel_muladd, sel_horner, a_idx, b_idx, c_idx, out_idx, a_is_reader, b_is_creator, c_is_reader, out_is_creator]` | 12 |
     ///
     /// Signed multiplicities are not stored here; they are computed in `get_airs_and_degrees_with_prep`
     /// using the `ext_reads` field, which tracks how many times each witness is read.
@@ -276,192 +276,13 @@ impl<F: Field> Circuit<F> {
         d: usize,
     ) -> Result<PreprocessedColumns<F>, CircuitError> {
         let mut preprocessed = PreprocessedColumns::new_with_d(d);
-
-        // Track which witnesses have been defined (first-occurrence = creator).
-        // Const and Public define their outputs first. ALU ops define their output (forward)
-        // or their `b` operand (backward/sub encoding where `out` was already defined).
         let mut defined = vec![false; self.witness_count as usize];
 
-        // Process each primitive operation.
         for op in &self.ops {
-            match op {
-                // Const: creates the output witness value. Store D-scaled out index.
-                // No ext_reads increment: Const is a creator, not a reader.
-                Op::Const { out, .. } => {
-                    let idx = preprocessed.witness_index_as_field(*out);
-                    preprocessed.primitive[PrimitiveOpType::Const as usize].push(idx);
-                    let out_idx = out.0 as usize;
-                    if out_idx >= defined.len() {
-                        defined.resize(out_idx + 1, false);
-                    }
-                    defined[out_idx] = true;
-                }
-                // Public: creates the output witness value. Store D-scaled out index.
-                // No ext_reads increment: Public is a creator, not a reader.
-                Op::Public { out, .. } => {
-                    let idx = preprocessed.witness_index_as_field(*out);
-                    preprocessed.primitive[PrimitiveOpType::Public as usize].push(idx);
-                    let out_idx = out.0 as usize;
-                    if out_idx >= defined.len() {
-                        defined.resize(out_idx + 1, false);
-                    }
-                    defined[out_idx] = true;
-                }
-                // Unified ALU operations with selectors for operation kind.
-                //
-                // Preprocessed per op (12 values, no multiplicities):
-                // [sel_add_vs_mul, sel_bool, sel_muladd, sel_horner, a_idx, b_idx, c_idx, out_idx,
-                //  a_is_reader, b_is_creator, c_is_reader, out_is_creator]
-                //
-                // a_is_reader: 1 if `a` is a constrained witness (defined by Const/Public/ALU/Poseidon2).
-                // c_is_reader: 1 if `c` is a constrained witness.
-                // 0 means unconstrained (Unconstrained NonPrimitive op output): no bus contribution.
-                //
-                // Three cases based on which operands are already defined:
-                //
-                // Forward (out not yet defined): b_is_creator=0, out_is_creator=1.
-                //   Creator: out. Readers: b (always), a (if a_is_reader), c (if c_is_reader).
-                //
-                // Backward (out defined, b not yet defined, e.g. backward-encoded Sub):
-                //   b_is_creator=1, out_is_creator=0. Creator: b.
-                //   Readers: out (always), a (if a_is_reader), c (if c_is_reader).
-                //
-                // All-reader (out and b both already defined, e.g. assert_zero rewrite):
-                //   b_is_creator=0, out_is_creator=0. No creator.
-                //   Readers: b, out (always), a (if a_is_reader), c (if c_is_reader).
-                Op::Alu {
-                    kind, a, b, c, out, ..
-                } => {
-                    let (sel_add_vs_mul, sel_bool, sel_muladd, sel_horner) = match kind {
-                        AluOpKind::Add => (F::ONE, F::ZERO, F::ZERO, F::ZERO),
-                        AluOpKind::Mul => (F::ZERO, F::ZERO, F::ZERO, F::ZERO),
-                        AluOpKind::BoolCheck => (F::ZERO, F::ONE, F::ZERO, F::ZERO),
-                        AluOpKind::MulAdd => (F::ZERO, F::ZERO, F::ONE, F::ZERO),
-                        AluOpKind::HornerAcc => (F::ZERO, F::ZERO, F::ZERO, F::ONE),
-                    };
-                    let c_wid = c.unwrap_or(WitnessId(0));
-                    let d_u32 = d as u32;
-
-                    let out_already_defined =
-                        (out.0 as usize) < defined.len() && defined[out.0 as usize];
-                    let b_already_defined = (b.0 as usize) < defined.len() && defined[b.0 as usize];
-
-                    // Determine whether a and c are constrained witnesses (have creator AIRs).
-                    // Unconstrained witnesses are never marked defined; their reads don't
-                    // contribute to the WitnessChecks bus.
-                    let a_is_reader = (a.0 as usize) < defined.len() && defined[a.0 as usize];
-                    let c_is_reader =
-                        (c_wid.0 as usize) < defined.len() && defined[c_wid.0 as usize];
-
-                    let (b_is_creator, out_is_creator) = if !out_already_defined {
-                        (F::ZERO, F::ONE) // forward: out is new creator
-                    } else if !b_already_defined {
-                        (F::ONE, F::ZERO) // backward: b is new creator
-                    } else {
-                        (F::ZERO, F::ZERO) // all-reader: no new creator
-                    };
-
-                    preprocessed.primitive[PrimitiveOpType::Alu as usize].extend([
-                        sel_add_vs_mul,
-                        sel_bool,
-                        sel_muladd,
-                        sel_horner,
-                        F::from_u32(a.0 * d_u32),
-                        F::from_u32(b.0 * d_u32),
-                        F::from_u32(c_wid.0 * d_u32),
-                        F::from_u32(out.0 * d_u32),
-                        if a_is_reader { F::ONE } else { F::ZERO },
-                        b_is_creator,
-                        if c_is_reader { F::ONE } else { F::ZERO },
-                        out_is_creator,
-                    ]);
-
-                    if !out_already_defined {
-                        // Forward: out is the creator, b is always a reader.
-                        // a and c contribute to ext_reads only if they are constrained.
-                        let out_idx = out.0 as usize;
-                        if out_idx >= defined.len() {
-                            defined.resize(out_idx + 1, false);
-                        }
-                        defined[out_idx] = true;
-                        let mut readers = vec![*b];
-                        if a_is_reader {
-                            readers.push(*a);
-                        }
-                        if c_is_reader {
-                            readers.push(c_wid);
-                        }
-                        preprocessed.increment_ext_reads(&readers);
-                    } else if !b_already_defined {
-                        // Backward: b is the creator, out is always a reader.
-                        // a and c contribute to ext_reads only if they are constrained.
-                        let b_idx = b.0 as usize;
-                        if b_idx >= defined.len() {
-                            defined.resize(b_idx + 1, false);
-                        }
-                        defined[b_idx] = true;
-                        let mut readers = vec![*out];
-                        if a_is_reader {
-                            readers.push(*a);
-                        }
-                        if c_is_reader {
-                            readers.push(c_wid);
-                        }
-                        preprocessed.increment_ext_reads(&readers);
-                    } else {
-                        // All-reader: b and out are always readers.
-                        // a and c contribute to ext_reads only if they are constrained.
-                        let mut readers = vec![*b, *out];
-                        if a_is_reader {
-                            readers.push(*a);
-                        }
-                        if c_is_reader {
-                            readers.push(c_wid);
-                        }
-                        preprocessed.increment_ext_reads(&readers);
-                    }
-                }
-                Op::NonPrimitiveOpWithExecutor {
-                    executor,
-                    inputs,
-                    outputs,
-                    ..
-                } => {
-                    executor.preprocess(inputs, outputs, &mut preprocessed)?;
-
-                    // Track duplicate non-primitive outputs: first occurrence is a creator,
-                    // subsequent occurrences are treated as readers on WitnessChecks.
-                    let op_type = executor.op_type();
-                    let n_exposed = executor.num_exposed_outputs().unwrap_or(outputs.len());
-                    for out_limb in outputs.iter().take(n_exposed) {
-                        for wid in out_limb {
-                            let wid_idx = wid.0 as usize;
-                            if wid_idx < defined.len() && defined[wid_idx] {
-                                let dup = preprocessed
-                                    .dup_npo_outputs
-                                    .entry(op_type.clone())
-                                    .or_default();
-                                if wid_idx >= dup.len() {
-                                    dup.resize(wid_idx + 1, false);
-                                }
-                                dup[wid_idx] = true;
-                                preprocessed.increment_ext_reads(&[*wid]);
-                            } else {
-                                if wid_idx >= defined.len() {
-                                    defined.resize(wid_idx + 1, false);
-                                }
-                                defined[wid_idx] = true;
-                            }
-                        }
-                    }
-                }
-                Op::Hint { .. } => {
-                    // Hints do not participate in preprocessed columns or table-backed ops.
-                }
-            }
+            op.preprocess(&mut defined, &mut preprocessed)?;
         }
 
-        // Ensure ext_reads covers at least all witnesses.
+        // Ensure ext_reads covers all witnesses.
         let size = self.witness_count as usize;
         if preprocessed.ext_reads.len() < size {
             preprocessed.ext_reads.resize(size, 0);

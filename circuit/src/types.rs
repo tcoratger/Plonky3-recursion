@@ -1,3 +1,4 @@
+use alloc::vec::Vec;
 use core::fmt;
 
 use serde::{Deserialize, Serialize};
@@ -14,6 +15,20 @@ impl WitnessId {
             cur = next;
         }
         cur
+    }
+
+    /// Check if this witness ID has been marked as defined in the tracking vector.
+    pub fn is_defined(self, defined: &[bool]) -> bool {
+        defined.get(self.0 as usize).copied().unwrap_or(false)
+    }
+
+    /// Mark this witness ID as defined, growing the vector if needed.
+    pub fn mark_defined(self, defined: &mut Vec<bool>) {
+        let idx = self.0 as usize;
+        if idx >= defined.len() {
+            defined.resize(idx + 1, false);
+        }
+        defined[idx] = true;
     }
 }
 
@@ -72,7 +87,9 @@ impl WitnessAllocator {
 
 #[cfg(test)]
 mod tests {
-    use alloc::format;
+    use alloc::{format, vec};
+
+    use proptest::prelude::*;
 
     use super::*;
 
@@ -94,6 +111,57 @@ mod tests {
         assert_eq!(w1, WitnessId(1));
         assert_eq!(w2, WitnessId(2));
         assert_eq!(allocator.witness_count(), 3);
+    }
+
+    #[test]
+    fn test_witness_id_is_defined_in_bounds() {
+        let defined = vec![false, true, false, true];
+        assert!(!WitnessId(0).is_defined(&defined));
+        assert!(WitnessId(1).is_defined(&defined));
+        assert!(!WitnessId(2).is_defined(&defined));
+        assert!(WitnessId(3).is_defined(&defined));
+    }
+
+    #[test]
+    fn test_witness_id_is_defined_out_of_bounds() {
+        let defined = vec![true];
+        assert!(!WitnessId(1).is_defined(&defined));
+        assert!(!WitnessId(100).is_defined(&defined));
+    }
+
+    #[test]
+    fn test_witness_id_is_defined_empty() {
+        let defined: Vec<bool> = vec![];
+        assert!(!WitnessId(0).is_defined(&defined));
+    }
+
+    #[test]
+    fn test_witness_id_mark_defined_in_bounds() {
+        let mut defined = vec![false, false, false];
+        WitnessId(1).mark_defined(&mut defined);
+        assert_eq!(defined, vec![false, true, false]);
+    }
+
+    #[test]
+    fn test_witness_id_mark_defined_grows_vector() {
+        let mut defined = vec![true];
+        WitnessId(3).mark_defined(&mut defined);
+        assert_eq!(defined, vec![true, false, false, true]);
+    }
+
+    #[test]
+    fn test_witness_id_mark_defined_empty_vector() {
+        let mut defined: Vec<bool> = vec![];
+        WitnessId(2).mark_defined(&mut defined);
+        assert_eq!(defined, vec![false, false, true]);
+    }
+
+    #[test]
+    fn test_witness_id_mark_defined_idempotent() {
+        let mut defined = vec![false, false];
+        WitnessId(1).mark_defined(&mut defined);
+        WitnessId(1).mark_defined(&mut defined);
+        assert_eq!(defined, vec![false, true]);
     }
 
     #[test]
@@ -125,78 +193,89 @@ mod tests {
         assert_eq!(WitnessId(5).resolve(&rewrite), WitnessId(5));
     }
 
-    #[cfg(test)]
-    mod proptests {
-        use proptest::prelude::*;
+    proptest! {
+        #[test]
+        fn witness_id_mark_defined_then_is_defined(idx in 0u32..256) {
+            let wid = WitnessId(idx);
+            let mut defined = vec![];
 
-        use super::*;
+            prop_assert!(!wid.is_defined(&defined), "should not be defined initially");
 
-        proptest! {
-            #[test]
-            fn witness_id_ordering(a in 0u32..u32::MAX, b in 0u32..u32::MAX) {
-                let id_a = WitnessId(a);
-                let id_b = WitnessId(b);
+            wid.mark_defined(&mut defined);
 
-                if a < b {
-                    prop_assert!(id_a < id_b, "ordering should match inner value");
-                } else if a > b {
-                    prop_assert!(id_a > id_b, "ordering should match inner value");
-                } else {
-                    prop_assert_eq!(id_a, id_b, "equal values should compare equal");
-                }
+            prop_assert!(wid.is_defined(&defined), "should be defined after marking");
+            prop_assert_eq!(defined.len(), idx as usize + 1, "vector should grow to fit");
+
+            // Marking again should be idempotent.
+            wid.mark_defined(&mut defined);
+            prop_assert!(wid.is_defined(&defined), "should still be defined after re-marking");
+            prop_assert_eq!(defined.len(), idx as usize + 1, "vector length should not change");
+        }
+
+        #[test]
+        fn witness_id_ordering(a in 0u32..u32::MAX, b in 0u32..u32::MAX) {
+            let id_a = WitnessId(a);
+            let id_b = WitnessId(b);
+
+            if a < b {
+                prop_assert!(id_a < id_b, "ordering should match inner value");
+            } else if a > b {
+                prop_assert!(id_a > id_b, "ordering should match inner value");
+            } else {
+                prop_assert_eq!(id_a, id_b, "equal values should compare equal");
             }
+        }
 
-            #[test]
-            fn expr_id_ordering(a in 0u32..u32::MAX, b in 0u32..u32::MAX) {
-                let id_a = ExprId(a);
-                let id_b = ExprId(b);
+        #[test]
+        fn expr_id_ordering(a in 0u32..u32::MAX, b in 0u32..u32::MAX) {
+            let id_a = ExprId(a);
+            let id_b = ExprId(b);
 
-                if a < b {
-                    prop_assert!(id_a < id_b, "ordering should match inner value");
-                } else if a > b {
-                    prop_assert!(id_a > id_b, "ordering should match inner value");
-                } else {
-                    prop_assert_eq!(id_a, id_b, "equal values should compare equal");
-                }
+            if a < b {
+                prop_assert!(id_a < id_b, "ordering should match inner value");
+            } else if a > b {
+                prop_assert!(id_a > id_b, "ordering should match inner value");
+            } else {
+                prop_assert_eq!(id_a, id_b, "equal values should compare equal");
             }
+        }
 
-            #[test]
-            fn non_primitive_op_id_equality(a in 0u32..u32::MAX, b in 0u32..u32::MAX) {
-                let id_a1 = NonPrimitiveOpId(a);
-                let id_a2 = NonPrimitiveOpId(a);
-                let id_b = NonPrimitiveOpId(b);
+        #[test]
+        fn non_primitive_op_id_equality(a in 0u32..u32::MAX, b in 0u32..u32::MAX) {
+            let id_a1 = NonPrimitiveOpId(a);
+            let id_a2 = NonPrimitiveOpId(a);
+            let id_b = NonPrimitiveOpId(b);
 
-                prop_assert_eq!(id_a1, id_a2, "same value should be equal");
-                if a != b {
-                    prop_assert_ne!(id_a1, id_b, "different values should not be equal");
-                }
+            prop_assert_eq!(id_a1, id_a2, "same value should be equal");
+            if a != b {
+                prop_assert_ne!(id_a1, id_b, "different values should not be equal");
             }
+        }
 
-            #[test]
-            fn witness_allocator_unique(count in 1usize..100) {
-                let mut allocator = WitnessAllocator::new();
-                let mut seen = hashbrown::HashSet::new();
+        #[test]
+        fn witness_allocator_unique(count in 1usize..100) {
+            let mut allocator = WitnessAllocator::new();
+            let mut seen = hashbrown::HashSet::new();
 
-                for _ in 0..count {
-                    let id = allocator.alloc();
-                    prop_assert!(seen.insert(id), "each allocation should be unique");
-                }
+            for _ in 0..count {
+                let id = allocator.alloc();
+                prop_assert!(seen.insert(id), "each allocation should be unique");
             }
+        }
 
-            #[test]
-            fn witness_allocator_count_accurate(count in 0usize..100) {
-                let mut allocator = WitnessAllocator::new();
+        #[test]
+        fn witness_allocator_count_accurate(count in 0usize..100) {
+            let mut allocator = WitnessAllocator::new();
 
-                prop_assert_eq!(allocator.witness_count(), 0, "new allocator should have count 0");
+            prop_assert_eq!(allocator.witness_count(), 0, "new allocator should have count 0");
 
-                for i in 1..=count {
-                    allocator.alloc();
-                    prop_assert_eq!(
-                        allocator.witness_count(),
-                        i as u32,
-                        "count should increment with each allocation"
-                    );
-                }
+            for i in 1..=count {
+                allocator.alloc();
+                prop_assert_eq!(
+                    allocator.witness_count(),
+                    i as u32,
+                    "count should increment with each allocation"
+                );
             }
         }
     }
