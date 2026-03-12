@@ -276,8 +276,13 @@ impl<F: Field> Circuit<F> {
         d: usize,
     ) -> Result<PreprocessedColumns<F>, CircuitError> {
         let mut preprocessed = PreprocessedColumns::new_with_d(d);
+
+        // Track which witnesses have been defined (first-occurrence = creator).
+        // Const and Public define their outputs first. ALU ops define their output (forward)
+        // or their `b` operand (backward/sub encoding where `out` was already defined).
         let mut defined = vec![false; self.witness_count as usize];
 
+        // Process each primitive operation.
         for op in &self.ops {
             op.preprocess(&mut defined, &mut preprocessed)?;
         }
