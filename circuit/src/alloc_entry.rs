@@ -28,7 +28,7 @@ pub enum AllocationType {
 
 impl AllocationType {
     /// Section header for grouped display.
-    fn group_name(&self) -> &'static str {
+    const fn group_name(&self) -> &'static str {
         match self {
             Self::Public => "Public Inputs",
             Self::Const => "Constants",
@@ -44,7 +44,7 @@ impl AllocationType {
     }
 
     /// Arithmetic operator for binary ops, `None` for everything else.
-    fn operator(&self) -> Option<char> {
+    const fn operator(&self) -> Option<char> {
         match self {
             Self::Add => Some('+'),
             Self::Sub => Some('-'),
@@ -89,14 +89,14 @@ pub struct AllocationEntry {
 
 impl fmt::Display for AllocationEntry {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let Some(op) = self.alloc_type.operator() {
-            if self.dependencies.len() == 2 {
-                return write!(
-                    f,
-                    "expr_{} = expr_{} {op} expr_{}",
-                    self.expr_id.0, self.dependencies[0][0].0, self.dependencies[1][0].0,
-                );
-            }
+        if let Some(op) = self.alloc_type.operator()
+            && self.dependencies.len() == 2
+        {
+            return write!(
+                f,
+                "expr_{} = expr_{} {op} expr_{}",
+                self.expr_id.0, self.dependencies[0][0].0, self.dependencies[1][0].0,
+            );
         }
 
         if let AllocationType::NonPrimitiveOp(_) = &self.alloc_type {
