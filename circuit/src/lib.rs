@@ -15,7 +15,7 @@ pub mod types;
 
 // Re-export public API
 #[cfg(feature = "debugging")]
-pub use alloc_entry::{AllocationEntry, AllocationType, dump_expr_ids};
+pub use alloc_entry::{AllocationEntry, AllocationLog, AllocationType};
 pub use builder::{
     CircuitBuilder, CircuitBuilderError, NonPrimitiveOperationData, NpoCircuitPlugin,
     NpoLoweringContext,

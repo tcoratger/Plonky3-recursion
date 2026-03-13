@@ -19,6 +19,8 @@ use hashbrown::HashMap;
 use p3_field::PrimeCharacteristicRing;
 
 use crate::NpoTypeId;
+#[cfg(feature = "debugging")]
+use crate::alloc_entry::AllocationLog;
 use crate::expr::{Expr, ExpressionGraph};
 use crate::types::{ExprId, NonPrimitiveOpId};
 #[cfg(feature = "debugging")]
@@ -185,7 +187,7 @@ pub struct ExpressionBuilder<F> {
     ///
     /// **Only present in debug builds.**
     #[cfg(feature = "debugging")]
-    allocation_log: Vec<AllocationEntry>,
+    allocation_log: AllocationLog,
 
     /// Hierarchical scope stack for organizing allocations.
     ///
@@ -258,7 +260,7 @@ where
             cse_pool: HashMap::new(),
             pending_connects: Vec::new(),
             #[cfg(feature = "debugging")]
-            allocation_log: Vec::new(),
+            allocation_log: AllocationLog::default(),
             #[cfg(feature = "debugging")]
             scope_stack: Vec::new(),
             #[cfg(feature = "profiling")]
@@ -917,7 +919,7 @@ where
     /// If debug_assertions are not enabled, this is a no-op.
     pub fn dump_expr_ids(&self, expr_ids: &[ExprId]) {
         #[cfg(feature = "debugging")]
-        crate::alloc_entry::dump_expr_ids(&self.allocation_log, expr_ids);
+        self.allocation_log.dump_expr_ids(expr_ids);
     }
 
     /// Dumps the allocation log to stdout (debug builds only).
@@ -931,7 +933,7 @@ where
     /// this method does nothing.
     pub fn dump_allocation_log(&self) {
         #[cfg(feature = "debugging")]
-        crate::alloc_entry::dump_allocation_log(&self.allocation_log);
+        self.allocation_log.dump();
     }
 
     /// Lists all unique scopes in the allocation log.
@@ -946,7 +948,7 @@ where
     pub fn list_scopes(&self) -> Vec<String> {
         #[cfg(feature = "debugging")]
         {
-            crate::alloc_entry::list_scopes(&self.allocation_log)
+            self.allocation_log.scopes()
         }
         #[cfg(not(feature = "debugging"))]
         {
