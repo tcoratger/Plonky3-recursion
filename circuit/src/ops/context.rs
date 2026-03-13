@@ -392,15 +392,6 @@ mod tests {
         value: Option<u64>,
     }
 
-    impl OpExecutionState for TestOpState {
-        fn as_any(&self) -> &dyn core::any::Any {
-            self
-        }
-        fn as_any_mut(&mut self) -> &mut dyn core::any::Any {
-            self
-        }
-    }
-
     #[test]
     fn test_execution_context_op_state() {
         let mut witness: Vec<Option<F>> = vec![];
