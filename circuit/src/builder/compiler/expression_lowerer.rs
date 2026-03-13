@@ -438,6 +438,17 @@ where
                     ));
                     expr_to_widx.insert(expr_id, out_widx);
                 }
+                Expr::BoolCheck { val } => {
+                    let out_widx = alloc_witness_id_for_expr(expr_idx);
+                    let val_widx = get_witness_id(
+                        &expr_to_widx,
+                        *val,
+                        &format!("BoolCheck val for {expr_id:?}"),
+                    )?;
+                    // b slot is unused by the AIR; pass val_widx as placeholder
+                    ops.push(Op::bool_check(val_widx, val_widx, out_widx));
+                    expr_to_widx.insert(expr_id, out_widx);
+                }
                 Expr::NonPrimitiveCall { op_id, inputs: _ } => {
                     // The `inputs` field encodes DAG dependencies for ordering purposes.
                     // Actual input data is read from NonPrimitiveOperationData.

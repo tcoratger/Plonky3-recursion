@@ -26,6 +26,10 @@ pub enum Expr<F> {
         p_at_z: ExprId,
         p_at_x: ExprId,
     },
+    /// Boolean check: asserts val ∈ {0, 1}.
+    ///
+    /// Emits a single BoolCheck ALU op with no intermediate witnesses.
+    BoolCheck { val: ExprId },
     /// Anchor node for a non-primitive operation in the expression DAG.
     ///
     /// This node has no witness value itself, but it fixes the relative execution order

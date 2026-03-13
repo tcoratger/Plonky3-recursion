@@ -118,14 +118,13 @@ impl<F: Field> MulAddFusion<F> {
                 }
                 Op::Alu {
                     kind: AluOpKind::Add,
-                    a,
                     b,
                     out,
                     c: None,
                     ..
                 } => {
                     self.track_backwards_op(idx, *out, *b);
-                    self.insert_def(*out, idx, OpDef::Add { a: *a, b: *b });
+                    self.insert_def(*out, idx, OpDef::Other);
                 }
                 Op::Alu { out, .. } | Op::Public { out, .. } => {
                     self.insert_def(*out, idx, OpDef::Other);
