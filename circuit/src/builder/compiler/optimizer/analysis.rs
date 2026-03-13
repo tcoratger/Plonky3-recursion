@@ -2,6 +2,10 @@ use crate::ops::AluOpKind;
 use crate::types::WitnessId;
 
 /// Lightweight summary of how a witness was produced.
+///
+/// Only encodes the shapes that BoolCheck and MulAdd fusion need to inspect
+/// (`Const`, `Add`, `Mul`); every other operation is collapsed into `Other`
+/// because the fusion passes do not need to reason about them.
 #[derive(Clone, Debug)]
 pub(super) enum OpDef<F> {
     Const(F),

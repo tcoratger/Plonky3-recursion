@@ -28,17 +28,11 @@ use crate::types::WitnessId;
 ///
 /// *Note*: CSE is implemented within the
 /// [ExpressionBuilder](crate::builder::expression_builder::ExpressionBuilder) itself.
-pub struct Optimizer<F> {
-    ops: Vec<Op<F>>,
-}
+pub struct Optimizer<F>(core::marker::PhantomData<F>);
 
 impl<F: Field> Optimizer<F> {
-    pub const fn new(ops: Vec<Op<F>>) -> Self {
-        Self { ops }
-    }
-
-    pub fn optimize(self) -> (Vec<Op<F>>, HashMap<WitnessId, WitnessId>) {
-        let (ops, rewrite) = Deduplicator::new().run(self.ops);
+    pub fn optimize(ops: Vec<Op<F>>) -> (Vec<Op<F>>, HashMap<WitnessId, WitnessId>) {
+        let (ops, rewrite) = Deduplicator::new().run(ops);
         let ops = BoolCheckFusion::new(&ops).run(ops);
         let ops = MulAddFusion::new(&ops).run(ops);
         (ops, rewrite)
@@ -68,7 +62,7 @@ mod tests {
             Op::add(WitnessId(0), WitnessId(1), WitnessId(2)),
         ];
 
-        let (optimized, _) = Optimizer::new(ops.clone()).optimize();
+        let (optimized, _) = Optimizer::optimize(ops.clone());
         assert_eq!(optimized, ops);
     }
 
@@ -94,7 +88,7 @@ mod tests {
             Op::add(WitnessId(8), one, WitnessId(9)), // a*c + 1 -> MulAdd
         ];
 
-        let (optimized, _) = Optimizer::new(ops).optimize();
+        let (optimized, _) = Optimizer::optimize(ops);
 
         let bool_checks = optimized
             .iter()
@@ -150,7 +144,7 @@ mod tests {
     #[test]
     fn test_empty_ops() {
         let ops: Vec<Op<F>> = vec![];
-        let (optimized, rewrite) = Optimizer::new(ops).optimize();
+        let (optimized, rewrite) = Optimizer::optimize(ops);
         assert!(optimized.is_empty());
         assert!(rewrite.is_empty());
     }
@@ -173,8 +167,8 @@ mod tests {
             Op::add(WitnessId(8), WitnessId(0), WitnessId(9)),
         ];
 
-        let (first_pass, _) = Optimizer::new(ops).optimize();
-        let (second_pass, rewrite2) = Optimizer::new(first_pass.clone()).optimize();
+        let (first_pass, _) = Optimizer::optimize(ops);
+        let (second_pass, rewrite2) = Optimizer::optimize(first_pass.clone());
 
         assert_eq!(first_pass, second_pass, "Optimizer should be idempotent");
         assert!(
@@ -197,7 +191,7 @@ mod tests {
         ];
 
         let original_len = ops.len();
-        let (optimized, _) = Optimizer::new(ops).optimize();
+        let (optimized, _) = Optimizer::optimize(ops);
         assert!(optimized.len() <= original_len);
     }
 }

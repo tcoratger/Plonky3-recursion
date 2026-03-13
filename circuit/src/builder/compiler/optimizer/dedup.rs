@@ -91,11 +91,12 @@ mod tests {
         let b = WitnessId(1);
         let c = WitnessId(2);
         let mul_out = WitnessId(3);
+        let mul_out2 = WitnessId(5);
         let add_out = WitnessId(4);
 
         let ops: Vec<Op<F>> = vec![
             Op::mul(a, b, mul_out),
-            Op::mul(a, b, mul_out),
+            Op::mul(a, b, mul_out2),
             Op::add(mul_out, c, add_out),
         ];
 
@@ -105,7 +106,7 @@ mod tests {
             deduped,
             vec![Op::mul(a, b, mul_out), Op::add(mul_out, c, add_out)]
         );
-        assert!(rewrite.is_empty());
+        assert_eq!(rewrite.get(&mul_out2), Some(&mul_out));
     }
 
     #[test]

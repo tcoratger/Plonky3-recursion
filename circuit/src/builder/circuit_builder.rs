@@ -769,7 +769,7 @@ where
         let (ops, public_rows, expr_to_widx, public_mappings, witness_count) = lowerer.lower()?;
 
         // Stage 2: IR transformations and optimizations
-        let (ops, rewrite) = Optimizer::new(ops).optimize();
+        let (ops, rewrite) = Optimizer::optimize(ops);
 
         let resolve = |id: WitnessId| id.resolve(&rewrite);
         let expr_to_widx = expr_to_widx
