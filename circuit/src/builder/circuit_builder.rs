@@ -483,9 +483,12 @@ where
     /// Asserts that an expression is boolean: b ∈ {0,1}.
     ///
     /// Emits a single BoolCheck ALU op enforcing b · (b − 1) = 0.
+    ///
+    /// The BoolCheck output is a dead copy of `b`;
+    ///
+    /// No connect is needed because the AIR constraint is enforced on the `a` input slot.
     pub fn assert_bool(&mut self, b: ExprId) {
-        let check = self.expr_builder.add_bool_check(b, "bool_check");
-        self.connect(b, check);
+        self.expr_builder.add_bool_check(b, "bool_check");
     }
 
     /// Connects two expressions, enforcing a == b (by aliasing outputs).
