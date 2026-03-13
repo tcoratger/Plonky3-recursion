@@ -1,10 +1,4 @@
 //! Structured allocation logging for circuit expression graphs.
-//!
-//! Every expression allocated during circuit construction is recorded as an
-//! [`AllocationEntry`] inside an [`AllocationLog`].  The dump methods emit
-//! **structured [`tracing`] spans and events** — not hand-formatted strings —
-//! so any subscriber (pretty-print, `tracing-forest`, JSON, OpenTelemetry)
-//! can filter, aggregate, and render the data idiomatically.
 
 use alloc::format;
 use alloc::string::String;
