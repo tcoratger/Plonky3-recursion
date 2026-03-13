@@ -8,10 +8,10 @@ pub mod circuit;
 pub mod errors;
 pub mod expr;
 pub mod ops;
+pub mod symbolic;
 pub mod tables;
 pub mod test_utils;
 pub mod types;
-pub mod utils;
 
 // Re-export public API
 #[cfg(feature = "debugging")]

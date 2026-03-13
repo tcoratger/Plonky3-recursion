@@ -1,7 +1,7 @@
 mod common;
 
 use p3_air::{Air, BaseAir, RowWindow};
-use p3_circuit::utils::{ColumnsTargets, RowSelectorsTargets};
+use p3_circuit::symbolic::{ColumnsTargets, RowSelectorsTargets};
 use p3_circuit::{CircuitBuilder, CircuitError};
 use p3_circuit_prover::air::{AluAir, ConstAir, PublicAir};
 use p3_lookup::logup::LogUpGadget;

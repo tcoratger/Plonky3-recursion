@@ -3,7 +3,7 @@ use alloc::vec::Vec;
 use alloc::{format, vec};
 
 use itertools::Itertools;
-use p3_circuit::utils::ColumnsTargets;
+use p3_circuit::symbolic::ColumnsTargets;
 use p3_circuit::{CircuitBuilder, CircuitBuilderError, NonPrimitiveOpId};
 use p3_commit::{Pcs, PolynomialSpace};
 use p3_field::{BasedVectorSpace, ExtensionField, Field, PrimeCharacteristicRing, PrimeField64};
