@@ -166,7 +166,7 @@ pub fn generate_poseidon2_trace<
     let op_type = NpoTypeId::poseidon2_perm(Config::CONFIG);
     let Some(state) = op_states
         .get(&op_type)
-        .and_then(|s| s.as_any().downcast_ref::<Poseidon2ExecutionState<F>>())
+        .and_then(|s| s.downcast_ref::<Poseidon2ExecutionState<F>>())
     else {
         return Ok(None);
     };

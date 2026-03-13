@@ -363,7 +363,7 @@ where
     let op_type = NpoTypeId::recompose();
     let Some(state) = op_states
         .get(&op_type)
-        .and_then(|s| s.as_any().downcast_ref::<RecomposeExecutionState<EF>>())
+        .and_then(|s| s.downcast_ref::<RecomposeExecutionState<EF>>())
     else {
         return Ok(None);
     };

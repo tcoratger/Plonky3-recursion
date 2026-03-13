@@ -18,19 +18,21 @@ use crate::{CircuitError, PreprocessedColumns};
 /// - Recording execution data for canonical trace generation
 ///
 /// Automatically implemented for any type that is `Any + Send + Sync + Debug`.
-pub trait OpExecutionState: Any + Send + Sync + Debug {
-    /// Downcast to concrete type for reading.
-    fn as_any(&self) -> &dyn Any;
-    /// Downcast to concrete type for mutation.
-    fn as_any_mut(&mut self) -> &mut dyn Any;
-}
+pub trait OpExecutionState: Any + Send + Sync + Debug {}
 
-impl<T: Any + Send + Sync + Debug> OpExecutionState for T {
-    fn as_any(&self) -> &dyn Any {
-        self
+impl<T: Any + Send + Sync + Debug> OpExecutionState for T {}
+
+impl dyn OpExecutionState {
+    /// Downcast to a concrete type by reference.
+    pub fn downcast_ref<T: 'static>(&self) -> Option<&T> {
+        let any: &dyn Any = self;
+        any.downcast_ref()
     }
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
+
+    /// Downcast to a concrete type by mutable reference.
+    pub fn downcast_mut<T: 'static>(&mut self) -> Option<&mut T> {
+        let any: &mut dyn Any = self;
+        any.downcast_mut()
     }
 }
 
