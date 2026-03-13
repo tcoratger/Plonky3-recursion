@@ -1078,6 +1078,88 @@ mod tests {
     }
 
     #[test]
+    fn test_bool_check_lowering() {
+        // BoolCheck { val } lowers to a BoolCheck ALU op.
+        // connect(p0, check) aliases check output to p0's witness.
+        let mut graph = create_graph_with_zero();
+        let p0 = graph.add_expr(Expr::Public(0));
+        let check = graph.add_expr(Expr::BoolCheck { val: p0 });
+
+        let connects = vec![(p0, check)];
+        let alloc = WitnessAllocator::new();
+        let registry = HashMap::new();
+
+        let lowerer = ExpressionLowerer::new(&graph, &[], &connects, 1, alloc, &registry);
+        let (prims, _public_rows, expr_map, _public_map, witness_count) = lowerer.lower().unwrap();
+
+        assert_eq!(
+            prims,
+            vec![
+                Op::Const {
+                    out: WitnessId(0),
+                    val: BabyBear::ZERO
+                },
+                Op::Public {
+                    out: WitnessId(1),
+                    public_pos: 0
+                },
+                Op::Alu {
+                    kind: AluOpKind::BoolCheck,
+                    a: WitnessId(1),
+                    b: WitnessId(0),
+                    c: Some(WitnessId(1)),
+                    out: WitnessId(1),
+                    intermediate_out: None,
+                },
+            ]
+        );
+
+        // Check and p0 share the same witness (via connect)
+        assert_eq!(expr_map[&check], expr_map[&p0]);
+        assert_eq!(witness_count, 2);
+    }
+
+    #[test]
+    fn test_bool_check_lowering_without_connect() {
+        // BoolCheck without connect: out gets a fresh witness (forward mode).
+        let mut graph = create_graph_with_zero();
+        let p0 = graph.add_expr(Expr::Public(0));
+        let _check = graph.add_expr(Expr::BoolCheck { val: p0 });
+
+        let connects = vec![];
+        let alloc = WitnessAllocator::new();
+        let registry = HashMap::new();
+
+        let lowerer = ExpressionLowerer::new(&graph, &[], &connects, 1, alloc, &registry);
+        let (prims, _public_rows, _expr_map, _public_map, witness_count) = lowerer.lower().unwrap();
+
+        assert_eq!(
+            prims,
+            vec![
+                Op::Const {
+                    out: WitnessId(0),
+                    val: BabyBear::ZERO
+                },
+                Op::Public {
+                    out: WitnessId(1),
+                    public_pos: 0
+                },
+                Op::Alu {
+                    kind: AluOpKind::BoolCheck,
+                    a: WitnessId(1),
+                    b: WitnessId(0),
+                    c: Some(WitnessId(1)),
+                    out: WitnessId(2),
+                    intermediate_out: None,
+                },
+            ]
+        );
+
+        // 3 witnesses: zero(0), p0(1), check_out(2)
+        assert_eq!(witness_count, 3);
+    }
+
+    #[test]
     fn test_dsu_stress_chain() {
         // 1000-element chain: 0->1->2->...->999
         let mut parents = HashMap::new();
