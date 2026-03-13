@@ -11,8 +11,9 @@ use hashbrown::HashSet;
 use crate::ExprId;
 use crate::ops::NpoTypeId;
 
-/// Display order for allocation groups. Must list every value returned by
-/// [`AllocationType::group_name`] exactly once.
+/// Display order for allocation groups.
+///
+/// Must list every value returned by [`AllocationType::group_name`] exactly once.
 const GROUP_ORDER: &[&str] = &[
     "Public Inputs",
     "Constants",
