@@ -1,12 +1,11 @@
 //! Structured allocation logging for circuit expression graphs.
 
+use alloc::collections::BTreeSet;
 use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt;
 use core::ops::Deref;
-
-use hashbrown::HashSet;
 
 use crate::ExprId;
 use crate::ops::NpoTypeId;
@@ -136,14 +135,11 @@ impl AllocationLog {
 
     /// Sorted, deduplicated list of scope names in the log.
     pub fn scopes(&self) -> Vec<String> {
-        let mut v: Vec<_> = self
-            .iter()
+        self.iter()
             .filter_map(|e| e.scope.clone())
-            .collect::<HashSet<_>>()
+            .collect::<BTreeSet<_>>()
             .into_iter()
-            .collect();
-        v.sort_unstable();
-        v
+            .collect()
     }
 
     /// Emit structured trace events for specific [`ExprId`]s.
