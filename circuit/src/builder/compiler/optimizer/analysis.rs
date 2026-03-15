@@ -3,13 +3,12 @@ use crate::types::WitnessId;
 
 /// Lightweight summary of how a witness was produced.
 ///
-/// Only encodes the shapes that BoolCheck and MulAdd fusion need to inspect
-/// (`Const`, `Add`, `Mul`); every other operation is collapsed into `Other`
+/// Only encodes the shapes that MulAdd fusion needs to inspect
+/// (`Const`, `Mul`); every other operation is collapsed into `Other`
 /// because the fusion passes do not need to reason about them.
 #[derive(Clone, Debug)]
 pub(super) enum OpDef<F> {
     Const(F),
-    Add { a: WitnessId, b: WitnessId },
     Mul { a: WitnessId, b: WitnessId },
     Other,
 }
@@ -17,13 +16,6 @@ pub(super) enum OpDef<F> {
 impl<F> OpDef<F> {
     pub(super) const fn is_const(&self) -> bool {
         matches!(self, Self::Const(_))
-    }
-
-    pub(super) const fn const_value(&self) -> Option<&F> {
-        match self {
-            Self::Const(v) => Some(v),
-            _ => None,
-        }
     }
 
     pub(super) const fn as_mul(&self) -> Option<(WitnessId, WitnessId)> {
@@ -102,29 +94,6 @@ mod tests {
             }
             .is_const()
         );
-        assert!(
-            !OpDef::<F>::Add {
-                a: WitnessId(0),
-                b: WitnessId(1)
-            }
-            .is_const()
-        );
-    }
-
-    #[test]
-    fn opdef_const_value() {
-        let def = OpDef::<F>::Const(F::TWO);
-        assert_eq!(def.const_value(), Some(&F::TWO));
-
-        assert_eq!(OpDef::<F>::Other.const_value(), None);
-        assert_eq!(
-            OpDef::<F>::Mul {
-                a: WitnessId(0),
-                b: WitnessId(1)
-            }
-            .const_value(),
-            None
-        );
     }
 
     #[test]
@@ -137,14 +106,6 @@ mod tests {
 
         assert_eq!(OpDef::<F>::Other.as_mul(), None);
         assert_eq!(OpDef::<F>::Const(F::ONE).as_mul(), None);
-        assert_eq!(
-            OpDef::<F>::Add {
-                a: WitnessId(0),
-                b: WitnessId(1)
-            }
-            .as_mul(),
-            None
-        );
     }
 
     #[test]

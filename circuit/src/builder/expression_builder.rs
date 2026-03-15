@@ -53,6 +53,8 @@ pub struct OpCounts {
     pub divs: u64,
     /// Number of Horner accumulator expressions allocated.
     pub horner_accs: u64,
+    /// Number of boolean check expressions allocated.
+    pub bool_checks: u64,
     /// Number of non-primitive calls allocated, broken down by type.
     pub non_primitives: HashMap<NpoTypeId, u64>,
 }
@@ -114,6 +116,11 @@ impl ProfilingState {
     #[inline]
     fn bump_horner_acc(&mut self) {
         self.bump_with(|c| c.horner_accs += 1);
+    }
+
+    #[inline]
+    fn bump_bool_check(&mut self) {
+        self.bump_with(|c| c.bool_checks += 1);
     }
 
     #[inline]
@@ -598,6 +605,25 @@ where
                 AllocationType::HornerAcc,
                 vec![vec![acc], vec![alpha], vec![p_at_z], vec![p_at_x]],
             )
+        });
+        #[cfg(not(feature = "debugging"))]
+        self.log_alloc(expr_id, label, || ());
+
+        expr_id
+    }
+
+    /// Adds a boolean check expression to the graph: asserts val ∈ {0, 1}.
+    ///
+    /// Lowers to a single BoolCheck ALU op with no intermediate witnesses.
+    pub fn add_bool_check(&mut self, val: ExprId, label: &'static str) -> ExprId {
+        #[cfg(feature = "profiling")]
+        self.profiling.bump_bool_check();
+
+        let expr_id = self.graph.add_expr(Expr::BoolCheck { val });
+
+        #[cfg(feature = "debugging")]
+        self.log_alloc(expr_id, label, || {
+            (AllocationType::BoolCheck, vec![vec![val]])
         });
         #[cfg(not(feature = "debugging"))]
         self.log_alloc(expr_id, label, || ());

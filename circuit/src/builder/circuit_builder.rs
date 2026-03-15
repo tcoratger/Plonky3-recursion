@@ -482,13 +482,10 @@ where
 
     /// Asserts that an expression is boolean: b ∈ {0,1}.
     ///
-    /// Encodes the constraint b · (b − 1) = 0 via `assert_zero`.
-    /// Cost: 1 mul + 1 add.
+    /// Emits a single BoolCheck ALU op enforcing b · (b − 1) = 0.
     pub fn assert_bool(&mut self, b: ExprId) {
-        let one = self.define_const(F::ONE);
-        let b_minus_one = self.sub(b, one);
-        let prod = self.mul(b, b_minus_one);
-        self.assert_zero(prod);
+        let check = self.expr_builder.add_bool_check(b, "bool_check");
+        self.connect(b, check);
     }
 
     /// Connects two expressions, enforcing a == b (by aliasing outputs).

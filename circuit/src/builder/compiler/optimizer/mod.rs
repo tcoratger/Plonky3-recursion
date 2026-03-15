@@ -1,12 +1,10 @@
 mod analysis;
 mod dedup;
-mod fuse_bool_check;
 mod fuse_mul_add;
 
 use alloc::vec::Vec;
 
 use dedup::Deduplicator;
-use fuse_bool_check::BoolCheckFusion;
 use fuse_mul_add::MulAddFusion;
 use hashbrown::HashMap;
 use p3_field::Field;
@@ -23,7 +21,6 @@ use crate::types::WitnessId;
 ///
 /// Currently implements:
 /// - ALU deduplication: removes duplicate ALU ops (identical or same inputs via connect)
-/// - BoolCheck fusion: detects `b * (b - 1) = 0` patterns and fuses them into BoolCheck ops
 /// - MulAdd fusion: detects `a * b + c` patterns and fuses them into MulAdd ops
 ///
 /// *Note*: CSE is implemented within the
@@ -33,7 +30,6 @@ pub struct Optimizer<F>(core::marker::PhantomData<F>);
 impl<F: Field> Optimizer<F> {
     pub fn optimize(ops: Vec<Op<F>>) -> (Vec<Op<F>>, HashMap<WitnessId, WitnessId>) {
         let (ops, rewrite) = Deduplicator::new().run(ops);
-        let ops = BoolCheckFusion::new(&ops).run(ops);
         let ops = MulAddFusion::new(&ops).run(ops);
         (ops, rewrite)
     }
@@ -67,25 +63,17 @@ mod tests {
     }
 
     #[test]
-    fn test_mixed_bool_check_and_muladd() {
-        let b = WitnessId(0);
-        let one = WitnessId(1);
-        let neg_one = WitnessId(2);
-
+    fn test_bool_check_passthrough_and_muladd() {
+        // BoolCheck ops now come directly from lowering (not fusion).
+        // The optimizer should pass them through unchanged while still fusing MulAdd.
         let ops: Vec<Op<F>> = vec![
             Op::Const {
-                out: one,
+                out: WitnessId(0),
                 val: F::ONE,
             },
-            Op::Const {
-                out: neg_one,
-                val: -F::ONE,
-            },
-            Op::mul(one, neg_one, WitnessId(3)),    // -1
-            Op::add(b, WitnessId(3), WitnessId(4)), // b - 1
-            Op::mul(b, WitnessId(4), WitnessId(5)), // b*(b-1) -> BoolCheck
-            Op::mul(WitnessId(6), WitnessId(7), WitnessId(8)), // a * c
-            Op::add(WitnessId(8), one, WitnessId(9)), // a*c + 1 -> MulAdd
+            Op::bool_check(WitnessId(1), WitnessId(1), WitnessId(2)),
+            Op::mul(WitnessId(3), WitnessId(4), WitnessId(5)), // a * c
+            Op::add(WitnessId(5), WitnessId(0), WitnessId(6)), // a*c + 1 -> MulAdd
         ];
 
         let (optimized, _) = Optimizer::optimize(ops);
@@ -99,7 +87,7 @@ mod tests {
             .filter(|op| op.is_alu_kind(AluOpKind::MulAdd))
             .count();
 
-        assert_eq!(bool_checks, 1, "Expected 1 BoolCheck");
+        assert_eq!(bool_checks, 1, "Expected 1 BoolCheck passthrough");
         assert!(mul_adds >= 1, "Expected at least 1 MulAdd");
     }
 
@@ -156,15 +144,9 @@ mod tests {
                 out: WitnessId(0),
                 val: F::ONE,
             },
-            Op::Const {
-                out: WitnessId(1),
-                val: -F::ONE,
-            },
-            Op::mul(WitnessId(0), WitnessId(1), WitnessId(2)),
-            Op::add(WitnessId(3), WitnessId(2), WitnessId(4)),
+            Op::bool_check(WitnessId(1), WitnessId(1), WitnessId(2)),
             Op::mul(WitnessId(3), WitnessId(4), WitnessId(5)),
-            Op::mul(WitnessId(6), WitnessId(7), WitnessId(8)),
-            Op::add(WitnessId(8), WitnessId(0), WitnessId(9)),
+            Op::add(WitnessId(5), WitnessId(0), WitnessId(6)),
         ];
 
         let (first_pass, _) = Optimizer::optimize(ops);

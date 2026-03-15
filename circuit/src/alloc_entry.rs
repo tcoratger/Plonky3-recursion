@@ -21,6 +21,7 @@ pub enum AllocationType {
     Mul,
     Div,
     HornerAcc,
+    BoolCheck,
     NonPrimitiveOp(NpoTypeId),
     WitnessHint,
 }
@@ -117,6 +118,7 @@ fn dump_internal_log(allocation_log: &[AllocationEntry]) {
     let mut muls = Vec::new();
     let mut divs = Vec::new();
     let mut horner_accs = Vec::new();
+    let mut bool_checks = Vec::new();
     let mut non_primitives = Vec::new();
     let mut witness_hints = Vec::new();
 
@@ -137,6 +139,7 @@ fn dump_internal_log(allocation_log: &[AllocationEntry]) {
             AllocationType::Mul => muls.push(entry),
             AllocationType::Div => divs.push(entry),
             AllocationType::HornerAcc => horner_accs.push(entry),
+            AllocationType::BoolCheck => bool_checks.push(entry),
             AllocationType::NonPrimitiveOp(_) => {
                 non_primitives.push(entry);
             }
@@ -263,6 +266,18 @@ fn dump_internal_log(allocation_log: &[AllocationEntry]) {
         for entry in horner_accs {
             tracing::debug!(
                 "  expr_{} (HornerAcc){}",
+                entry.expr_id.0,
+                display_label(entry.label)
+            );
+        }
+        tracing::debug!("");
+    }
+
+    if !bool_checks.is_empty() {
+        tracing::debug!("--- Bool Checks ({}) ---", bool_checks.len());
+        for entry in bool_checks {
+            tracing::debug!(
+                "  expr_{} (BoolCheck){}",
                 entry.expr_id.0,
                 display_label(entry.label)
             );

@@ -13,7 +13,7 @@ use crate::builder::npo::{
     NonPrimitiveOpParams, NonPrimitiveOperationData, NpoCircuitPlugin, NpoLoweringContext,
 };
 use crate::expr::{Expr, ExpressionGraph};
-use crate::ops::{NpoTypeId, Op};
+use crate::ops::{AluOpKind, NpoTypeId, Op};
 use crate::types::{ExprId, NonPrimitiveOpId, WitnessAllocator, WitnessId};
 
 /// Sparse disjoint-set "find" with path compression over a HashMap (iterative).
@@ -436,6 +436,32 @@ where
                         out_widx,
                         acc_widx,
                     ));
+                    expr_to_widx.insert(expr_id, out_widx);
+                }
+                Expr::BoolCheck { val } => {
+                    let out_widx = alloc_witness_id_for_expr(expr_idx);
+                    let val_widx = get_witness_id(
+                        &expr_to_widx,
+                        *val,
+                        &format!("BoolCheck val for {expr_id:?}"),
+                    )?;
+                    let zero_widx =
+                        get_witness_id(&expr_to_widx, ExprId::ZERO, "BoolCheck zero constant")?;
+                    // BoolCheck AIR: sel_bool * a * (a - 1) = 0.
+                    // Runner sets: out = a_val, b_val = 0, c_val = a_val.
+                    //
+                    // For WitnessChecks bus consistency, operand witnesses must match
+                    // the trace values:
+                    //   b = zero_widx  → witness holds 0, matching b_val = 0
+                    //   c = val_widx   → witness holds a_val, matching c_val = a_val
+                    ops.push(Op::Alu {
+                        kind: AluOpKind::BoolCheck,
+                        a: val_widx,
+                        b: zero_widx,
+                        c: Some(val_widx),
+                        out: out_widx,
+                        intermediate_out: None,
+                    });
                     expr_to_widx.insert(expr_id, out_widx);
                 }
                 Expr::NonPrimitiveCall { op_id, inputs: _ } => {
