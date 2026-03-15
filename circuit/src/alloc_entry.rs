@@ -249,7 +249,10 @@ impl AllocationLog {
         ];
 
         for predicate in GROUPS {
-            let group: Vec<_> = entries.iter().filter(|e| predicate(&e.alloc_type)).collect();
+            let group: Vec<_> = entries
+                .iter()
+                .filter(|e| predicate(&e.alloc_type))
+                .collect();
             if group.is_empty() {
                 continue;
             }
