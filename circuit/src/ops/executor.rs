@@ -1,5 +1,6 @@
 use alloc::boxed::Box;
 use alloc::vec::Vec;
+use core::any::Any;
 use core::fmt::Debug;
 
 use p3_field::Field;
@@ -16,12 +17,23 @@ use crate::{CircuitError, PreprocessedColumns};
 /// - Permutation chaining (storing previous output for next input)
 /// - Recording execution data for canonical trace generation
 ///
-/// Implementors must support downcasting via `Any` for type-safe retrieval.
-pub trait OpExecutionState: core::any::Any + Send + Sync + Debug {
-    /// Downcast to concrete type for reading.
-    fn as_any(&self) -> &dyn core::any::Any;
-    /// Downcast to concrete type for mutation.
-    fn as_any_mut(&mut self) -> &mut dyn core::any::Any;
+/// Automatically implemented for any type that is `Any + Send + Sync + Debug`.
+pub trait OpExecutionState: Any + Send + Sync + Debug {}
+
+impl<T: Any + Send + Sync + Debug> OpExecutionState for T {}
+
+impl dyn OpExecutionState {
+    /// Downcast to a concrete type by reference.
+    pub fn downcast_ref<T: 'static>(&self) -> Option<&T> {
+        let any: &dyn Any = self;
+        any.downcast_ref()
+    }
+
+    /// Downcast to a concrete type by mutable reference.
+    pub fn downcast_mut<T: 'static>(&mut self) -> Option<&mut T> {
+        let any: &mut dyn Any = self;
+        any.downcast_mut()
+    }
 }
 
 /// Trait for executable non-primitive operations
@@ -46,7 +58,7 @@ pub trait NonPrimitiveExecutor<F: Field>: Debug {
     fn op_type(&self) -> &NpoTypeId;
 
     /// Allow downcasting to concrete executor types
-    fn as_any(&self) -> &dyn core::any::Any;
+    fn as_any(&self) -> &dyn Any;
 
     /// Update the preprocessed values related to this operation. This consists of:
     /// - the preprocessed values for the associated table

@@ -135,7 +135,7 @@ impl<'a, F: PrimeCharacteristicRing + Eq + Clone> ExecutionContext<'a, F> {
     pub fn get_op_state<T: OpExecutionState + 'static>(&self, op_type: &NpoTypeId) -> Option<&T> {
         self.op_states
             .get(op_type)
-            .and_then(|state| state.as_any().downcast_ref())
+            .and_then(|state| state.downcast_ref())
     }
 
     /// Get operation-specific state for mutation, creating default if not present.
@@ -148,7 +148,6 @@ impl<'a, F: PrimeCharacteristicRing + Eq + Clone> ExecutionContext<'a, F> {
         self.op_states
             .entry(op_type.clone())
             .or_insert_with(|| Box::new(T::default()))
-            .as_any_mut()
             .downcast_mut::<T>()
             .expect("type mismatch in op state - this is a bug")
     }
@@ -390,15 +389,6 @@ mod tests {
     #[derive(Debug, Default)]
     struct TestOpState {
         value: Option<u64>,
-    }
-
-    impl OpExecutionState for TestOpState {
-        fn as_any(&self) -> &dyn core::any::Any {
-            self
-        }
-        fn as_any_mut(&mut self) -> &mut dyn core::any::Any {
-            self
-        }
     }
 
     #[test]

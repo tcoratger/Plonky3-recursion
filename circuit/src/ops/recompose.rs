@@ -19,7 +19,7 @@ use p3_field::{ExtensionField, Field, PrimeField64};
 use crate::builder::{
     CircuitBuilderError, NonPrimitiveOpParams, NpoCircuitPlugin, NpoLoweringContext,
 };
-use crate::ops::{ExecutionContext, NonPrimitiveExecutor, NpoTypeId, Op, OpExecutionState};
+use crate::ops::{ExecutionContext, NonPrimitiveExecutor, NpoTypeId, Op};
 use crate::tables::{NonPrimitiveTrace, TraceGeneratorFn};
 use crate::types::{ExprId, WitnessId};
 use crate::{CircuitError, PreprocessedColumns};
@@ -54,15 +54,6 @@ pub struct RecomposeCircuitRow<F> {
 #[derive(Debug, Default)]
 pub struct RecomposeExecutionState<F> {
     pub rows: Vec<RecomposeCircuitRow<F>>,
-}
-
-impl<F: Send + Sync + Debug + 'static> OpExecutionState for RecomposeExecutionState<F> {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
 }
 
 // ============================================================================
@@ -372,7 +363,7 @@ where
     let op_type = NpoTypeId::recompose();
     let Some(state) = op_states
         .get(&op_type)
-        .and_then(|s| s.as_any().downcast_ref::<RecomposeExecutionState<EF>>())
+        .and_then(|s| s.downcast_ref::<RecomposeExecutionState<EF>>())
     else {
         return Ok(None);
     };

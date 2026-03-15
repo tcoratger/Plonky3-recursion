@@ -1,10 +1,7 @@
 //! Execution state and private data for Poseidon2 permutation operations.
 
 use alloc::vec::Vec;
-use core::any::Any;
-use core::fmt::Debug;
 
-use crate::ops::OpExecutionState;
 use crate::ops::poseidon2_perm::trace::Poseidon2CircuitRow;
 
 /// Private data for Poseidon2 permutation.
@@ -22,13 +19,4 @@ pub(crate) struct Poseidon2ExecutionState<F> {
     pub last_output_merkle: Option<Vec<F>>,
     /// Circuit rows captured during execution.
     pub rows: Vec<Poseidon2CircuitRow<F>>,
-}
-
-impl<F: Send + Sync + Debug + 'static> OpExecutionState for Poseidon2ExecutionState<F> {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
 }
