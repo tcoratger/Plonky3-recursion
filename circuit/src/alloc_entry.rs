@@ -27,7 +27,7 @@ pub enum AllocationType {
 
 impl AllocationType {
     /// Section header for grouped display.
-    fn group_name(&self) -> &'static str {
+    const fn group_name(&self) -> &'static str {
         match self {
             Self::Public => "Public Inputs",
             Self::Const => "Constants",
@@ -43,7 +43,7 @@ impl AllocationType {
     }
 
     /// Arithmetic operator for binary ops, `None` for everything else.
-    fn operator(&self) -> Option<char> {
+    const fn operator(&self) -> Option<char> {
         match self {
             Self::Add => Some('+'),
             Self::Sub => Some('-'),
