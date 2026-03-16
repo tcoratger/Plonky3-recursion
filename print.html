@@ -599,7 +599,7 @@ assumptions used in these heuristics.</p>
 <p>If building the verification circuit manually, use the dedicated builders:</p>
 <h3 id="starkverifierinputsbuilder-uni-stark"><a class="header" href="#starkverifierinputsbuilder-uni-stark"><code>StarkVerifierInputsBuilder</code> (uni-STARK)</a></h3>
 <p>Returned by <code>verify_p3_uni_proof_circuit</code>. Packs values from a <code>Proof&lt;SC&gt;</code>:</p>
-<pre><code class="language-rust ignore">let public_inputs = verifier_inputs.pack_values(
+<pre><code class="language-rust ignore">let public_inputs = verifier_inputs.pack_public_values(
     &amp;air_public_inputs,
     &amp;proof,
     &amp;preprocessed_commit,
@@ -607,7 +607,7 @@ assumptions used in these heuristics.</p>
 runner.set_public_inputs(&amp;public_inputs)?;</code></pre>
 <h3 id="batchstarkverifierinputsbuilder-batch-stark"><a class="header" href="#batchstarkverifierinputsbuilder-batch-stark"><code>BatchStarkVerifierInputsBuilder</code> (batch-STARK)</a></h3>
 <p>Returned by <code>verify_p3_batch_proof_circuit</code>. Packs values from a <code>BatchProof&lt;SC&gt;</code> and <code>CommonData&lt;SC&gt;</code>:</p>
-<pre><code class="language-rust ignore">let public_inputs = verifier_inputs.pack_values(
+<pre><code class="language-rust ignore">let public_inputs = verifier_inputs.pack_public_values(
     &amp;table_public_inputs,
     &amp;batch_proof,
     &amp;common_data,
@@ -793,7 +793,7 @@ let op_ids = verify_p3_uni_proof_circuit::&lt;
 let circuit = circuit_builder.build()?;
 let mut runner = circuit.runner();
 
-let public_inputs = verifier_inputs.pack_values(&amp;pis, &amp;proof, &amp;preprocessed_commit);
+let public_inputs = verifier_inputs.pack_public_values(&amp;pis, &amp;proof, &amp;preprocessed_commit);
 runner.set_public_inputs(&amp;public_inputs)?;
 
 set_fri_mmcs_private_data(&amp;mut runner, &amp;op_ids, &amp;proof.opening_proof)?;
@@ -818,7 +818,7 @@ let (verifier_inputs, op_ids) = verify_p3_batch_proof_circuit::&lt;
 let circuit = circuit_builder.build()?;
 let mut runner = circuit.runner();
 
-let public_inputs = verifier_inputs.pack_values(
+let public_inputs = verifier_inputs.pack_public_values(
     &amp;table_public_inputs, &amp;batch_proof.proof, &amp;common_data,
 );
 runner.set_public_inputs(&amp;public_inputs)?;
@@ -1489,29 +1489,27 @@ This ensures that all constraints are properly satisfied before proceeding to th
 <li>
 <p><strong>Keccak AIR program:</strong> (1,000 hashes)</p>
 <ul>
-<li>Base uni-stark proof: 1.36 s</li>
-<li>1st recursion layer: 1.21 s</li>
-<li>2nd recursion layer: 300 ms</li>
-<li>3rd and 4th recursion layers: 247 ms</li>
-<li>5th and next recursion layers: 193 ms</li>
+<li>Base uni-stark proof: 1.37 s</li>
+<li>1st recursion layer: 1.03 s</li>
+<li>2nd and 3rd recursion layers: 230 ms</li>
+<li>4th and next recursion layers: 179 ms</li>
 </ul>
 </li>
 <li>
 <p><strong>Fibonacci multi-AIR program:</strong> (10,000th element)</p>
 <ul>
 <li>Base batch-stark proof: 82.6 ms</li>
-<li>1st recursion layer: 193 ms</li>
-<li>2nd and 3rd recursion layers: 260 ms</li>
-<li>4th and next recursion layers: 198 ms</li>
+<li>1st recursion layer: 171 ms</li>
+<li>2nd and 3rd recursion layers: 230 ms</li>
+<li>4th and next recursion layers: 178 ms</li>
 </ul>
 </li>
 <li>
 <p><strong>2-to-1 aggregation:</strong></p>
 <ul>
 <li>Base batch-stark proof: 28 ms</li>
-<li>1st aggregation layer: 186 ms</li>
-<li>2nd aggregation layer: 317 ms</li>
-<li>3rd and next aggregation layers: 316 ms</li>
+<li>1st aggregation layer: 166 ms</li>
+<li>2nd and next aggregation layers: 280 ms</li>
 </ul>
 </li>
 </ul>
