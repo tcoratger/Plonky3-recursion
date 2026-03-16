@@ -420,10 +420,9 @@ where
     /// A new `ExprId` representing the result of `a * b + c`.
     ///
     /// # Cost
-    /// 1 multiplication and 1 addition constraint.
+    /// 1 fused multiply-add constraint (single ALU row).
     pub fn mul_add(&mut self, a: ExprId, b: ExprId, c: ExprId) -> ExprId {
-        let product = self.mul(a, b);
-        self.add(product, c)
+        self.expr_builder.add_mul_add(a, b, c, "mul_add")
     }
 
     /// Horner accumulator step: result = acc * alpha + p_at_z - p_at_x
@@ -482,7 +481,7 @@ where
     /// A new `ExprId` representing the inner product.
     ///
     /// # Cost
-    /// `N` multiplications and `N-1` additions, where `N` is the length of the slices.
+    /// `N` fused multiply-adds.
     pub fn inner_product(&mut self, a: &[ExprId], b: &[ExprId]) -> ExprId {
         let zero = self.define_const(F::ZERO);
 
