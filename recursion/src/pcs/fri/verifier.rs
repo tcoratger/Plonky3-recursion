@@ -63,8 +63,7 @@ where
             let mut packed = chunk[0];
             for j in 1..d {
                 let val = if j < chunk.len() { chunk[j] } else { zero };
-                let term = builder.mul(val, basis_consts[j]);
-                packed = builder.add(packed, term);
+                packed = builder.mul_add(val, basis_consts[j], packed);
             }
             packed
         })
@@ -515,13 +514,11 @@ where
 
         let beta_minus_x0 = builder.sub(beta, x0);
         let t = builder.mul(beta_minus_x0, e1_minus_e0);
-        let t_inv = builder.mul(t, inv);
-        let mut new_folded = builder.add(e0, t_inv);
+        let mut new_folded = builder.mul_add(t, inv, e0);
 
         if let Some(ro) = roll_in {
             let beta_sq = precomputed_beta_pow.unwrap_or_else(|| builder.mul(beta, beta));
-            let add_term = builder.mul(beta_sq, ro);
-            new_folded = builder.add(new_folded, add_term);
+            new_folded = builder.mul_add(beta_sq, ro, new_folded);
         }
         builder.pop_scope();
         return new_folded;
@@ -600,8 +597,7 @@ where
     if let Some(ro) = roll_in {
         let beta_pow =
             precomputed_beta_pow.unwrap_or_else(|| builder.exp_power_of_2(beta, log_arity));
-        let add_term = builder.mul(beta_pow, ro);
-        new_folded = builder.add(new_folded, add_term);
+        new_folded = builder.mul_add(beta_pow, ro, new_folded);
     }
 
     builder.pop_scope();
@@ -678,8 +674,7 @@ fn evaluate_polynomial<EF: Field>(
 
     let mut result = coefficients[coefficients.len() - 1];
     for &coeff in coefficients.iter().rev().skip(1) {
-        result = builder.mul(result, point);
-        result = builder.add(result, coeff);
+        result = builder.mul_add(result, point, coeff);
     }
 
     builder.pop_scope(); // close `evaluate_polynomial` scope
