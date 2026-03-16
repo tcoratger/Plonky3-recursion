@@ -1189,7 +1189,7 @@ mod tests {
         assert_eq!(row.input_indices, vec![1, 0, 3, 0]);
         assert_eq!(row.out_ctl, vec![true, false]);
         assert_eq!(row.output_indices, vec![5, 0]);
-        assert_eq!(row.mmcs_ctl_enabled, true);
+        assert!(row.mmcs_ctl_enabled);
         assert_eq!(row.mmcs_index_sum, F::from_u64(42));
     }
 
@@ -1316,7 +1316,7 @@ mod tests {
             exec: alloc::sync::Arc::new(|_: &[F]| vec![F::ZERO; 16]),
         });
         let mut configs = HashMap::new();
-        configs.insert(op_type.clone(), npo_config);
+        configs.insert(op_type, npo_config);
         let mut witness: Vec<Option<F>> = vec![None; 32];
         let mut op_states = BTreeMap::new();
         let mut ctx = make_ctx(&mut witness, &[], &configs, &mut op_states);
