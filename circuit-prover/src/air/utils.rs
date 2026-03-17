@@ -2,10 +2,9 @@ use alloc::vec::Vec;
 use core::iter;
 
 use itertools::Itertools;
-use p3_air::{Air, AirBuilder, AirLayout, PermutationAirBuilder};
+use p3_air::{AirBuilder, AirLayout};
 use p3_field::Field;
-use p3_lookup::lookup_traits::{Direction, Lookup, LookupInput};
-use p3_lookup::{AirWithLookups, LookupAir, LookupEvaluator};
+use p3_lookup::lookup_traits::{Direction, LookupInput};
 use p3_matrix::Matrix;
 use p3_matrix::dense::RowMajorMatrix;
 use p3_uni_stark::{SymbolicAirBuilder, SymbolicExpression, SymbolicVariable};
@@ -138,70 +137,6 @@ pub fn create_direct_preprocessed_trace_with_extra<F: Field>(
     }
 
     pad_matrix_with_min_height(widened, min_height)
-}
-
-/// Object‑safe gadget shim.
-pub trait LookupEvaluatorDyn<AB: PermutationAirBuilder> {
-    fn num_aux_cols(&self) -> usize;
-    fn num_challenges(&self) -> usize;
-    fn eval_with_lookups_dyn(&self, builder: &mut AB, contexts: &[Lookup<AB::F>]);
-}
-
-/// Blanket: any concrete `LookupEvaluator` becomes object‑safe.
-impl<AB, LE> LookupEvaluatorDyn<AB> for LE
-where
-    AB: PermutationAirBuilder,
-    LE: LookupEvaluator,
-{
-    fn num_aux_cols(&self) -> usize {
-        LE::num_aux_cols(self)
-    }
-    fn num_challenges(&self) -> usize {
-        LE::num_challenges(self)
-    }
-    fn eval_with_lookups_dyn(&self, builder: &mut AB, contexts: &[Lookup<AB::F>]) {
-        // forward to the generic method on the concrete handler
-        LE::eval_lookups(self, builder, contexts);
-    }
-}
-
-/// Object‑safe AIR shim.
-pub trait AirDyn<AB>
-where
-    AB: PermutationAirBuilder,
-{
-    fn add_lookup_columns_dyn(&mut self) -> Vec<usize>;
-    fn get_lookups_dyn(&mut self) -> Vec<Lookup<AB::F>>;
-    fn eval_with_lookups_dyn<LE: LookupEvaluator>(
-        &self,
-        builder: &mut AB,
-        contexts: &[Lookup<AB::F>],
-        lookup_evaluator: &LE,
-    );
-}
-
-/// Blanket: any existing `Air` now satisfies the object‑safe shim.
-impl<AB, T> AirDyn<AB> for T
-where
-    AB: PermutationAirBuilder,
-    T: Air<AB> + LookupAir<AB::F>,
-{
-    fn add_lookup_columns_dyn(&mut self) -> Vec<usize> {
-        self.add_lookup_columns()
-    }
-
-    fn get_lookups_dyn(&mut self) -> Vec<Lookup<AB::F>> {
-        self.get_lookups()
-    }
-
-    fn eval_with_lookups_dyn<LE: LookupEvaluator>(
-        &self,
-        builder: &mut AB,
-        contexts: &[Lookup<AB::F>],
-        lookup_evaluator: &LE,
-    ) {
-        T::eval_with_lookups(self, builder, contexts, lookup_evaluator);
-    }
 }
 
 /// Helper to create symbolic air builder and extract symbolic variables for lookup generation.
