@@ -23,7 +23,6 @@ mod builder;
 pub mod call;
 pub(crate) mod config;
 pub(crate) mod executor;
-mod input_resolver;
 pub(crate) mod plugin;
 pub mod state;
 pub mod trace;
