@@ -544,8 +544,7 @@ where
             return t;
         }
         let t_minus_s = self.sub(t, s);
-        let scaled = self.mul(b, t_minus_s);
-        self.add(s, scaled)
+        self.mul_add(b, t_minus_s, s)
     }
 
     /// Exponentiates a base expression to a power of 2 (i.e. base^(2^power_log)), by squaring repeatedly.
@@ -967,8 +966,7 @@ where
                 self.assert_bool(b);
 
                 // Add b_i · 2^j to the accumulator (at the corresponding limb).
-                let term = self.mul(b, pow2);
-                acc = self.add(acc, term);
+                acc = self.mul_add(b, pow2, acc);
             }
         }
 
@@ -1026,8 +1024,7 @@ where
                 .expect("basis coefficients are valid");
 
             let basis_const = self.define_const(basis_elem);
-            let term = self.mul(coeff, basis_const);
-            acc = self.add(acc, term);
+            acc = self.mul_add(coeff, basis_const, acc);
         }
 
         self.pop_scope();

@@ -1,9 +1,11 @@
 mod analysis;
 mod dedup;
+mod fuse_mul_add;
 
 use alloc::vec::Vec;
 
 use dedup::Deduplicator;
+use fuse_mul_add::MulAddFusion;
 use hashbrown::HashMap;
 use p3_field::Field;
 
@@ -19,15 +21,17 @@ use crate::types::WitnessId;
 ///
 /// Currently implements:
 /// - ALU deduplication: removes duplicate ALU ops (identical or same inputs via connect)
+/// - MulAdd fusion: detects `a * b + c` patterns and fuses them into MulAdd ops
 ///
 /// *Note*: CSE is implemented within the
 /// [ExpressionBuilder](crate::builder::expression_builder::ExpressionBuilder) itself.
-/// MulAdd is emitted directly by the expression builder via `Expr::MulAdd`.
 pub struct Optimizer<F>(core::marker::PhantomData<F>);
 
 impl<F: Field> Optimizer<F> {
     pub fn optimize(ops: Vec<Op<F>>) -> (Vec<Op<F>>, HashMap<WitnessId, WitnessId>) {
-        Deduplicator::new().run(ops)
+        let (ops, rewrite) = Deduplicator::new().run(ops);
+        let ops = MulAddFusion::new(&ops).run(ops);
+        (ops, rewrite)
     }
 }
 
@@ -59,17 +63,17 @@ mod tests {
     }
 
     #[test]
-    fn test_bool_check_passthrough_no_fusion() {
-        // MulAdd is now emitted directly by the expression builder, not fused
-        // by the optimizer. Separate Mul+Add ops remain as-is.
+    fn test_bool_check_passthrough_and_muladd() {
+        // BoolCheck ops now come directly from lowering (not fusion).
+        // The optimizer should pass them through unchanged while still fusing MulAdd.
         let ops: Vec<Op<F>> = vec![
             Op::Const {
                 out: WitnessId(0),
                 val: F::ONE,
             },
             Op::bool_check(WitnessId(1), WitnessId(1), WitnessId(2)),
-            Op::mul(WitnessId(3), WitnessId(4), WitnessId(5)),
-            Op::add(WitnessId(5), WitnessId(0), WitnessId(6)),
+            Op::mul(WitnessId(3), WitnessId(4), WitnessId(5)), // a * c
+            Op::add(WitnessId(5), WitnessId(0), WitnessId(6)), // a*c + 1 -> MulAdd
         ];
 
         let (optimized, _) = Optimizer::optimize(ops);
@@ -84,10 +88,7 @@ mod tests {
             .count();
 
         assert_eq!(bool_checks, 1, "Expected 1 BoolCheck passthrough");
-        assert_eq!(
-            mul_adds, 0,
-            "No MulAdd fusion — emitted directly by builder"
-        );
+        assert!(mul_adds >= 1, "Expected at least 1 MulAdd");
     }
 
     #[test]
@@ -144,7 +145,8 @@ mod tests {
                 val: F::ONE,
             },
             Op::bool_check(WitnessId(1), WitnessId(1), WitnessId(2)),
-            Op::mul_add(WitnessId(3), WitnessId(4), WitnessId(0), WitnessId(5)),
+            Op::mul(WitnessId(3), WitnessId(4), WitnessId(5)),
+            Op::add(WitnessId(5), WitnessId(0), WitnessId(6)),
         ];
 
         let (first_pass, _) = Optimizer::optimize(ops);

@@ -463,8 +463,7 @@ fn arity2_fold_at_point<EF: Field>(
     let e1_minus_e0 = builder.sub(e1, e0);
     let beta_minus_x0 = builder.sub(beta, x0);
     let t = builder.mul(beta_minus_x0, e1_minus_e0);
-    let t_inv = builder.mul(t, inv);
-    builder.add(e0, t_inv)
+    builder.mul_add(t, inv, e0)
 }
 
 /// Perform a single FRI fold phase with arbitrary arity.

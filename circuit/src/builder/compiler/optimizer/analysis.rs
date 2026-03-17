@@ -1,6 +1,44 @@
 use crate::ops::AluOpKind;
 use crate::types::WitnessId;
 
+/// Lightweight summary of how a witness was produced.
+///
+/// Only encodes the shapes that MulAdd fusion needs to inspect
+/// (`Const`, `Mul`); every other operation is collapsed into `Other`
+/// because the fusion passes do not need to reason about them.
+#[derive(Clone, Debug)]
+pub(super) enum OpDef<F> {
+    Const(F),
+    Mul { a: WitnessId, b: WitnessId },
+    Other,
+}
+
+impl<F> OpDef<F> {
+    pub(super) const fn is_const(&self) -> bool {
+        matches!(self, Self::Const(_))
+    }
+
+    pub(super) const fn as_mul(&self) -> Option<(WitnessId, WitnessId)> {
+        match self {
+            Self::Mul { a, b } => Some((*a, *b)),
+            _ => None,
+        }
+    }
+}
+
+/// An operation definition paired with its position in the op list.
+#[derive(Clone, Debug)]
+pub(super) struct IndexedDef<F> {
+    pub(super) idx: usize,
+    pub(super) def: OpDef<F>,
+}
+
+impl<F> IndexedDef<F> {
+    pub(super) const fn new(idx: usize, def: OpDef<F>) -> Self {
+        Self { idx, def }
+    }
+}
+
 /// Dedup key for ALU operations, normalizing commutative operands.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(super) struct AluKey {
@@ -38,9 +76,44 @@ impl AluKey {
 
 #[cfg(test)]
 mod tests {
+    use p3_test_utils::baby_bear_params::{BabyBear, PrimeCharacteristicRing};
     use proptest::prelude::*;
 
     use super::*;
+
+    type F = BabyBear;
+
+    #[test]
+    fn opdef_is_const() {
+        assert!(OpDef::<F>::Const(F::ZERO).is_const());
+        assert!(!OpDef::<F>::Other.is_const());
+        assert!(
+            !OpDef::<F>::Mul {
+                a: WitnessId(0),
+                b: WitnessId(1)
+            }
+            .is_const()
+        );
+    }
+
+    #[test]
+    fn opdef_as_mul() {
+        let def = OpDef::<F>::Mul {
+            a: WitnessId(3),
+            b: WitnessId(7),
+        };
+        assert_eq!(def.as_mul(), Some((WitnessId(3), WitnessId(7))));
+
+        assert_eq!(OpDef::<F>::Other.as_mul(), None);
+        assert_eq!(OpDef::<F>::Const(F::ONE).as_mul(), None);
+    }
+
+    #[test]
+    fn indexed_def_fields() {
+        let def = IndexedDef::new(42, OpDef::<F>::Other);
+        assert_eq!(def.idx, 42);
+        assert!(matches!(def.def, OpDef::Other));
+    }
 
     #[test]
     fn alu_key_commutative_add() {
