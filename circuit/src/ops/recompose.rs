@@ -16,9 +16,7 @@ use core::fmt::Debug;
 
 use p3_field::{ExtensionField, Field, PrimeField64};
 
-use crate::builder::{
-    CircuitBuilderError, NonPrimitiveOpParams, NpoCircuitPlugin, NpoLoweringContext,
-};
+use crate::builder::{CircuitBuilderError, NpoCircuitPlugin, NpoLoweringContext};
 use crate::ops::{ExecutionContext, NonPrimitiveExecutor, NpoTypeId, Op};
 use crate::tables::{NonPrimitiveTrace, TraceGeneratorFn};
 use crate::types::{ExprId, WitnessId};
@@ -228,26 +226,16 @@ where
         output_exprs: &[(u32, ExprId)],
         ctx: &mut NpoLoweringContext<'_, F>,
     ) -> Result<Op<F>, CircuitBuilderError> {
-        let expr_to_widx = &mut *ctx.expr_to_widx;
-
-        // Ensure output ExprIds are mapped
         for (_output_idx, expr_id) in output_exprs {
-            expr_to_widx
-                .entry(*expr_id)
-                .or_insert_with(|| (ctx.alloc_witness_id)(expr_id.0 as usize));
+            ctx.ensure_witness_id(*expr_id);
         }
 
-        // Validate params
-        match data.params.as_ref() {
-            Some(NonPrimitiveOpParams::Recompose) => {}
-            _ => {
-                return Err(CircuitBuilderError::InvalidNonPrimitiveOpConfiguration {
-                    op: data.op_type.clone(),
-                });
-            }
+        if !data.params.as_ref().is_some_and(|p| p.is_recompose()) {
+            return Err(CircuitBuilderError::InvalidNonPrimitiveOpConfiguration {
+                op: data.op_type.clone(),
+            });
         }
 
-        // Expect 1 input group with D expressions
         if data.input_exprs.len() != 1 || data.input_exprs[0].len() != self.d {
             return Err(CircuitBuilderError::NonPrimitiveOpArity {
                 op: "Recompose",
@@ -256,21 +244,14 @@ where
             });
         }
 
-        // Map input expressions to witness IDs
         let input_wids: Vec<WitnessId> = data.input_exprs[0]
             .iter()
             .enumerate()
             .map(|(i, &expr)| {
-                expr_to_widx.get(&expr).copied().ok_or_else(|| {
-                    CircuitBuilderError::MissingExprMapping {
-                        expr_id: expr,
-                        context: format!("Recompose input coefficient {i}"),
-                    }
-                })
+                ctx.resolve_witness_id(expr, &format!("Recompose input coefficient {i}"))
             })
             .collect::<Result<_, _>>()?;
 
-        // Map output expression to witness ID (should be exactly 1 output)
         if output_exprs.len() != 1 {
             return Err(CircuitBuilderError::NonPrimitiveOpArity {
                 op: "Recompose",
@@ -279,12 +260,7 @@ where
             });
         }
         let (_, out_expr) = output_exprs[0];
-        let out_wid = *expr_to_widx.get(&out_expr).ok_or_else(|| {
-            CircuitBuilderError::MissingExprMapping {
-                expr_id: out_expr,
-                context: "Recompose output".to_string(),
-            }
-        })?;
+        let out_wid = ctx.resolve_witness_id(out_expr, "Recompose output")?;
 
         Ok(Op::NonPrimitiveOpWithExecutor {
             inputs: vec![input_wids],

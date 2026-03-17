@@ -1,19 +1,49 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Runs the recursive_fibonacci example, keeps only the PROFILING lines,
+# Runs a recursive example, keeps only the PROFILING lines,
 # truncates to the chunk starting at the LAST "global: OpCounts" (included),
 # then converts OpCounts blocks to CSV.
 #
+# Usage: ./scripts/profiling.sh [fibonacci|keccak|aggregation]
+# Default example is "fibonacci".
+#
+# Default example parameters:
+# - fibonacci:  -n 10000
+# - keccak:     -n 1000
+# - aggregation: (no -n argument)
+#
 # Output columns:
-# scope, # primitives, publics, consts, adds, subs, muls, divs, horner_accs, # non-primitives, poseidon2_perm, recompose_npo, unconstrained
+# scope, # primitives, publics, consts, adds, subs, muls, divs, horner_accs, bool_checks, # non-primitives, poseidon2_perm, recompose_npo, unconstrained
 
 export RUSTFLAGS="-Ctarget-cpu=native -Copt-level=3"
 
-echo "Profiling recursive_fibonacci with N=10000."
+example="${1:-fibonacci}"
+
+case "$example" in
+  fibonacci)
+    example_bin="recursive_fibonacci"
+    example_args="-n 10000 --num-recursive-layers 4"
+    ;;
+  keccak)
+    example_bin="recursive_keccak"
+    example_args="-n 1000 --num-recursive-layers 4"
+    ;;
+  aggregation)
+    example_bin="recursive_aggregation"
+    example_args="--num-recursive-layers 3"
+    ;;
+  *)
+    echo "Unknown example: $example" >&2
+    echo "Usage: $0 [fibonacci|keccak|aggregation]" >&2
+    exit 1
+    ;;
+esac
+
+echo "Profiling $example_bin with args: $example_args"
 echo "----------------------------------------"
 
-RUST_LOG=info cargo run --release --example recursive_fibonacci -q --features parallel,profiling -- -n 10000 --num-recursive-layers 4 \
+RUST_LOG=info cargo run --release --example "$example_bin" -q --features parallel,profiling -- $example_args \
 | grep -E "PROFILING" \
 | awk '
   # Keep only lines after the LAST appearance of "global: OpCounts" (included).
@@ -24,7 +54,7 @@ RUST_LOG=info cargo run --release --example recursive_fibonacci -q --features pa
 | awk '
   BEGIN {
     OFS=",";
-    print "scope,# primitives,publics,consts,adds,subs,muls,divs,horner_accs,# non-primitives,poseidon2_perm,recompose_npo,unconstrained"
+    print "scope,# primitives,publics,consts,adds,subs,muls,divs,horner_accs,bool_checks,# non-primitives,poseidon2_perm,recompose_npo,unconstrained"
   }
 
   /\[PROFILING\].*OpCounts \{/ {
@@ -39,7 +69,7 @@ RUST_LOG=info cargo run --release --example recursive_fibonacci -q --features pa
     }
 
     # Defaults
-    publics=0; consts=0; adds=0; subs=0; muls=0; divs=0; horner_accs=0;
+    publics=0; consts=0; adds=0; subs=0; muls=0; divs=0; horner_accs=0; bool_checks=0;
     poseidon2_perm=0; recompose_npo=0; unconstrained=0;
 
     # Extract OpCounts body for simpler parsing
@@ -56,6 +86,7 @@ RUST_LOG=info cargo run --release --example recursive_fibonacci -q --features pa
     if (match(body, /muls: [0-9]+/))    muls    = substr(body, RSTART+6,  RLENGTH-6)  + 0
     if (match(body, /divs: [0-9]+/))    divs    = substr(body, RSTART+6,  RLENGTH-6)  + 0
     if (match(body, /horner_accs: [0-9]+/)) horner_accs = substr(body, RSTART+13, RLENGTH-13) + 0
+    if (match(body, /bool_checks: [0-9]+/)) bool_checks = substr(body, RSTART+13, RLENGTH-13) + 0
 
     # non_primitives { ... } (if present)
     if (match(body, /non_primitives: \{[^}]*\}/)) {
@@ -89,9 +120,9 @@ RUST_LOG=info cargo run --release --example recursive_fibonacci -q --features pa
       }
     }
 
-    primitives_sum = publics + consts + adds + subs + muls + divs + horner_accs
+    primitives_sum = publics + consts + adds + subs + muls + divs + horner_accs + bool_checks
     nonprims_sum   = poseidon2_perm + recompose_npo + unconstrained
 
-    print scope, primitives_sum, publics, consts, adds, subs, muls, divs, horner_accs, nonprims_sum, poseidon2_perm, recompose_npo, unconstrained
+    print scope, primitives_sum, publics, consts, adds, subs, muls, divs, horner_accs, bool_checks, nonprims_sum, poseidon2_perm, recompose_npo, unconstrained
   }
 '
