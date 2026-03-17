@@ -1,7 +1,6 @@
 //! Poseidon2 configuration types and execution closures.
 
 use alloc::format;
-use alloc::string::ToString;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
@@ -122,7 +121,7 @@ impl Poseidon2Config {
 
     /// Check that input and output counts match this config's expected layout.
     ///
-    /// - For D=1: expects 16 inputs and 8 or 16 outputs.
+    /// - For D=1: expects `width` inputs and `rate` or `width` outputs.
     /// - For D>1: expects `width_ext + 2` inputs and `rate_ext` or `width_ext` outputs.
     ///
     /// # Errors
@@ -134,7 +133,11 @@ impl Poseidon2Config {
         output_count: usize,
     ) -> Result<(), CircuitBuilderError> {
         let is_d1 = self.d() == 1;
-        let expected_inputs = if is_d1 { 16 } else { self.width_ext() + 2 };
+        let expected_inputs = if is_d1 {
+            self.width()
+        } else {
+            self.width_ext() + 2
+        };
         if input_count != expected_inputs {
             return Err(CircuitBuilderError::NonPrimitiveOpArity {
                 op: "Poseidon2Perm",
@@ -144,7 +147,7 @@ impl Poseidon2Config {
         }
 
         let valid_output_count = if is_d1 {
-            output_count == 8 || output_count == 16
+            output_count == self.rate() || output_count == self.width()
         } else {
             output_count == self.rate_ext() || output_count == self.width_ext()
         };
@@ -152,7 +155,7 @@ impl Poseidon2Config {
             return Err(CircuitBuilderError::NonPrimitiveOpArity {
                 op: "Poseidon2Perm",
                 expected: if is_d1 {
-                    "8 or 16 outputs for D=1 mode".to_string()
+                    format!("{} or {} outputs for D=1 mode", self.rate(), self.width())
                 } else {
                     format!(
                         "{} or {} outputs for D>1 mode",
