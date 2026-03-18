@@ -1,9 +1,7 @@
 //! Symbolic constraint compiler.
 
-use alloc::vec::Vec;
-
 use hashbrown::HashMap;
-use p3_air::{BaseLeaf, ExtLeaf, SymbolicExpr, SymbolicExprNode, SymbolicExpressionExt};
+use p3_air::{BaseLeaf, ExtLeaf, SymbolicExpressionExt};
 use p3_field::{ExtensionField, Field};
 use p3_uni_stark::SymbolicExpression;
 
@@ -17,9 +15,9 @@ use crate::{CircuitBuilder, ExprId};
 ///
 /// # Algorithm
 ///
-/// Builds a [`SymbolicExprDag`] from expression trees, then iterates
-/// the topologically-sorted nodes in a single linear pass. Shared
-/// sub-expressions are automatically deduplicated by the DAG construction.
+/// Recursively walks expression trees with pointer-keyed caches.
+/// Shared sub-expressions (via `Arc`) produce a single circuit node
+/// rather than duplicated sub-trees.
 pub struct SymbolicCompiler<'a> {
     /// Lagrange selector targets (first row, last row, transition).
     row_selectors: RowSelectorsTargets,
@@ -49,41 +47,43 @@ impl<'a> SymbolicCompiler<'a> {
         circuit: &mut CircuitBuilder<EF>,
         cache: &mut HashMap<*const SymbolicExpression<CF>, ExprId>,
     ) -> ExprId {
-        // Fast path: already compiled this exact expression (by pointer).
-        let root_key = expr as *const _;
-        if let Some(&cached) = cache.get(&root_key) {
+        let key = expr as *const _;
+        if let Some(&cached) = cache.get(&key) {
             return cached;
         }
 
-        // Build a topologically-sorted DAG from the expression tree.
-        // This deduplicates shared sub-expressions via Arc pointer identity.
-        let dag = SymbolicExpr::flatten_to_dag(core::slice::from_ref(expr));
+        let id = match expr {
+            SymbolicExpression::Leaf(BaseLeaf::Constant(c)) => circuit.define_const(EF::from(*c)),
+            SymbolicExpression::Leaf(BaseLeaf::Variable(v)) => {
+                self.columns.resolve_base_var(&v.entry, v.index)
+            }
+            SymbolicExpression::Leaf(BaseLeaf::IsFirstRow) => self.row_selectors.is_first_row,
+            SymbolicExpression::Leaf(BaseLeaf::IsLastRow) => self.row_selectors.is_last_row,
+            SymbolicExpression::Leaf(BaseLeaf::IsTransition) => self.row_selectors.is_transition,
+            SymbolicExpression::Add { x, y, .. } => {
+                let l = self.compile_base(x, circuit, cache);
+                let r = self.compile_base(y, circuit, cache);
+                circuit.add(l, r)
+            }
+            SymbolicExpression::Sub { x, y, .. } => {
+                let l = self.compile_base(x, circuit, cache);
+                let r = self.compile_base(y, circuit, cache);
+                circuit.sub(l, r)
+            }
+            SymbolicExpression::Neg { x, .. } => {
+                let val = self.compile_base(x, circuit, cache);
+                let zero = circuit.define_const(EF::ZERO);
+                circuit.sub(zero, val)
+            }
+            SymbolicExpression::Mul { x, y, .. } => {
+                let l = self.compile_base(x, circuit, cache);
+                let r = self.compile_base(y, circuit, cache);
+                circuit.mul(l, r)
+            }
+        };
 
-        // Single linear pass: map each DAG node to a circuit ExprId.
-        let mut ids: Vec<ExprId> = Vec::with_capacity(dag.nodes.len());
-        for node in &dag.nodes {
-            let id = match node {
-                SymbolicExprNode::Leaf(BaseLeaf::Constant(c)) => circuit.define_const(EF::from(*c)),
-                SymbolicExprNode::Leaf(BaseLeaf::Variable(v)) => {
-                    self.columns.resolve_base_var(&v.entry, v.index)
-                }
-                SymbolicExprNode::Leaf(BaseLeaf::IsFirstRow) => self.row_selectors.is_first_row,
-                SymbolicExprNode::Leaf(BaseLeaf::IsLastRow) => self.row_selectors.is_last_row,
-                SymbolicExprNode::Leaf(BaseLeaf::IsTransition) => self.row_selectors.is_transition,
-                SymbolicExprNode::Add { left, right, .. } => circuit.add(ids[*left], ids[*right]),
-                SymbolicExprNode::Sub { left, right, .. } => circuit.sub(ids[*left], ids[*right]),
-                SymbolicExprNode::Neg { idx, .. } => {
-                    let zero = circuit.define_const(EF::ZERO);
-                    circuit.sub(zero, ids[*idx])
-                }
-                SymbolicExprNode::Mul { left, right, .. } => circuit.mul(ids[*left], ids[*right]),
-            };
-            ids.push(id);
-        }
-
-        let result = ids[dag.constraint_idx[0]];
-        cache.insert(root_key, result);
-        result
+        cache.insert(key, id);
+        id
     }
 
     /// Compile an extension-field symbolic expression into circuit operations.
@@ -102,40 +102,43 @@ impl<'a> SymbolicCompiler<'a> {
         base_cache: &mut HashMap<*const SymbolicExpression<F>, ExprId>,
         ext_cache: &mut HashMap<*const SymbolicExpressionExt<F, EF>, ExprId>,
     ) -> ExprId {
-        // Fast path: already compiled this exact expression (by pointer).
-        let root_key = expr as *const _;
-        if let Some(&cached) = ext_cache.get(&root_key) {
+        let key = expr as *const _;
+        if let Some(&cached) = ext_cache.get(&key) {
             return cached;
         }
 
-        // Build a topologically-sorted DAG from the extension expression tree.
-        let dag = SymbolicExpr::flatten_to_dag(core::slice::from_ref(expr));
+        let id = match expr {
+            SymbolicExpressionExt::Leaf(ExtLeaf::Base(base_expr)) => {
+                self.compile_base(base_expr, circuit, base_cache)
+            }
+            SymbolicExpressionExt::Leaf(ExtLeaf::ExtVariable(v)) => {
+                self.columns.resolve_ext_var(&v.entry, v.index)
+            }
+            SymbolicExpressionExt::Leaf(ExtLeaf::ExtConstant(c)) => circuit.define_const(*c),
+            SymbolicExpressionExt::Add { x, y, .. } => {
+                let l = self.compile_ext(x, circuit, base_cache, ext_cache);
+                let r = self.compile_ext(y, circuit, base_cache, ext_cache);
+                circuit.add(l, r)
+            }
+            SymbolicExpressionExt::Sub { x, y, .. } => {
+                let l = self.compile_ext(x, circuit, base_cache, ext_cache);
+                let r = self.compile_ext(y, circuit, base_cache, ext_cache);
+                circuit.sub(l, r)
+            }
+            SymbolicExpressionExt::Neg { x, .. } => {
+                let val = self.compile_ext(x, circuit, base_cache, ext_cache);
+                let zero = circuit.define_const(EF::ZERO);
+                circuit.sub(zero, val)
+            }
+            SymbolicExpressionExt::Mul { x, y, .. } => {
+                let l = self.compile_ext(x, circuit, base_cache, ext_cache);
+                let r = self.compile_ext(y, circuit, base_cache, ext_cache);
+                circuit.mul(l, r)
+            }
+        };
 
-        // Single linear pass: map each DAG node to a circuit ExprId.
-        let mut ids: Vec<ExprId> = Vec::with_capacity(dag.nodes.len());
-        for node in &dag.nodes {
-            let id = match node {
-                SymbolicExprNode::Leaf(ExtLeaf::Base(base_expr)) => {
-                    self.compile_base(base_expr, circuit, base_cache)
-                }
-                SymbolicExprNode::Leaf(ExtLeaf::ExtVariable(v)) => {
-                    self.columns.resolve_ext_var(&v.entry, v.index)
-                }
-                SymbolicExprNode::Leaf(ExtLeaf::ExtConstant(c)) => circuit.define_const(*c),
-                SymbolicExprNode::Add { left, right, .. } => circuit.add(ids[*left], ids[*right]),
-                SymbolicExprNode::Sub { left, right, .. } => circuit.sub(ids[*left], ids[*right]),
-                SymbolicExprNode::Neg { idx, .. } => {
-                    let zero = circuit.define_const(EF::ZERO);
-                    circuit.sub(zero, ids[*idx])
-                }
-                SymbolicExprNode::Mul { left, right, .. } => circuit.mul(ids[*left], ids[*right]),
-            };
-            ids.push(id);
-        }
-
-        let result = ids[dag.constraint_idx[0]];
-        ext_cache.insert(root_key, result);
-        result
+        ext_cache.insert(key, id);
+        id
     }
 }
 
@@ -457,16 +460,16 @@ mod tests {
         use alloc::sync::Arc;
 
         // Build expr = shared * shared where both sides of the Mul
-        // point to the *same* Arc allocation, so the DAG deduplicates.
+        // point to the *same* Arc allocation, so the cache deduplicates.
         // Use variables (not constants) to avoid sym_add constant folding.
         //
-        //         Mul (root)        ← 1 node
+        //         Mul (root)        <- 1 entry
         //        /         \
-        //     shared     shared     ← 1 node (same Arc, deduplicated by DAG)
+        //     shared     shared     <- 1 entry (same Arc, second call is a cache hit)
         //      / \
-        //  local[0] local[1]        ← 2 nodes (variable leaves)
+        //  local[0] local[1]        <- 2 entries (variable leaves)
         //
-        // Total DAG nodes: 4.
+        // Total: 4 cache entries.
         let v0 = SymbolicVariable::<Challenge>::new(BaseEntry::Main { offset: 0 }, 0);
         let v1 = SymbolicVariable::<Challenge>::new(BaseEntry::Main { offset: 0 }, 1);
         let shared = Arc::new(SymbolicExpression::from(v0) + SymbolicExpression::from(v1));
@@ -498,12 +501,11 @@ mod tests {
         let mut cache = HashMap::new();
         let result = compiler.compile_base(&expr, &mut circuit, &mut cache);
 
-        // The DAG should have 4 nodes: v0, v1, Add, Mul.
-        // The shared sub-expression is deduplicated by the DAG itself.
-        // The external cache has 1 entry (the root expression pointer).
-        assert_eq!(cache.len(), 1);
+        // 4 entries: v0, v1, shared (Add), root (Mul).
+        // Without dedup the shared Add would be compiled twice -> 6 entries.
+        assert_eq!(cache.len(), 4);
 
-        // Verify correctness: (a + b) * (a + b) with a=3, b=5 → 64.
+        // Verify correctness: (a + b) * (a + b) with a=3, b=5 -> 64.
         let a = Challenge::from_u64(3);
         let b = Challenge::from_u64(5);
         let expected = circuit.define_const((a + b) * (a + b));
