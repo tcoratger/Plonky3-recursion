@@ -2,6 +2,7 @@
 
 use alloc::vec::Vec;
 
+use hashbrown::HashMap;
 use p3_air::{BaseLeaf, ExtLeaf, SymbolicExpr, SymbolicExprNode, SymbolicExpressionExt};
 use p3_field::{ExtensionField, Field};
 use p3_uni_stark::SymbolicExpression;
@@ -46,7 +47,7 @@ impl<'a> SymbolicCompiler<'a> {
         &self,
         expr: &SymbolicExpression<CF>,
         circuit: &mut CircuitBuilder<EF>,
-        cache: &mut hashbrown::HashMap<*const SymbolicExpression<CF>, ExprId>,
+        cache: &mut HashMap<*const SymbolicExpression<CF>, ExprId>,
     ) -> ExprId {
         // Fast path: already compiled this exact expression (by pointer).
         let root_key = expr as *const _;
@@ -98,8 +99,8 @@ impl<'a> SymbolicCompiler<'a> {
         &self,
         expr: &SymbolicExpressionExt<F, EF>,
         circuit: &mut CircuitBuilder<EF>,
-        base_cache: &mut hashbrown::HashMap<*const SymbolicExpression<F>, ExprId>,
-        ext_cache: &mut hashbrown::HashMap<*const SymbolicExpressionExt<F, EF>, ExprId>,
+        base_cache: &mut HashMap<*const SymbolicExpression<F>, ExprId>,
+        ext_cache: &mut HashMap<*const SymbolicExpressionExt<F, EF>, ExprId>,
     ) -> ExprId {
         // Fast path: already compiled this exact expression (by pointer).
         let root_key = expr as *const _;
@@ -290,7 +291,7 @@ mod tests {
 
         // Compile the folded symbolic expression into circuit gates.
         let compiler = SymbolicCompiler::new(row_selectors, &columns);
-        let mut cache = hashbrown::HashMap::new();
+        let mut cache = HashMap::new();
         let sum = compiler.compile_base(&folded_symbolic_constraints, &mut circuit, &mut cache);
 
         // Assert that the circuit output equals the reference folded value.
@@ -367,7 +368,7 @@ mod tests {
         };
 
         let compiler = SymbolicCompiler::new(row_selectors, &columns);
-        let mut cache = hashbrown::HashMap::new();
+        let mut cache = HashMap::new();
         let result = compiler.compile_base(expr, &mut circuit, &mut cache);
 
         let expected_id = circuit.define_const(expected);
@@ -494,7 +495,7 @@ mod tests {
         };
 
         let compiler = SymbolicCompiler::new(row_selectors, &columns);
-        let mut cache = hashbrown::HashMap::new();
+        let mut cache = HashMap::new();
         let result = compiler.compile_base(&expr, &mut circuit, &mut cache);
 
         // The DAG should have 4 nodes: v0, v1, Add, Mul.
@@ -562,8 +563,8 @@ mod tests {
         };
 
         let compiler = SymbolicCompiler::new(row_selectors, &columns);
-        let mut base_cache = hashbrown::HashMap::new();
-        let mut ext_cache = hashbrown::HashMap::new();
+        let mut base_cache = HashMap::new();
+        let mut ext_cache = HashMap::new();
         let result = compiler.compile_ext(&expr, &mut circuit, &mut base_cache, &mut ext_cache);
 
         let expected = circuit.define_const(Challenge::from_u64(49));
@@ -609,8 +610,8 @@ mod tests {
         };
 
         let compiler = SymbolicCompiler::new(row_selectors, &columns);
-        let mut base_cache = hashbrown::HashMap::new();
-        let mut ext_cache = hashbrown::HashMap::new();
+        let mut base_cache = HashMap::new();
+        let mut ext_cache = HashMap::new();
         let result = compiler.compile_ext(&expr, &mut circuit, &mut base_cache, &mut ext_cache);
 
         let expected = circuit.define_const(-Challenge::from_u64(13));
@@ -664,8 +665,8 @@ mod tests {
         let perm_val = Challenge::from_u64(11);
 
         let compiler = SymbolicCompiler::new(row_selectors, &columns);
-        let mut base_cache = hashbrown::HashMap::new();
-        let mut ext_cache = hashbrown::HashMap::new();
+        let mut base_cache = HashMap::new();
+        let mut ext_cache = HashMap::new();
         let result = compiler.compile_ext(&expr, &mut circuit, &mut base_cache, &mut ext_cache);
 
         let expected = circuit.define_const(ch_val * perm_val);
@@ -720,7 +721,7 @@ mod tests {
         };
 
         let compiler = SymbolicCompiler::new(row_selectors, &columns);
-        let mut cache = hashbrown::HashMap::new();
+        let mut cache = HashMap::new();
         // CF=F, EF=Challenge: constants are lifted via Challenge::from(F).
         let result = compiler.compile_base(&expr, &mut circuit, &mut cache);
 
