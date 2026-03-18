@@ -87,11 +87,6 @@ impl<F: Field, const D: usize> ConstAir<F, D> {
         }
     }
 
-    /// Returns the number of auxiliary lookup columns registered so far.
-    pub const fn num_lookup_columns(&self) -> usize {
-        self.num_lookup_columns
-    }
-
     /// Set the minimum trace height for FRI compatibility.
     ///
     /// FRI requires: `log_trace_height > log_final_poly_len + log_blowup`
@@ -143,17 +138,6 @@ impl<F: Field, const D: usize> ConstAir<F, D> {
         mat.pad_to_power_of_two_height(F::ZERO);
 
         mat
-    }
-
-    /// Returns `[ext_mult, index]` pairs for each constant, with `ext_mult = F::ONE` as a
-    /// placeholder. In the full pipeline, `common.rs` computes actual multiplicities from
-    /// `ext_reads`.
-    pub fn trace_to_preprocessed<ExtF: BasedVectorSpace<F>>(trace: &ConstTrace<ExtF>) -> Vec<F> {
-        trace
-            .index
-            .iter()
-            .flat_map(|widx| [F::ONE, F::from_u64(widx.0 as u64 * D as u64)])
-            .collect()
     }
 }
 

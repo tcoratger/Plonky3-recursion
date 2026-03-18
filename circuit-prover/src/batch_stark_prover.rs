@@ -116,11 +116,6 @@ impl<SC: StarkGenericConfig> CircuitProverData<SC> {
     pub const fn common_data(&self) -> &CommonData<SC> {
         &self.prover_data.common
     }
-
-    /// Get a reference to the preprocessed columns.
-    pub const fn preprocessed_columns(&self) -> &PreprocessedColumns<Val<SC>> {
-        &self.preprocessed_columns
-    }
 }
 
 /// Convenience macro for deriving all degree-specific helpers from a single base
@@ -239,24 +234,12 @@ impl RowCounts {
         }
         Self(rows)
     }
-
-    /// Gets the row count for a specific table.
-    #[inline]
-    pub const fn get(&self, t: PrimitiveTable) -> usize {
-        self.0[t as usize]
-    }
 }
 
 impl core::ops::Index<PrimitiveTable> for RowCounts {
     type Output = usize;
     fn index(&self, table: PrimitiveTable) -> &Self::Output {
         &self.0[table as usize]
-    }
-}
-
-impl From<[usize; NUM_PRIMITIVE_TABLES]> for RowCounts {
-    fn from(rows: [usize; NUM_PRIMITIVE_TABLES]) -> Self {
-        Self(rows)
     }
 }
 
@@ -463,15 +446,6 @@ where
         self
     }
 
-    /// Enable the lookup debugger. When set, `prove_all_tables` will run
-    /// `check_lookups` on the constructed traces before generating the proof,
-    /// panicking with a detailed message on any multiset imbalance.
-    #[must_use]
-    pub const fn with_debug_lookups(mut self) -> Self {
-        self.debug_lookups = true;
-        self
-    }
-
     /// Register a dynamic non-primitive table prover.
     pub fn register_table_prover(&mut self, prover: Box<dyn TableProver<SC>>) {
         self.non_primitive_provers.push(prover);
@@ -510,16 +484,6 @@ where
         SC: Send + Sync,
     {
         self.register_table_prover(Box::new(RecomposeProver::<2>));
-    }
-
-    /// Builder-style registration for the recompose table prover (D=4).
-    #[must_use]
-    pub fn with_recompose_table(mut self) -> Self
-    where
-        SC: Send + Sync,
-    {
-        self.register_recompose_table();
-        self
     }
 
     /// Register Poseidon2 for D=2 challenge field (e.g. Goldilocks).
