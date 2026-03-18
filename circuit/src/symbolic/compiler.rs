@@ -463,11 +463,11 @@ mod tests {
         // point to the *same* Arc allocation, so the cache deduplicates.
         // Use variables (not constants) to avoid sym_add constant folding.
         //
-        //         Mul (root)        <- 1 entry
+        //         Mul (root)        ← 1 entry
         //        /         \
-        //     shared     shared     <- 1 entry (same Arc, second call is a cache hit)
+        //     shared     shared     ← 1 entry (same Arc, second call is a cache hit)
         //      / \
-        //  local[0] local[1]        <- 2 entries (variable leaves)
+        //  local[0] local[1]        ← 2 entries (variable leaves)
         //
         // Total: 4 cache entries.
         let v0 = SymbolicVariable::<Challenge>::new(BaseEntry::Main { offset: 0 }, 0);
@@ -502,10 +502,10 @@ mod tests {
         let result = compiler.compile_base(&expr, &mut circuit, &mut cache);
 
         // 4 entries: v0, v1, shared (Add), root (Mul).
-        // Without dedup the shared Add would be compiled twice -> 6 entries.
+        // Without dedup the shared Add would be compiled twice → 6 entries.
         assert_eq!(cache.len(), 4);
 
-        // Verify correctness: (a + b) * (a + b) with a=3, b=5 -> 64.
+        // Verify correctness: (a + b) * (a + b) with a=3, b=5 → 64.
         let a = Challenge::from_u64(3);
         let b = Challenge::from_u64(5);
         let expected = circuit.define_const((a + b) * (a + b));
