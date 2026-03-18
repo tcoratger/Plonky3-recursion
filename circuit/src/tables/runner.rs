@@ -681,8 +681,6 @@ mod tests {
 
         let traces = runner.run().unwrap();
 
-        traces.dump_primitive_traces_log();
-
         let f = BabyBear::from_u64;
         let neg_111 = -f(111);
         assert_eq!(

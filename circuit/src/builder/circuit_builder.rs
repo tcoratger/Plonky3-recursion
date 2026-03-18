@@ -17,11 +17,12 @@ use super::compiler::{ExpressionLowerer, Optimizer};
 use super::npo::{NonPrimitiveOpParams, NonPrimitiveOperationData, NpoCircuitPlugin};
 use super::{BuilderConfig, ExpressionBuilder, PublicInputTracker};
 use crate::circuit::Circuit;
-use crate::ops::poseidon2_perm::{Poseidon2CircuitPlugin, Poseidon2PermExec};
+use crate::ops::poseidon2_perm::{
+    Poseidon2CircuitPlugin, Poseidon2PermCallBase, Poseidon2PermExec,
+};
 use crate::ops::recompose::RecomposeCircuitPlugin;
 use crate::ops::{
     HintExecutor, NpoConfig, NpoRegistry, NpoTypeId, Poseidon2Params, Poseidon2PermCall,
-    Poseidon2PermCallBase,
 };
 use crate::tables::TraceGeneratorFn;
 use crate::types::{ExprId, NonPrimitiveOpId, WitnessAllocator, WitnessId};
@@ -2629,7 +2630,7 @@ mod proptests {
         runner.set_public_inputs(&[BabyBear::ZERO]).unwrap();
         let traces = runner.run().unwrap();
         assert!(
-            !traces.alu_trace.is_empty(),
+            !traces.alu_trace.values.is_empty(),
             "ALU trace should not be empty"
         );
 
@@ -2641,7 +2642,7 @@ mod proptests {
         runner2.set_public_inputs(&[BabyBear::ONE]).unwrap();
         let traces2 = runner2.run().unwrap();
         assert!(
-            !traces2.alu_trace.is_empty(),
+            !traces2.alu_trace.values.is_empty(),
             "ALU trace should not be empty"
         );
     }

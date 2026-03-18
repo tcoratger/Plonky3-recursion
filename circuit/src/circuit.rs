@@ -133,34 +133,6 @@ impl<F: Field> PreprocessedColumns<F> {
         Ok(())
     }
 
-    /// Extends the preprocessed data of `op_type`'s non-primitive operation
-    /// with a single witness index (D-scaled), and increments its ext-field read count.
-    pub fn register_non_primitive_witness_read(
-        &mut self,
-        op_type: &NpoTypeId,
-        wid: WitnessId,
-    ) -> Result<(), CircuitError> {
-        self.register_non_primitive_witness_reads(op_type, &[wid])
-    }
-
-    /// Extends the preprocessed data of `op_type`'s primitive operation with `values`.
-    /// Does not update read counts.
-    pub fn register_primitive_preprocessed_no_read(
-        &mut self,
-        op_type: PrimitiveOpType,
-        values: &[F],
-    ) -> Result<(), CircuitError> {
-        if self.primitive.len() != PrimitiveOpType::COUNT {
-            return Err(CircuitError::InvalidPreprocessing {
-                reason: "primitive vector length does not match PrimitiveOpType::COUNT",
-            });
-        }
-
-        self.primitive[op_type as usize].extend(values);
-
-        Ok(())
-    }
-
     /// Extends the preprocessed data of `op_type`'s non-primitive operation with `values`.
     /// Does not update read counts.
     pub fn register_non_primitive_preprocessed_no_read(
@@ -176,12 +148,6 @@ impl<F: Field> PreprocessedColumns<F> {
 impl<F: Field> Default for PreprocessedColumns<F> {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-impl<F: Field> PreprocessedColumns<F> {
-    pub const fn extension_degree(&self) -> usize {
-        self.d
     }
 }
 
