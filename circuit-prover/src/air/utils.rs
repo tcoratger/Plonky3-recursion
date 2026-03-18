@@ -5,7 +5,6 @@ use p3_air::{AirBuilder, AirLayout};
 use p3_field::Field;
 use p3_lookup::lookup_traits::{Direction, LookupInput};
 use p3_matrix::Matrix;
-use p3_matrix::dense::RowMajorMatrix;
 use p3_uni_stark::{SymbolicAirBuilder, SymbolicExpression, SymbolicVariable};
 
 use super::alu_air::{
