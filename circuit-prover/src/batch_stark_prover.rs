@@ -446,6 +446,15 @@ where
         self
     }
 
+    /// Enable the lookup debugger. When set, `prove_all_tables` will run
+    /// `check_lookups` on the constructed traces before generating the proof,
+    /// panicking with a detailed message on any multiset imbalance.
+    #[must_use]
+    pub const fn with_debug_lookups(mut self) -> Self {
+        self.debug_lookups = true;
+        self
+    }
+
     /// Register a dynamic non-primitive table prover.
     pub fn register_table_prover(&mut self, prover: Box<dyn TableProver<SC>>) {
         self.non_primitive_provers.push(prover);
@@ -484,6 +493,16 @@ where
         SC: Send + Sync,
     {
         self.register_table_prover(Box::new(RecomposeProver::<2>));
+    }
+
+    /// Builder-style registration for the recompose table prover (D=4).
+    #[must_use]
+    pub fn with_recompose_table(mut self) -> Self
+    where
+        SC: Send + Sync,
+    {
+        self.register_recompose_table();
+        self
     }
 
     /// Register Poseidon2 for D=2 challenge field (e.g. Goldilocks).
