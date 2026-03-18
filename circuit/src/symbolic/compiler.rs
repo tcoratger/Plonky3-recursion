@@ -62,9 +62,7 @@ impl<'a> SymbolicCompiler<'a> {
         let mut ids: Vec<ExprId> = Vec::with_capacity(dag.nodes.len());
         for node in &dag.nodes {
             let id = match node {
-                SymbolicExprNode::Leaf(BaseLeaf::Constant(c)) => {
-                    circuit.define_const(EF::from(*c))
-                }
+                SymbolicExprNode::Leaf(BaseLeaf::Constant(c)) => circuit.define_const(EF::from(*c)),
                 SymbolicExprNode::Leaf(BaseLeaf::Variable(v)) => {
                     self.columns.resolve_base_var(&v.entry, v.index)
                 }
