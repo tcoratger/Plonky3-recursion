@@ -2,10 +2,9 @@ use alloc::vec::Vec;
 use core::iter;
 
 use itertools::Itertools;
-use p3_air::{Air, AirBuilder, AirLayout, PermutationAirBuilder};
+use p3_air::{AirBuilder, AirLayout};
 use p3_field::Field;
-use p3_lookup::lookup_traits::{Direction, Lookup, LookupInput};
-use p3_lookup::{AirWithLookups, LookupAir, LookupEvaluator};
+use p3_lookup::lookup_traits::{Direction, LookupInput};
 use p3_matrix::Matrix;
 use p3_matrix::dense::RowMajorMatrix;
 use p3_uni_stark::{SymbolicAirBuilder, SymbolicExpression, SymbolicVariable};
@@ -91,8 +90,9 @@ pub fn create_direct_preprocessed_trace<F: Field>(
         values.extend(core::iter::repeat_n(F::ZERO, preprocessed_width.max(1)));
     }
 
-    let mat = RowMajorMatrix::new(values, preprocessed_width);
-    pad_matrix_with_min_height(mat, min_height)
+    let mut mat = RowMajorMatrix::new(values, preprocessed_width);
+    mat.pad_to_min_power_of_two_height(min_height, F::ZERO);
+    mat
 }
 
 /// Like [`create_direct_preprocessed_trace`], but allocates the *final* width
@@ -137,71 +137,8 @@ pub fn create_direct_preprocessed_trace_with_extra<F: Field>(
         // trailing extra_cols_per_row entries stay zero
     }
 
-    pad_matrix_with_min_height(widened, min_height)
-}
-
-/// Object‑safe gadget shim.
-pub trait LookupEvaluatorDyn<AB: PermutationAirBuilder> {
-    fn num_aux_cols(&self) -> usize;
-    fn num_challenges(&self) -> usize;
-    fn eval_with_lookups_dyn(&self, builder: &mut AB, contexts: &[Lookup<AB::F>]);
-}
-
-/// Blanket: any concrete `LookupEvaluator` becomes object‑safe.
-impl<AB, LE> LookupEvaluatorDyn<AB> for LE
-where
-    AB: PermutationAirBuilder,
-    LE: LookupEvaluator,
-{
-    fn num_aux_cols(&self) -> usize {
-        LE::num_aux_cols(self)
-    }
-    fn num_challenges(&self) -> usize {
-        LE::num_challenges(self)
-    }
-    fn eval_with_lookups_dyn(&self, builder: &mut AB, contexts: &[Lookup<AB::F>]) {
-        // forward to the generic method on the concrete handler
-        LE::eval_lookups(self, builder, contexts);
-    }
-}
-
-/// Object‑safe AIR shim.
-pub trait AirDyn<AB>
-where
-    AB: PermutationAirBuilder,
-{
-    fn add_lookup_columns_dyn(&mut self) -> Vec<usize>;
-    fn get_lookups_dyn(&mut self) -> Vec<Lookup<AB::F>>;
-    fn eval_with_lookups_dyn<LE: LookupEvaluator>(
-        &self,
-        builder: &mut AB,
-        contexts: &[Lookup<AB::F>],
-        lookup_evaluator: &LE,
-    );
-}
-
-/// Blanket: any existing `Air` now satisfies the object‑safe shim.
-impl<AB, T> AirDyn<AB> for T
-where
-    AB: PermutationAirBuilder,
-    T: Air<AB> + LookupAir<AB::F>,
-{
-    fn add_lookup_columns_dyn(&mut self) -> Vec<usize> {
-        self.add_lookup_columns()
-    }
-
-    fn get_lookups_dyn(&mut self) -> Vec<Lookup<AB::F>> {
-        self.get_lookups()
-    }
-
-    fn eval_with_lookups_dyn<LE: LookupEvaluator>(
-        &self,
-        builder: &mut AB,
-        contexts: &[Lookup<AB::F>],
-        lookup_evaluator: &LE,
-    ) {
-        T::eval_with_lookups(self, builder, contexts, lookup_evaluator);
-    }
+    widened.pad_to_min_power_of_two_height(min_height, F::ZERO);
+    widened
 }
 
 /// Helper to create symbolic air builder and extract symbolic variables for lookup generation.
@@ -234,24 +171,6 @@ pub fn create_symbolic_variables<F: Field>(
         .to_vec();
 
     (symbolic_main_local, preprocessed_local)
-}
-
-/// Helper to pad a matrix to power-of-two height and then to min_height if needed.
-pub fn pad_matrix_with_min_height<F: Field>(
-    mut mat: RowMajorMatrix<F>,
-    min_height: usize,
-) -> RowMajorMatrix<F> {
-    mat.pad_to_power_of_two_height(F::ZERO);
-
-    let min_rows = min_height.next_power_of_two();
-    if mat.height() < min_rows {
-        let width = mat.width();
-        let padding_rows = min_rows - mat.height();
-        mat.values
-            .extend(core::iter::repeat_n(F::ZERO, padding_rows * width));
-    }
-
-    mat
 }
 
 /// Helper to create preprocessed trace with multiplicity insertion and padding.
@@ -287,8 +206,9 @@ pub fn create_preprocessed_trace_with_multiplicity<F: Field>(
         }
     }
 
-    let mat = RowMajorMatrix::new(values, row_width);
-    pad_matrix_with_min_height(mat, min_height)
+    let mut mat = RowMajorMatrix::new(values, row_width);
+    mat.pad_to_min_power_of_two_height(min_height, F::ZERO);
+    mat
 }
 
 /// Helper to create preprocessed trace for single-row-per-op AIRs (like ConstAir).
@@ -304,8 +224,9 @@ pub fn create_simple_preprocessed_trace<F: Field>(
         .flat_map(|v| [F::ONE, *v])
         .collect();
 
-    let mat = RowMajorMatrix::new(preprocessed_with_multiplicity, preprocessed_width);
-    pad_matrix_with_min_height(mat, min_height)
+    let mut mat = RowMajorMatrix::new(preprocessed_with_multiplicity, preprocessed_width);
+    mat.pad_to_min_power_of_two_height(min_height, F::ZERO);
+    mat
 }
 
 /// Helper to create preprocessed trace for AIRs with chunked preprocessed values (like AluAir).
@@ -340,6 +261,7 @@ pub fn create_chunked_preprocessed_trace<F: Field>(
         preprocessed_with_multiplicity.extend(core::iter::repeat_n(F::ZERO, padding_len));
     }
 
-    let mat = RowMajorMatrix::new(preprocessed_with_multiplicity, preprocessed_width);
-    pad_matrix_with_min_height(mat, min_height)
+    let mut mat = RowMajorMatrix::new(preprocessed_with_multiplicity, preprocessed_width);
+    mat.pad_to_min_power_of_two_height(min_height, F::ZERO);
+    mat
 }
