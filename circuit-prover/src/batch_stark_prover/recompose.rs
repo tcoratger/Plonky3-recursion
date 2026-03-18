@@ -65,7 +65,7 @@ impl<const D: usize> RecomposeProver<D> {
         let lanes = 1;
 
         // Build preprocessed data: 2 values per operation [output_idx, out_mult]
-        // These are stored flat; create_direct_preprocessed_trace handles lane layout.
+        // These are stored flat; from_flat_padded handles lane layout.
         let mut preprocessed = Val::<SC>::zero_vec(num_ops * 2);
         for (i, row) in t.operations.iter().enumerate() {
             preprocessed[i * 2] = Val::<SC>::from_u32(row.output_wid.0 * D as u32);

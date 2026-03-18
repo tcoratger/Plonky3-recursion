@@ -36,9 +36,7 @@ use p3_lookup::LookupAir;
 use p3_lookup::lookup_traits::{Direction, Kind, Lookup};
 use p3_matrix::dense::RowMajorMatrix;
 
-use crate::air::utils::{
-    create_direct_preprocessed_trace, create_symbolic_variables, get_index_lookups,
-};
+use crate::air::utils::{create_symbolic_variables, get_index_lookups};
 
 /// ConstAir: vector-valued constant binding with generic extension degree D.
 ///
@@ -147,12 +145,10 @@ impl<F: Field, const D: usize> BaseAir<F> for ConstAir<F, D> {
     }
 
     fn preprocessed_trace(&self) -> Option<RowMajorMatrix<F>> {
-        Some(create_direct_preprocessed_trace(
-            &self.preprocessed,
-            Self::preprocessed_width(),
-            1,
-            self.min_height,
-        ))
+        let width = Self::preprocessed_width();
+        let mut mat = RowMajorMatrix::from_flat_padded(self.preprocessed.to_vec(), width, F::ZERO);
+        mat.pad_to_min_power_of_two_height(self.min_height, F::ZERO);
+        Some(mat)
     }
 
     fn main_next_row_columns(&self) -> Vec<usize> {
