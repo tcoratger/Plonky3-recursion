@@ -454,7 +454,13 @@ fn test_bool_check_lowering() {
 
     // Verify that exactly one BoolCheck op was emitted.
     let bc_op = result.ops.iter().find(|op| {
-        matches!(op, Op::Alu { kind: AluOpKind::BoolCheck, .. })
+        matches!(
+            op,
+            Op::Alu {
+                kind: AluOpKind::BoolCheck,
+                ..
+            }
+        )
     });
     assert!(bc_op.is_some(), "expected a BoolCheck op");
     // The check node should have its own witness slot.
@@ -468,7 +474,11 @@ fn test_mul_add_lowering() {
     let c1 = graph.add_expr(Expr::Const(BabyBear::ONE));
     let c2 = graph.add_expr(Expr::Const(BabyBear::from_u64(2)));
     let c3 = graph.add_expr(Expr::Const(BabyBear::from_u64(3)));
-    let ma = graph.add_expr(Expr::MulAdd { a: c1, b: c2, c: c3 });
+    let ma = graph.add_expr(Expr::MulAdd {
+        a: c1,
+        b: c2,
+        c: c3,
+    });
 
     let connects = vec![];
     let alloc = WitnessAllocator::new();
@@ -478,13 +488,26 @@ fn test_mul_add_lowering() {
 
     // Verify that exactly one MulAdd op was emitted.
     let ma_op = result.ops.iter().find(|op| {
-        matches!(op, Op::Alu { kind: AluOpKind::MulAdd, .. })
+        matches!(
+            op,
+            Op::Alu {
+                kind: AluOpKind::MulAdd,
+                ..
+            }
+        )
     });
     assert!(ma_op.is_some(), "expected a MulAdd op");
     assert!(result.expr_to_widx.contains_key(&ma));
 
     // Verify operand wiring: a, b, c should point to the constant witnesses.
-    if let Op::Alu { a, b, c: Some(c_w), out, .. } = ma_op.unwrap() {
+    if let Op::Alu {
+        a,
+        b,
+        c: Some(c_w),
+        out,
+        ..
+    } = ma_op.unwrap()
+    {
         assert_eq!(*a, result.expr_to_widx[&c1]);
         assert_eq!(*b, result.expr_to_widx[&c2]);
         assert_eq!(*c_w, result.expr_to_widx[&c3]);
@@ -515,7 +538,13 @@ fn test_horner_acc_lowering() {
 
     // Verify that exactly one HornerAcc op was emitted.
     let ha_op = result.ops.iter().find(|op| {
-        matches!(op, Op::Alu { kind: AluOpKind::HornerAcc, .. })
+        matches!(
+            op,
+            Op::Alu {
+                kind: AluOpKind::HornerAcc,
+                ..
+            }
+        )
     });
     assert!(ha_op.is_some(), "expected a HornerAcc op");
     assert!(result.expr_to_widx.contains_key(&ha));
