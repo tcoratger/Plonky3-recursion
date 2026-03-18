@@ -481,8 +481,8 @@ impl<F: Field> Circuit<F> {
 }
 
 impl<F: Field> Circuit<F> {
-    /// Create a circuit runner for execution and trace generation
-    pub fn runner(self) -> CircuitRunner<F> {
+    /// Create a circuit runner for execution and trace generation.
+    pub fn runner(&self) -> CircuitRunner<'_, F> {
         CircuitRunner::new(self)
     }
 }

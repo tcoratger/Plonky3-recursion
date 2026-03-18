@@ -31,9 +31,7 @@ use p3_lookup::LookupAir;
 use p3_lookup::lookup_traits::{Direction, Kind, Lookup};
 use p3_matrix::dense::RowMajorMatrix;
 
-use crate::air::utils::{
-    create_direct_preprocessed_trace, create_symbolic_variables, get_index_lookups,
-};
+use crate::air::utils::{create_symbolic_variables, get_index_lookups};
 
 /// PublicAir: vector-valued public input binding with generic extension degree D.
 /// Layout per row: [value[0..D)] repeated `lanes` times.
@@ -180,12 +178,10 @@ impl<F: Field, const D: usize> BaseAir<F> for PublicAir<F, D> {
     }
 
     fn preprocessed_trace(&self) -> Option<RowMajorMatrix<F>> {
-        Some(create_direct_preprocessed_trace(
-            &self.preprocessed,
-            Self::preprocessed_lane_width(),
-            self.lanes,
-            self.min_height,
-        ))
+        let width = self.lanes * Self::preprocessed_lane_width();
+        let mut mat = RowMajorMatrix::from_flat_padded(self.preprocessed.to_vec(), width, F::ZERO);
+        mat.pad_to_min_power_of_two_height(self.min_height, F::ZERO);
+        Some(mat)
     }
 
     fn main_next_row_columns(&self) -> Vec<usize> {

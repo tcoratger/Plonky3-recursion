@@ -32,7 +32,7 @@ use p3_lookup::lookup_traits::{Direction, Kind, Lookup};
 use p3_lookup::{LookupAir, LookupInput};
 use p3_matrix::dense::RowMajorMatrix;
 
-use super::utils::{create_direct_preprocessed_trace, create_symbolic_variables};
+use super::utils::create_symbolic_variables;
 
 /// AIR for the recompose (BF→EF packing) table.
 ///
@@ -101,12 +101,10 @@ impl<F: Field, const D: usize> BaseAir<F> for RecomposeAir<F, D> {
     }
 
     fn preprocessed_trace(&self) -> Option<RowMajorMatrix<F>> {
-        Some(create_direct_preprocessed_trace(
-            &self.preprocessed,
-            Self::preprocessed_lane_width(),
-            self.lanes,
-            self.min_height,
-        ))
+        let width = self.lanes * Self::preprocessed_lane_width();
+        let mut mat = RowMajorMatrix::from_flat_padded(self.preprocessed.to_vec(), width, F::ZERO);
+        mat.pad_to_min_power_of_two_height(self.min_height, F::ZERO);
+        Some(mat)
     }
 
     fn main_next_row_columns(&self) -> Vec<usize> {
