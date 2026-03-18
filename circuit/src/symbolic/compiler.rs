@@ -1,14 +1,11 @@
 //! Symbolic constraint compiler.
 
-use alloc::vec;
 use alloc::vec::Vec;
 
-use hashbrown::HashMap;
-use p3_air::{BaseLeaf, ExtLeaf, SymbolicExpressionExt};
+use p3_air::{BaseLeaf, ExtLeaf, SymbolicExpr, SymbolicExprNode, SymbolicExpressionExt};
 use p3_field::{ExtensionField, Field};
 use p3_uni_stark::SymbolicExpression;
 
-use super::dag::{BinOp, Work};
 use super::targets::{ColumnsTargets, RowSelectorsTargets};
 use crate::{CircuitBuilder, ExprId};
 
@@ -19,8 +16,9 @@ use crate::{CircuitBuilder, ExprId};
 ///
 /// # Algorithm
 ///
-/// Uses an iterative DAG walk with pointer-keyed caches.
-/// Shared sub-expressions produce a single circuit node rather than duplicated sub-trees.
+/// Builds a [`SymbolicExprDag`] from expression trees, then iterates
+/// the topologically-sorted nodes in a single linear pass. Shared
+/// sub-expressions are automatically deduplicated by the DAG construction.
 pub struct SymbolicCompiler<'a> {
     /// Lagrange selector targets (first row, last row, transition).
     row_selectors: RowSelectorsTargets,
@@ -48,87 +46,45 @@ impl<'a> SymbolicCompiler<'a> {
         &self,
         expr: &SymbolicExpression<CF>,
         circuit: &mut CircuitBuilder<EF>,
-        cache: &mut HashMap<*const SymbolicExpression<CF>, ExprId>,
+        cache: &mut hashbrown::HashMap<*const SymbolicExpression<CF>, ExprId>,
     ) -> ExprId {
-        // Seed the work stack with the root expression.
-        let mut tasks = vec![Work::Eval(expr)];
-        // Value stack holds circuit ids produced by completed sub-expressions.
-        let mut stack = Vec::with_capacity(16);
-
-        while let Some(work) = tasks.pop() {
-            match work {
-                Work::BuildNeg(key) => {
-                    let val = stack.pop().expect("operand for neg");
-                    let zero = circuit.define_const(EF::ZERO);
-                    let id = circuit.sub(zero, val);
-                    cache.insert(key, id);
-                    stack.push(id);
-                }
-                Work::BuildBinary(key, op) => {
-                    let rhs = stack.pop().expect("rhs");
-                    let lhs = stack.pop().expect("lhs");
-                    let id = match op {
-                        BinOp::Add => circuit.add(lhs, rhs),
-                        BinOp::Sub => circuit.sub(lhs, rhs),
-                        BinOp::Mul => circuit.mul(lhs, rhs),
-                    };
-                    cache.insert(key, id);
-                    stack.push(id);
-                }
-                Work::Eval(node) => {
-                    let key = node as *const _;
-                    if let Some(&cached) = cache.get(&key) {
-                        stack.push(cached);
-                        continue;
-                    }
-
-                    let id = match node {
-                        SymbolicExpression::Leaf(BaseLeaf::Constant(c)) => {
-                            circuit.define_const(EF::from(*c))
-                        }
-                        SymbolicExpression::Leaf(BaseLeaf::Variable(v)) => {
-                            self.columns.resolve_base_var(&v.entry, v.index)
-                        }
-                        SymbolicExpression::Leaf(BaseLeaf::IsFirstRow) => {
-                            self.row_selectors.is_first_row
-                        }
-                        SymbolicExpression::Leaf(BaseLeaf::IsLastRow) => {
-                            self.row_selectors.is_last_row
-                        }
-                        SymbolicExpression::Leaf(BaseLeaf::IsTransition) => {
-                            self.row_selectors.is_transition
-                        }
-                        SymbolicExpression::Neg { x, .. } => {
-                            tasks.push(Work::BuildNeg(key));
-                            tasks.push(Work::Eval(x));
-                            continue;
-                        }
-                        SymbolicExpression::Add { x, y, .. } => {
-                            tasks.push(Work::BuildBinary(key, BinOp::Add));
-                            tasks.push(Work::Eval(y));
-                            tasks.push(Work::Eval(x));
-                            continue;
-                        }
-                        SymbolicExpression::Sub { x, y, .. } => {
-                            tasks.push(Work::BuildBinary(key, BinOp::Sub));
-                            tasks.push(Work::Eval(y));
-                            tasks.push(Work::Eval(x));
-                            continue;
-                        }
-                        SymbolicExpression::Mul { x, y, .. } => {
-                            tasks.push(Work::BuildBinary(key, BinOp::Mul));
-                            tasks.push(Work::Eval(y));
-                            tasks.push(Work::Eval(x));
-                            continue;
-                        }
-                    };
-                    cache.insert(key, id);
-                    stack.push(id);
-                }
-            }
+        // Fast path: already compiled this exact expression (by pointer).
+        let root_key = expr as *const _;
+        if let Some(&cached) = cache.get(&root_key) {
+            return cached;
         }
 
-        stack.pop().expect("final target")
+        // Build a topologically-sorted DAG from the expression tree.
+        // This deduplicates shared sub-expressions via Arc pointer identity.
+        let dag = SymbolicExpr::flatten_to_dag(core::slice::from_ref(expr));
+
+        // Single linear pass: map each DAG node to a circuit ExprId.
+        let mut ids: Vec<ExprId> = Vec::with_capacity(dag.nodes.len());
+        for node in &dag.nodes {
+            let id = match node {
+                SymbolicExprNode::Leaf(BaseLeaf::Constant(c)) => {
+                    circuit.define_const(EF::from(*c))
+                }
+                SymbolicExprNode::Leaf(BaseLeaf::Variable(v)) => {
+                    self.columns.resolve_base_var(&v.entry, v.index)
+                }
+                SymbolicExprNode::Leaf(BaseLeaf::IsFirstRow) => self.row_selectors.is_first_row,
+                SymbolicExprNode::Leaf(BaseLeaf::IsLastRow) => self.row_selectors.is_last_row,
+                SymbolicExprNode::Leaf(BaseLeaf::IsTransition) => self.row_selectors.is_transition,
+                SymbolicExprNode::Add { left, right, .. } => circuit.add(ids[*left], ids[*right]),
+                SymbolicExprNode::Sub { left, right, .. } => circuit.sub(ids[*left], ids[*right]),
+                SymbolicExprNode::Neg { idx, .. } => {
+                    let zero = circuit.define_const(EF::ZERO);
+                    circuit.sub(zero, ids[*idx])
+                }
+                SymbolicExprNode::Mul { left, right, .. } => circuit.mul(ids[*left], ids[*right]),
+            };
+            ids.push(id);
+        }
+
+        let result = ids[dag.constraint_idx[0]];
+        cache.insert(root_key, result);
+        result
     }
 
     /// Compile an extension-field symbolic expression into circuit operations.
@@ -144,82 +100,43 @@ impl<'a> SymbolicCompiler<'a> {
         &self,
         expr: &SymbolicExpressionExt<F, EF>,
         circuit: &mut CircuitBuilder<EF>,
-        base_cache: &mut HashMap<*const SymbolicExpression<F>, ExprId>,
-        ext_cache: &mut HashMap<*const SymbolicExpressionExt<F, EF>, ExprId>,
+        base_cache: &mut hashbrown::HashMap<*const SymbolicExpression<F>, ExprId>,
+        ext_cache: &mut hashbrown::HashMap<*const SymbolicExpressionExt<F, EF>, ExprId>,
     ) -> ExprId {
-        // Seed the work stack with the root extension expression.
-        let mut tasks = vec![Work::Eval(expr)];
-        // Value stack holds circuit ids produced by completed sub-expressions.
-        let mut stack = Vec::with_capacity(16);
-
-        while let Some(work) = tasks.pop() {
-            match work {
-                Work::BuildNeg(key) => {
-                    let val = stack.pop().expect("operand for neg");
-                    let zero = circuit.define_const(EF::ZERO);
-                    let id = circuit.sub(zero, val);
-                    ext_cache.insert(key, id);
-                    stack.push(id);
-                }
-                Work::BuildBinary(key, op) => {
-                    let rhs = stack.pop().expect("rhs");
-                    let lhs = stack.pop().expect("lhs");
-                    let id = match op {
-                        BinOp::Add => circuit.add(lhs, rhs),
-                        BinOp::Sub => circuit.sub(lhs, rhs),
-                        BinOp::Mul => circuit.mul(lhs, rhs),
-                    };
-                    ext_cache.insert(key, id);
-                    stack.push(id);
-                }
-                Work::Eval(node) => {
-                    let key = node as *const _;
-                    if let Some(&cached) = ext_cache.get(&key) {
-                        stack.push(cached);
-                        continue;
-                    }
-
-                    let id = match node {
-                        SymbolicExpressionExt::Leaf(ExtLeaf::Base(base_expr)) => {
-                            self.compile_base(base_expr, circuit, base_cache)
-                        }
-                        SymbolicExpressionExt::Leaf(ExtLeaf::ExtVariable(v)) => {
-                            self.columns.resolve_ext_var(&v.entry, v.index)
-                        }
-                        SymbolicExpressionExt::Leaf(ExtLeaf::ExtConstant(c)) => {
-                            circuit.define_const(*c)
-                        }
-                        SymbolicExpressionExt::Neg { x, .. } => {
-                            tasks.push(Work::BuildNeg(key));
-                            tasks.push(Work::Eval(x));
-                            continue;
-                        }
-                        SymbolicExpressionExt::Add { x, y, .. } => {
-                            tasks.push(Work::BuildBinary(key, BinOp::Add));
-                            tasks.push(Work::Eval(y));
-                            tasks.push(Work::Eval(x));
-                            continue;
-                        }
-                        SymbolicExpressionExt::Sub { x, y, .. } => {
-                            tasks.push(Work::BuildBinary(key, BinOp::Sub));
-                            tasks.push(Work::Eval(y));
-                            tasks.push(Work::Eval(x));
-                            continue;
-                        }
-                        SymbolicExpressionExt::Mul { x, y, .. } => {
-                            tasks.push(Work::BuildBinary(key, BinOp::Mul));
-                            tasks.push(Work::Eval(y));
-                            tasks.push(Work::Eval(x));
-                            continue;
-                        }
-                    };
-                    ext_cache.insert(key, id);
-                    stack.push(id);
-                }
-            }
+        // Fast path: already compiled this exact expression (by pointer).
+        let root_key = expr as *const _;
+        if let Some(&cached) = ext_cache.get(&root_key) {
+            return cached;
         }
 
-        stack.pop().expect("final target")
+        // Build a topologically-sorted DAG from the extension expression tree.
+        let dag = SymbolicExpr::flatten_to_dag(core::slice::from_ref(expr));
+
+        // Single linear pass: map each DAG node to a circuit ExprId.
+        let mut ids: Vec<ExprId> = Vec::with_capacity(dag.nodes.len());
+        for node in &dag.nodes {
+            let id = match node {
+                SymbolicExprNode::Leaf(ExtLeaf::Base(base_expr)) => {
+                    self.compile_base(base_expr, circuit, base_cache)
+                }
+                SymbolicExprNode::Leaf(ExtLeaf::ExtVariable(v)) => {
+                    self.columns.resolve_ext_var(&v.entry, v.index)
+                }
+                SymbolicExprNode::Leaf(ExtLeaf::ExtConstant(c)) => circuit.define_const(*c),
+                SymbolicExprNode::Add { left, right, .. } => circuit.add(ids[*left], ids[*right]),
+                SymbolicExprNode::Sub { left, right, .. } => circuit.sub(ids[*left], ids[*right]),
+                SymbolicExprNode::Neg { idx, .. } => {
+                    let zero = circuit.define_const(EF::ZERO);
+                    circuit.sub(zero, ids[*idx])
+                }
+                SymbolicExprNode::Mul { left, right, .. } => circuit.mul(ids[*left], ids[*right]),
+            };
+            ids.push(id);
+        }
+
+        let result = ids[dag.constraint_idx[0]];
+        ext_cache.insert(root_key, result);
+        result
     }
 }
 
@@ -375,7 +292,7 @@ mod tests {
 
         // Compile the folded symbolic expression into circuit gates.
         let compiler = SymbolicCompiler::new(row_selectors, &columns);
-        let mut cache = HashMap::new();
+        let mut cache = hashbrown::HashMap::new();
         let sum = compiler.compile_base(&folded_symbolic_constraints, &mut circuit, &mut cache);
 
         // Assert that the circuit output equals the reference folded value.
@@ -452,7 +369,7 @@ mod tests {
         };
 
         let compiler = SymbolicCompiler::new(row_selectors, &columns);
-        let mut cache = HashMap::new();
+        let mut cache = hashbrown::HashMap::new();
         let result = compiler.compile_base(expr, &mut circuit, &mut cache);
 
         let expected_id = circuit.define_const(expected);
@@ -541,16 +458,16 @@ mod tests {
         use alloc::sync::Arc;
 
         // Build expr = shared * shared where both sides of the Mul
-        // point to the *same* Arc allocation, so the cache deduplicates.
+        // point to the *same* Arc allocation, so the DAG deduplicates.
         // Use variables (not constants) to avoid sym_add constant folding.
         //
-        //         Mul (root)        ← 1 entry
+        //         Mul (root)        ← 1 node
         //        /         \
-        //     shared     shared     ← 1 entry (same Arc, second Eval is a cache hit)
+        //     shared     shared     ← 1 node (same Arc, deduplicated by DAG)
         //      / \
-        //  local[0] local[1]        ← 2 entries (variable leaves)
+        //  local[0] local[1]        ← 2 nodes (variable leaves)
         //
-        // Total: 4 cache entries.
+        // Total DAG nodes: 4.
         let v0 = SymbolicVariable::<Challenge>::new(BaseEntry::Main { offset: 0 }, 0);
         let v1 = SymbolicVariable::<Challenge>::new(BaseEntry::Main { offset: 0 }, 1);
         let shared = Arc::new(SymbolicExpression::from(v0) + SymbolicExpression::from(v1));
@@ -579,12 +496,13 @@ mod tests {
         };
 
         let compiler = SymbolicCompiler::new(row_selectors, &columns);
-        let mut cache = HashMap::new();
+        let mut cache = hashbrown::HashMap::new();
         let result = compiler.compile_base(&expr, &mut circuit, &mut cache);
 
-        // 4 entries: v0, v1, shared (Add), root (Mul).
-        // Without dedup the shared Add would be compiled twice → 6 entries.
-        assert_eq!(cache.len(), 4);
+        // The DAG should have 4 nodes: v0, v1, Add, Mul.
+        // The shared sub-expression is deduplicated by the DAG itself.
+        // The external cache has 1 entry (the root expression pointer).
+        assert_eq!(cache.len(), 1);
 
         // Verify correctness: (a + b) * (a + b) with a=3, b=5 → 64.
         let a = Challenge::from_u64(3);
@@ -646,8 +564,8 @@ mod tests {
         };
 
         let compiler = SymbolicCompiler::new(row_selectors, &columns);
-        let mut base_cache = HashMap::new();
-        let mut ext_cache = HashMap::new();
+        let mut base_cache = hashbrown::HashMap::new();
+        let mut ext_cache = hashbrown::HashMap::new();
         let result = compiler.compile_ext(&expr, &mut circuit, &mut base_cache, &mut ext_cache);
 
         let expected = circuit.define_const(Challenge::from_u64(49));
@@ -693,8 +611,8 @@ mod tests {
         };
 
         let compiler = SymbolicCompiler::new(row_selectors, &columns);
-        let mut base_cache = HashMap::new();
-        let mut ext_cache = HashMap::new();
+        let mut base_cache = hashbrown::HashMap::new();
+        let mut ext_cache = hashbrown::HashMap::new();
         let result = compiler.compile_ext(&expr, &mut circuit, &mut base_cache, &mut ext_cache);
 
         let expected = circuit.define_const(-Challenge::from_u64(13));
@@ -748,8 +666,8 @@ mod tests {
         let perm_val = Challenge::from_u64(11);
 
         let compiler = SymbolicCompiler::new(row_selectors, &columns);
-        let mut base_cache = HashMap::new();
-        let mut ext_cache = HashMap::new();
+        let mut base_cache = hashbrown::HashMap::new();
+        let mut ext_cache = hashbrown::HashMap::new();
         let result = compiler.compile_ext(&expr, &mut circuit, &mut base_cache, &mut ext_cache);
 
         let expected = circuit.define_const(ch_val * perm_val);
@@ -804,7 +722,7 @@ mod tests {
         };
 
         let compiler = SymbolicCompiler::new(row_selectors, &columns);
-        let mut cache = HashMap::new();
+        let mut cache = hashbrown::HashMap::new();
         // CF=F, EF=Challenge: constants are lifted via Challenge::from(F).
         let result = compiler.compile_base(&expr, &mut circuit, &mut cache);
 
