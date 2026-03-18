@@ -75,9 +75,6 @@ pub type NpoRegistry<F> = HashMap<NpoTypeId, Arc<dyn NpoCircuitPlugin<F>>>;
 /// this wrapper. The core infrastructure never inspects the contents.
 pub struct NpoConfig(pub(crate) Arc<dyn Any + Send + Sync>);
 
-/// Backward-compatible alias during migration.
-pub type NonPrimitiveOpConfig = NpoConfig;
-
 impl NpoConfig {
     /// Wrap a concrete config value.
     pub fn new<T: Any + Send + Sync>(val: T) -> Self {
@@ -129,9 +126,6 @@ impl Debug for NpoConfig {
 /// Each NPO plugin both produces and consumes its own typed data through
 /// this wrapper. The core infrastructure never inspects the contents.
 pub struct NpoPrivateData(pub(crate) Box<dyn Any + Send + Sync>);
-
-/// Backward-compatible alias during migration.
-pub type NonPrimitiveOpPrivateData = NpoPrivateData;
 
 impl NpoPrivateData {
     /// Wrap concrete private data.

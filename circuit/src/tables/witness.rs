@@ -39,16 +39,6 @@ impl<F> WitnessTrace<F> {
     pub fn get_value(&self, witness_id: WitnessId) -> Option<&F> {
         self.values.get(witness_id.0 as usize)
     }
-
-    /// Return the last value (useful for padding in matrix construction).
-    pub fn last_value(&self) -> Option<&F> {
-        self.values.last()
-    }
-
-    #[cfg(feature = "debugging")]
-    pub(crate) fn values(&self) -> &[F] {
-        &self.values
-    }
 }
 
 #[cfg(test)]
@@ -124,24 +114,6 @@ mod tests {
 
         assert_eq!(trace.get_value(WitnessId(1)), None);
         assert_eq!(trace.get_value(WitnessId(100)), None);
-    }
-
-    #[test]
-    fn test_last_value() {
-        let trace = WitnessTrace::new(vec![F::from_u64(1), F::from_u64(2), F::from_u64(99)]);
-        assert_eq!(trace.last_value(), Some(&F::from_u64(99)));
-    }
-
-    #[test]
-    fn test_last_value_empty() {
-        let trace = WitnessTrace::<F>::new(vec![]);
-        assert_eq!(trace.last_value(), None);
-    }
-
-    #[test]
-    fn test_last_value_single() {
-        let trace = WitnessTrace::new(vec![F::from_u64(7)]);
-        assert_eq!(trace.last_value(), Some(&F::from_u64(7)));
     }
 
     #[test]

@@ -126,7 +126,7 @@ mod tests {
             .set_public_inputs(&[F::from_u32(42), F::from_u32(42)])
             .unwrap();
 
-        assert_eq!(runner.run().unwrap().alu_trace.len(), 1);
+        assert_eq!(runner.run().unwrap().alu_trace.values.len(), 1);
     }
 
     #[test]

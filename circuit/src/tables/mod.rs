@@ -18,7 +18,7 @@ mod public;
 mod runner;
 mod witness;
 
-pub use alu::{AluOpRecord, AluTrace};
+pub use alu::AluTrace;
 pub use constant::{ConstTrace, ConstTraceBuilder};
 pub use public::{PublicTrace, PublicTraceBuilder};
 pub use runner::CircuitRunner;
@@ -138,63 +138,5 @@ where
             .field("alu_trace", &self.alu_trace)
             .field("non_primitive_traces", &extra_summary)
             .finish()
-    }
-}
-
-impl<F: alloc::fmt::Debug> Traces<F> {
-    #[allow(clippy::missing_const_for_fn)]
-    pub fn dump_primitive_traces_log(&self) {
-        #[cfg(feature = "debugging")]
-        {
-            tracing::debug!("\n=== WITNESS TRACE ===");
-            for (i, (idx, val)) in self
-                .witness_trace
-                .index
-                .iter()
-                .zip(self.witness_trace.values().iter())
-                .enumerate()
-            {
-                tracing::debug!("Row {i}: WitnessId({idx}) = {val:?}");
-            }
-
-            tracing::debug!("\n=== CONST TRACE ===");
-            for (i, (idx, val)) in self
-                .const_trace
-                .index
-                .iter()
-                .zip(self.const_trace.values.iter())
-                .enumerate()
-            {
-                tracing::debug!("Row {i}: WitnessId({idx}) = {val:?}");
-            }
-
-            tracing::debug!("\n=== PUBLIC TRACE ===");
-            for (i, (idx, val)) in self
-                .public_trace
-                .index
-                .iter()
-                .zip(self.public_trace.values.iter())
-                .enumerate()
-            {
-                tracing::debug!("Row {i}: WitnessId({idx}) = {val:?}");
-            }
-
-            tracing::debug!("\n=== ALU TRACE ===");
-            for i in 0..self.alu_trace.values.len() {
-                tracing::debug!(
-                    "Row {}: {:?} WitnessId({}) op WitnessId({}) [c={}] -> WitnessId({}) | {:?} op {:?} [{:?}] -> {:?}",
-                    i,
-                    self.alu_trace.op_kind[i],
-                    self.alu_trace.indices[i][0],
-                    self.alu_trace.indices[i][1],
-                    self.alu_trace.indices[i][2],
-                    self.alu_trace.indices[i][3],
-                    self.alu_trace.values[i][0],
-                    self.alu_trace.values[i][1],
-                    self.alu_trace.values[i][2],
-                    self.alu_trace.values[i][3]
-                );
-            }
-        }
     }
 }

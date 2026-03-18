@@ -178,16 +178,6 @@ impl<F> Op<F> {
         matches!(self, Self::Alu { kind: k, .. } if *k == kind)
     }
 
-    /// Check if this is an addition operation.
-    pub fn is_add(&self) -> bool {
-        self.is_alu_kind(AluOpKind::Add)
-    }
-
-    /// Check if this is a multiplication operation.
-    pub fn is_mul(&self) -> bool {
-        self.is_alu_kind(AluOpKind::Mul)
-    }
-
     /// Rewrite witness IDs in place using the given map (follows chains to canonical ID).
     /// Used by the optimizer to apply ALU dedup without re-boxing non-primitive executors.
     pub fn apply_witness_rewrite(&mut self, rewrite: &HashMap<WitnessId, WitnessId>) {
