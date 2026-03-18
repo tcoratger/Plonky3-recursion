@@ -794,8 +794,14 @@ where
             self.witness_alloc,
             &self.npo_registry,
         );
-        let (ops, public_rows, private_input_rows, expr_to_widx, public_mappings, witness_count) =
-            lowerer.lower()?;
+        // Run the multi-phase lowering pipeline and destructure the result.
+        let result = lowerer.lower()?;
+        let ops = result.ops;
+        let public_rows = result.public_rows;
+        let private_input_rows = result.private_input_rows;
+        let expr_to_widx = result.expr_to_widx;
+        let public_mappings = result.public_mappings;
+        let witness_count = result.witness_count;
 
         // Stage 2: IR transformations and optimizations
         let (ops, rewrite) = Optimizer::optimize(ops);
