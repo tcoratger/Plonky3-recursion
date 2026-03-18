@@ -33,11 +33,6 @@ impl BuilderConfig {
         self.enabled_ops.contains_key(op)
     }
 
-    /// Gets the configuration for an operation type, if enabled.
-    pub fn get_op_config(&self, op: &NpoTypeId) -> Option<&NpoConfig> {
-        self.enabled_ops.get(op)
-    }
-
     /// Consumes the config and returns the enabled operations map.
     pub fn into_enabled_ops(self) -> HashMap<NpoTypeId, NpoConfig> {
         self.enabled_ops

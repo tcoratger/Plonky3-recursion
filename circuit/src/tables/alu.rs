@@ -48,16 +48,6 @@ pub struct AluTrace<F> {
 }
 
 impl<F> AluTrace<F> {
-    /// Returns the number of operations in the trace.
-    pub const fn len(&self) -> usize {
-        self.values.len()
-    }
-
-    /// Returns true if the trace is empty.
-    pub const fn is_empty(&self) -> bool {
-        self.values.is_empty()
-    }
-
     /// Builds an ALU trace from execution records (no witness lookups).
     pub fn from_records(records: Vec<AluOpRecord<F>>) -> Self
     where
