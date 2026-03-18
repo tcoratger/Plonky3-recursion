@@ -98,9 +98,7 @@ use p3_lookup::lookup_traits::{Direction, Kind, Lookup};
 use p3_matrix::dense::RowMajorMatrix;
 use p3_uni_stark::SymbolicExpression;
 
-use crate::air::utils::{
-    create_direct_preprocessed_trace_with_extra, create_symbolic_variables, get_alu_index_lookups,
-};
+use crate::air::utils::{create_symbolic_variables, get_alu_index_lookups};
 
 // ── Preprocessed column offsets within each lane (13 columns) ────────────────
 pub(crate) const PREP_MULT_A: usize = 0;
@@ -572,16 +570,17 @@ impl<F: Field, const D: usize> BaseAir<F> for AluAir<F, D> {
     fn preprocessed_trace(&self) -> Option<RowMajorMatrix<F>> {
         self.schedule.as_ref().map_or_else(
             || {
-                // No Horner scheduling: build the preprocessed trace at the final
-                // width directly by appending 5 zero columns to every row. This
-                // avoids an extra allocation + row-by-row copy.
-                Some(create_direct_preprocessed_trace_with_extra(
-                    &self.preprocessed,
-                    PREP_LANE_WIDTH,
-                    EXTRA_PREP_WIDTH,
-                    self.lanes,
-                    self.min_height,
-                ))
+                // No Horner scheduling: build the preprocessed trace at the
+                // base width, then widen with zero columns for scheduling slots.
+                let base_width = self.lanes * PREP_LANE_WIDTH;
+                let mut mat = RowMajorMatrix::from_flat_padded(
+                    self.preprocessed.to_vec(),
+                    base_width,
+                    F::ZERO,
+                );
+                mat.widen_right(EXTRA_PREP_WIDTH, F::ZERO);
+                mat.pad_to_min_power_of_two_height(self.min_height, F::ZERO);
+                Some(mat)
             },
             |schedule| Some(self.build_scheduled_preprocessed_trace(schedule)),
         )
