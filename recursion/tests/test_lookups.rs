@@ -118,7 +118,7 @@ fn test_wrong_multiplicities() {
     let (airs_degrees, mut preprocessed_columns) =
         get_airs_and_degrees_with_prep::<MyConfig, F, 1>(
             &circuit,
-            table_packing,
+            &table_packing,
             &[],
             &[],
             ConstraintProfile::Standard,
@@ -594,7 +594,7 @@ fn get_test_circuit_proof() -> TestCircuitProofData {
     let circuit = builder.build().unwrap();
     let (airs_degrees, preprocessed_columns) = get_airs_and_degrees_with_prep::<MyConfig, F, 1>(
         &circuit,
-        table_packing,
+        &table_packing,
         &[],
         &[],
         ConstraintProfile::Standard,
@@ -717,7 +717,7 @@ fn get_verifier_inputs_and_challenges(
 ) -> ResultVerifierInputsAndChallenges {
     // Extract proof components
     let rows = batch_stark_proof.rows;
-    let packing = batch_stark_proof.table_packing;
+    let packing = batch_stark_proof.table_packing.clone();
 
     // Base field AIRs for native challenge generation
     let native_airs = vec![
@@ -755,7 +755,7 @@ fn get_verifier_inputs_and_challenges(
         Poseidon2Config::BabyBearD4Width16,
         &{
             let mut tp = poseidon2_table_provers_d4(Poseidon2Config::BabyBearD4Width16);
-            tp.extend(recompose_table_provers::<_, 4>());
+            tp.extend(recompose_table_provers::<_, 4>(1));
             tp
         },
     )
@@ -869,11 +869,11 @@ fn test_poseidon2_ctl_lookups() {
         Box::new(RecomposePreprocessor),
     ];
     let mut air_builders = poseidon2_air_builders_d4();
-    air_builders.extend(recompose_air_builders());
+    air_builders.extend(recompose_air_builders(1));
     let (airs_degrees, preprocessed_columns) =
         get_airs_and_degrees_with_prep::<MyConfig, Challenge, 4>(
             &circuit,
-            table_packing,
+            &table_packing,
             &npo_prep,
             &air_builders,
             ConstraintProfile::Standard,
@@ -998,11 +998,11 @@ fn test_poseidon2_chained_ctl_lookups() {
         Box::new(RecomposePreprocessor),
     ];
     let mut air_builders = poseidon2_air_builders_d4();
-    air_builders.extend(recompose_air_builders());
+    air_builders.extend(recompose_air_builders(1));
     let (airs_degrees, preprocessed_columns) =
         get_airs_and_degrees_with_prep::<MyConfig, Challenge, 4>(
             &circuit,
-            table_packing,
+            &table_packing,
             &npo_prep,
             &air_builders,
             ConstraintProfile::Standard,
