@@ -283,6 +283,79 @@ fn reconstruct_evals<EF: Field>(
             vec![e0, e1, e2, e3]
         }
 
+        // Arity 8: three bits [b0, b1, b2] (little-endian), idx = b0 + 2*b1 + 4*b2
+        //
+        // siblings = [s0, s1, s2, s3, s4, s5, s6]
+        //
+        // Same placement as one_hot + cum + select, in closed form:
+        //   e_j = h_j * folded + siblings[j] * sum_{k>j} h_k + siblings[j-1] * sum_{k<j} h_k
+        // with the missing sibling terms treated as zero (j = 0 or j = 7).
+        3 => {
+            let b0 = index_in_group_bits[0];
+            let b1 = index_in_group_bits[1];
+            let b2 = index_in_group_bits[2];
+
+            let s0 = siblings[0];
+            let s1 = siblings[1];
+            let s2 = siblings[2];
+            let s3 = siblings[3];
+            let s4 = siblings[4];
+            let s5 = siblings[5];
+            let s6 = siblings[6];
+
+            let [h0, h1, h2, h3, h4, h5, h6, h7] = one_hot_from_three_bits(builder, b0, b1, b2);
+
+            // P[j] = sum_{k < j} h_k for j = 1..=7
+            let p1 = h0;
+            let p2 = builder.add(p1, h1);
+            let p3 = builder.add(p2, h2);
+            let p4 = builder.add(p3, h3);
+            let p5 = builder.add(p4, h4);
+            let p6 = builder.add(p5, h5);
+            let p7 = builder.add(p6, h6);
+
+            // S[j] = sum_{k > j} h_k for j = 0..=6
+            let su6 = h7;
+            let su5 = builder.add(h6, su6);
+            let su4 = builder.add(h5, su5);
+            let su3 = builder.add(h4, su4);
+            let su2 = builder.add(h3, su3);
+            let su1 = builder.add(h2, su2);
+            let su0 = builder.add(h1, su1);
+
+            let e0_sib = builder.mul(s0, su0);
+            let e0 = builder.mul_add(h0, folded, e0_sib);
+
+            let e1_lo = builder.mul(s0, p1);
+            let e1_sib = builder.mul_add(s1, su1, e1_lo);
+            let e1 = builder.mul_add(h1, folded, e1_sib);
+
+            let e2_lo = builder.mul(s1, p2);
+            let e2_sib = builder.mul_add(s2, su2, e2_lo);
+            let e2 = builder.mul_add(h2, folded, e2_sib);
+
+            let e3_lo = builder.mul(s2, p3);
+            let e3_sib = builder.mul_add(s3, su3, e3_lo);
+            let e3 = builder.mul_add(h3, folded, e3_sib);
+
+            let e4_lo = builder.mul(s3, p4);
+            let e4_sib = builder.mul_add(s4, su4, e4_lo);
+            let e4 = builder.mul_add(h4, folded, e4_sib);
+
+            let e5_lo = builder.mul(s4, p5);
+            let e5_sib = builder.mul_add(s5, su5, e5_lo);
+            let e5 = builder.mul_add(h5, folded, e5_sib);
+
+            let e6_lo = builder.mul(s5, p6);
+            let e6_sib = builder.mul_add(s6, su6, e6_lo);
+            let e6 = builder.mul_add(h6, folded, e6_sib);
+
+            let e7_sib = builder.mul(s6, p7);
+            let e7 = builder.mul_add(h7, folded, e7_sib);
+
+            vec![e0, e1, e2, e3, e4, e5, e6, e7]
+        }
+
         // Generic path for larger arities
         _ => {
             let one_hot = one_hot_from_bits(builder, index_in_group_bits);
@@ -470,6 +543,7 @@ fn arity2_fold_at_point<EF: Field>(
 ///
 /// For log_arity > 1 we use k sequential arity-2 folds (beta, beta^2, ...)
 /// instead of one Lagrange interpolation, reducing batch inversions to one per step.
+/// Arity 4 and 8 use the same fold schedule with the loop unrolled (no subgroup `Vec`s).
 ///
 /// When `precomputed_evals` is `Some`, those evals are reused instead of
 /// rebuilding them via `reconstruct_evals`.
@@ -523,8 +597,6 @@ where
         return new_folded;
     }
 
-    // General path: k sequential arity-2 folds (beta, beta^2, ...) instead of
-    // one Lagrange interpolation, matching the native optimization to reduce inversions.
     let owned_evals;
     let evals: &[Target] = match precomputed_evals {
         Some(e) => e,
@@ -534,63 +606,131 @@ where
         }
     };
 
-    let (xs, subgroup_start) =
-        compute_subgroup_points::<F, EF>(builder, log_arity, precomputed_subgroup_start);
+    // Unrolled fold tree for arity 4 / 8: same x0 and beta schedule as the generic loop,
+    // but no `compute_subgroup_points` / `data` / `omega_s_br` vectors.
+    let mut new_folded = if log_arity == 2 {
+        let omega = F::two_adic_generator(2);
+        let ss = precomputed_subgroup_start;
 
-    let mut subgroup_start_powers: Vec<Target> = vec![subgroup_start];
-    for _ in 1..log_arity {
-        let prev = subgroup_start_powers.last().copied().unwrap();
-        subgroup_start_powers.push(builder.mul(prev, prev));
-    }
+        let x_at_step0 = |builder: &mut CircuitBuilder<EF>, j: usize| {
+            let br = p3_util::reverse_bits_len(2 * j, 2);
+            let w = builder.define_const(EF::from(omega.exp_u64(br as u64)));
+            builder.mul(ss, w)
+        };
 
-    let omega = F::two_adic_generator(log_arity);
-    let mut data: Vec<Target> = evals.to_vec();
-    let mut current_beta = beta;
+        let x00 = x_at_step0(builder, 0);
+        let x01 = x_at_step0(builder, 1);
+        let f0 = arity2_fold_at_point::<EF>(builder, evals[0], evals[1], beta, x00);
+        let f1 = arity2_fold_at_point::<EF>(builder, evals[2], evals[3], beta, x01);
 
-    for (step, ss) in subgroup_start_powers
-        .into_iter()
-        .enumerate()
-        .take(log_arity)
-    {
-        let num_pairs = data.len() / 2;
-        if step == 0 {
-            for j in 0..num_pairs {
-                data[j] = arity2_fold_at_point::<EF>(
-                    builder,
-                    data[2 * j],
-                    data[2 * j + 1],
-                    current_beta,
-                    xs[2 * j],
-                );
+        let beta2 = builder.mul(beta, beta);
+        let ss2 = builder.mul(ss, ss);
+        let omega_s = omega.exp_u64(1 << 1);
+        let br = p3_util::reverse_bits_len(0, 1);
+        let w = builder.define_const(EF::from(omega_s.exp_u64(br as u64)));
+        let x_step1 = builder.mul(ss2, w);
+        arity2_fold_at_point::<EF>(builder, f0, f1, beta2, x_step1)
+    } else if log_arity == 3 {
+        let omega = F::two_adic_generator(3);
+        let ss = precomputed_subgroup_start;
+
+        let x_at_step0 = |builder: &mut CircuitBuilder<EF>, j: usize| {
+            let br = p3_util::reverse_bits_len(2 * j, 3);
+            let w = builder.define_const(EF::from(omega.exp_u64(br as u64)));
+            builder.mul(ss, w)
+        };
+
+        let x00 = x_at_step0(builder, 0);
+        let x01 = x_at_step0(builder, 1);
+        let x02 = x_at_step0(builder, 2);
+        let x03 = x_at_step0(builder, 3);
+        let f0 = arity2_fold_at_point::<EF>(builder, evals[0], evals[1], beta, x00);
+        let f1 = arity2_fold_at_point::<EF>(builder, evals[2], evals[3], beta, x01);
+        let f2 = arity2_fold_at_point::<EF>(builder, evals[4], evals[5], beta, x02);
+        let f3 = arity2_fold_at_point::<EF>(builder, evals[6], evals[7], beta, x03);
+
+        let beta2 = builder.mul(beta, beta);
+        let ss2 = builder.mul(ss, ss);
+        let omega_s1 = omega.exp_u64(1 << 1);
+
+        let x_at_step1 = |builder: &mut CircuitBuilder<EF>, j: usize| {
+            let br = p3_util::reverse_bits_len(2 * j, 2);
+            let w = builder.define_const(EF::from(omega_s1.exp_u64(br as u64)));
+            builder.mul(ss2, w)
+        };
+        let x10 = x_at_step1(builder, 0);
+        let x11 = x_at_step1(builder, 1);
+        let g0 = arity2_fold_at_point::<EF>(builder, f0, f1, beta2, x10);
+        let g1 = arity2_fold_at_point::<EF>(builder, f2, f3, beta2, x11);
+
+        let beta4 = builder.mul(beta2, beta2);
+        let ss4 = builder.mul(ss2, ss2);
+        let omega_s2 = omega.exp_u64(1 << 2);
+        let br = p3_util::reverse_bits_len(0, 1);
+        let w = builder.define_const(EF::from(omega_s2.exp_u64(br as u64)));
+        let x_step2 = builder.mul(ss4, w);
+        arity2_fold_at_point::<EF>(builder, g0, g1, beta4, x_step2)
+    } else {
+        // General path: k sequential arity-2 folds (beta, beta^2, ...) instead of
+        // one Lagrange interpolation, matching the native optimization to reduce inversions.
+        let (xs, subgroup_start) =
+            compute_subgroup_points::<F, EF>(builder, log_arity, precomputed_subgroup_start);
+
+        let mut subgroup_start_powers: Vec<Target> = vec![subgroup_start];
+        for _ in 1..log_arity {
+            let prev = subgroup_start_powers.last().copied().unwrap();
+            subgroup_start_powers.push(builder.mul(prev, prev));
+        }
+
+        let omega = F::two_adic_generator(log_arity);
+        let mut data: Vec<Target> = evals.to_vec();
+        let mut current_beta = beta;
+
+        for (step, ss) in subgroup_start_powers
+            .into_iter()
+            .enumerate()
+            .take(log_arity)
+        {
+            let num_pairs = data.len() / 2;
+            if step == 0 {
+                for j in 0..num_pairs {
+                    data[j] = arity2_fold_at_point::<EF>(
+                        builder,
+                        data[2 * j],
+                        data[2 * j + 1],
+                        current_beta,
+                        xs[2 * j],
+                    );
+                }
+            } else {
+                let log_domain = log_arity - step;
+                let omega_s = omega.exp_u64(1 << step);
+                let omega_s_br: Vec<Target> = (0..num_pairs)
+                    .map(|j| {
+                        let br_2j = p3_util::reverse_bits_len(2 * j, log_domain);
+                        let c = omega_s.exp_u64(br_2j as u64);
+                        builder.define_const(EF::from(c))
+                    })
+                    .collect();
+                for j in 0..num_pairs {
+                    let x0 = builder.mul(ss, omega_s_br[j]);
+                    data[j] = arity2_fold_at_point::<EF>(
+                        builder,
+                        data[2 * j],
+                        data[2 * j + 1],
+                        current_beta,
+                        x0,
+                    );
+                }
             }
-        } else {
-            let log_domain = log_arity - step;
-            let omega_s = omega.exp_u64(1 << step);
-            let omega_s_br: Vec<Target> = (0..num_pairs)
-                .map(|j| {
-                    let br_2j = p3_util::reverse_bits_len(2 * j, log_domain);
-                    let c = omega_s.exp_u64(br_2j as u64);
-                    builder.define_const(EF::from(c))
-                })
-                .collect();
-            for j in 0..num_pairs {
-                let x0 = builder.mul(ss, omega_s_br[j]);
-                data[j] = arity2_fold_at_point::<EF>(
-                    builder,
-                    data[2 * j],
-                    data[2 * j + 1],
-                    current_beta,
-                    x0,
-                );
+            data.truncate(num_pairs);
+            if step < log_arity - 1 {
+                current_beta = builder.mul(current_beta, current_beta);
             }
         }
-        data.truncate(num_pairs);
-        if step < log_arity - 1 {
-            current_beta = builder.mul(current_beta, current_beta);
-        }
-    }
 
-    let mut new_folded = data[0];
+        data[0]
+    };
 
     // Roll-in: folded += beta^{2^log_arity} * roll_in
     if let Some(ro) = roll_in {
