@@ -90,9 +90,8 @@ use alloc::vec::Vec;
 use core::marker::PhantomData;
 
 use p3_air::{Air, AirBuilder, BaseAir, WindowAccess};
-use p3_circuit::ops::AluOpKind;
 use p3_circuit::tables::AluTrace;
-use p3_field::{BasedVectorSpace, Field, PrimeCharacteristicRing};
+use p3_field::{BasedVectorSpace, Dup, Field, PrimeCharacteristicRing};
 use p3_lookup::LookupAir;
 use p3_lookup::lookup_traits::{Direction, Kind, Lookup};
 use p3_matrix::dense::RowMajorMatrix;
@@ -107,8 +106,6 @@ pub(crate) const PREP_SEL_BOOL: usize = 2;
 pub(crate) const PREP_SEL_MULADD: usize = 3;
 pub(crate) const PREP_SEL_HORNER: usize = 4;
 pub(crate) const PREP_A_IDX: usize = 5;
-#[allow(dead_code)] // This is used in `get_alu_index_lookups`
-pub(crate) const PREP_B_IDX: usize = 6;
 pub(crate) const PREP_C_IDX: usize = 7;
 pub(crate) const PREP_OUT_IDX: usize = 8;
 pub(crate) const PREP_MULT_B: usize = 9;
@@ -275,11 +272,6 @@ impl<F: Field + PrimeCharacteristicRing, const D: usize> AluAir<F, D> {
     /// double-step HornerAcc columns (see `EXTRA_PREP_*` constants).
     pub const fn preprocessed_width(&self) -> usize {
         self.lanes * PREP_LANE_WIDTH + EXTRA_PREP_WIDTH
-    }
-
-    /// Number of preprocessed columns excluding multiplicity.
-    pub const fn preprocessed_width_without_multiplicity(&self) -> usize {
-        self.lanes * (Self::preprocessed_lane_width() - 1)
     }
 
     /// Total entries in the scheduled trace (including separators).
@@ -522,44 +514,6 @@ impl<F: Field + PrimeCharacteristicRing, const D: usize> AluAir<F, D> {
         mat.pad_to_min_power_of_two_height(self.min_height, F::ZERO);
         mat
     }
-
-    /// Convert an `AluTrace` to preprocessed values (13 columns per op).
-    ///
-    /// Layout: `[mult_a, sel_add_vs_mul, sel_bool, sel_muladd, sel_horner, a_idx, b_idx, c_idx, out_idx, mult_b, mult_out, a_is_reader, c_is_reader]`.
-    /// Indices are D-scaled. In standalone tests, `a_is_reader = c_is_reader = 1`.
-    pub fn trace_to_preprocessed<ExtF: BasedVectorSpace<F>>(trace: &AluTrace<ExtF>) -> Vec<F> {
-        let total_len = trace.indices.len() * Self::preprocessed_lane_width();
-        let mut preprocessed_values = Vec::with_capacity(total_len);
-        let neg_one = F::ZERO - F::ONE;
-
-        for (i, kind) in trace.op_kind.iter().enumerate() {
-            let (sel_add_vs_mul, sel_bool, sel_muladd, sel_horner) = match kind {
-                AluOpKind::Add => (F::ONE, F::ZERO, F::ZERO, F::ZERO),
-                AluOpKind::Mul => (F::ZERO, F::ZERO, F::ZERO, F::ZERO),
-                AluOpKind::BoolCheck => (F::ZERO, F::ONE, F::ZERO, F::ZERO),
-                AluOpKind::MulAdd => (F::ZERO, F::ZERO, F::ONE, F::ZERO),
-                AluOpKind::HornerAcc => (F::ZERO, F::ZERO, F::ZERO, F::ONE),
-            };
-
-            preprocessed_values.extend(&[
-                neg_one, // mult_a (base; active = 1)
-                sel_add_vs_mul,
-                sel_bool,
-                sel_muladd,
-                sel_horner,
-                F::from_u32(trace.indices[i][0].0 * D as u32),
-                F::from_u32(trace.indices[i][1].0 * D as u32),
-                F::from_u32(trace.indices[i][2].0 * D as u32),
-                F::from_u32(trace.indices[i][3].0 * D as u32),
-                neg_one, // mult_b (reader placeholder)
-                F::ONE,  // mult_out (creator placeholder)
-                F::ONE,  // a_is_reader (standalone: constrained)
-                F::ONE,  // c_is_reader (standalone: constrained)
-            ]);
-        }
-
-        preprocessed_values
-    }
 }
 
 impl<F: Field, const D: usize> BaseAir<F> for AluAir<F, D> {
@@ -604,9 +558,9 @@ fn ext_mul<AB: AirBuilder, const D: usize>(
             let term = x[i] * y[j];
             let k = i + j;
             if k < D {
-                acc[k] = acc[k].clone() + term;
+                acc[k] = acc[k].dup() + term;
             } else {
-                acc[k - D] = acc[k - D].clone() + w.clone().unwrap() * term;
+                acc[k - D] = acc[k - D].dup() + w.as_ref().unwrap().dup() * term;
             }
         }
     }
@@ -662,7 +616,7 @@ where
             // ── MUL: a * b - out = 0 ────────────────────────────────────
             let ab = ext_mul::<AB, D>(a, b, &w);
             for i in 0..D {
-                builder.assert_zero(sel_mul.clone() * (ab[i].clone() - out[i]));
+                builder.assert_zero(sel_mul.dup() * (ab[i].dup() - out[i]));
             }
 
             // ── BOOL_CHECK: a[0]*(a[0]-1)=0, a[1..D]=0 ─────────────────
@@ -674,7 +628,7 @@ where
 
             // ── MUL_ADD: a * b + c - out = 0 ────────────────────────────
             for i in 0..D {
-                builder.assert_zero(sel_muladd * (ab[i].clone() + c[i] - out[i]));
+                builder.assert_zero(sel_muladd * (ab[i].dup() + c[i] - out[i]));
             }
 
             // ── HORNER_ACC ───────────────────────────────────────────────
@@ -706,7 +660,7 @@ where
                 for i in 0..D {
                     builder.assert_zero(
                         next_sel_double
-                            * (out_next_b[i].clone() + next_c[i] - next_a[i] - next_int[i]),
+                            * (out_next_b[i].dup() + next_c[i] - next_a[i] - next_int[i]),
                     );
                 }
 
@@ -714,21 +668,21 @@ where
                 let next_sel_single = next_sel_horner - next_sel_double;
                 for i in 0..D {
                     builder.assert_zero(
-                        next_sel_single.clone()
-                            * (out_next_b[i].clone() + next_c[i] - next_a[i] - next_out[i]),
+                        next_sel_single.dup()
+                            * (out_next_b[i].dup() + next_c[i] - next_a[i] - next_out[i]),
                     );
                 }
 
                 // 3) Intra-row double-step: int * b + c1 - a1 - out = 0
                 let int_b = ext_mul::<AB, D>(int, b, &w);
                 for i in 0..D {
-                    builder.assert_zero(sel_double * (int_b[i].clone() + c1[i] - a1[i] - out[i]));
+                    builder.assert_zero(sel_double * (int_b[i].dup() + c1[i] - a1[i] - out[i]));
                 }
             } else {
                 for i in 0..D {
                     builder.assert_zero(
                         next_sel_horner
-                            * (out_next_b[i].clone() + next_c[i] - next_a[i] - next_out[i]),
+                            * (out_next_b[i].dup() + next_c[i] - next_a[i] - next_out[i]),
                     );
                 }
             }
@@ -782,7 +736,7 @@ impl<F: Field, const D: usize> LookupAir<F> for AluAir<F, D> {
         let c1_reader =
             SymbolicExpression::from(preprocessed_local[extra_prep + EXTRA_PREP_C1_READER]);
 
-        let eff_mult_a1 = mult_a_lane0.clone() * a1_reader;
+        let eff_mult_a1 = mult_a_lane0.dup() * a1_reader;
         let eff_mult_c1 = mult_a_lane0 * c1_reader;
 
         let a1_idx = SymbolicExpression::from(preprocessed_local[extra_prep + EXTRA_PREP_A1_IDX]);
@@ -821,6 +775,8 @@ mod tests {
     use alloc::vec::Vec;
 
     use p3_circuit::WitnessId;
+    use p3_circuit::ops::AluOpKind;
+    use p3_field::BasedVectorSpace;
     use p3_matrix::Matrix;
     use p3_test_utils::baby_bear_params::{
         BabyBear as Val, BinomialExtensionField, PrimeCharacteristicRing,
@@ -830,6 +786,43 @@ mod tests {
 
     use super::*;
     use crate::air::test_utils::build_test_config;
+
+    /// Convert an `AluTrace` to preprocessed values (13 columns per op) for standalone tests.
+    fn trace_to_preprocessed<F: Field, ExtF: BasedVectorSpace<F>, const D: usize>(
+        trace: &AluTrace<ExtF>,
+    ) -> Vec<F> {
+        let total_len = trace.indices.len() * AluAir::<F, D>::preprocessed_lane_width();
+        let mut preprocessed_values = Vec::with_capacity(total_len);
+        let neg_one = F::ZERO - F::ONE;
+
+        for (i, kind) in trace.op_kind.iter().enumerate() {
+            let (sel_add_vs_mul, sel_bool, sel_muladd, sel_horner) = match kind {
+                AluOpKind::Add => (F::ONE, F::ZERO, F::ZERO, F::ZERO),
+                AluOpKind::Mul => (F::ZERO, F::ZERO, F::ZERO, F::ZERO),
+                AluOpKind::BoolCheck => (F::ZERO, F::ONE, F::ZERO, F::ZERO),
+                AluOpKind::MulAdd => (F::ZERO, F::ZERO, F::ONE, F::ZERO),
+                AluOpKind::HornerAcc => (F::ZERO, F::ZERO, F::ZERO, F::ONE),
+            };
+
+            preprocessed_values.extend(&[
+                neg_one, // mult_a (base; active = 1)
+                sel_add_vs_mul,
+                sel_bool,
+                sel_muladd,
+                sel_horner,
+                F::from_u32(trace.indices[i][0].0 * D as u32),
+                F::from_u32(trace.indices[i][1].0 * D as u32),
+                F::from_u32(trace.indices[i][2].0 * D as u32),
+                F::from_u32(trace.indices[i][3].0 * D as u32),
+                neg_one, // mult_b (reader placeholder)
+                F::ONE,  // mult_out (creator placeholder)
+                F::ONE,  // a_is_reader (standalone: constrained)
+                F::ONE,  // c_is_reader (standalone: constrained)
+            ]);
+        }
+
+        preprocessed_values
+    }
 
     #[test]
     fn prove_verify_alu_add_base_field() {
@@ -852,7 +845,7 @@ mod tests {
             indices,
         };
 
-        let preprocessed_values = AluAir::<Val, 1>::trace_to_preprocessed(&trace);
+        let preprocessed_values = trace_to_preprocessed::<Val, _, 1>(&trace);
         let air = AluAir::<Val, 1>::new_with_preprocessed(n, 1, preprocessed_values);
         let matrix: RowMajorMatrix<Val> = air.trace_to_matrix(&trace);
         assert_eq!(matrix.width(), air.total_width());
@@ -887,7 +880,7 @@ mod tests {
             indices,
         };
 
-        let preprocessed_values = AluAir::<Val, 1>::trace_to_preprocessed(&trace);
+        let preprocessed_values = trace_to_preprocessed::<Val, _, 1>(&trace);
         let air = AluAir::<Val, 1>::new_with_preprocessed(n, 1, preprocessed_values);
         let matrix: RowMajorMatrix<Val> = air.trace_to_matrix(&trace);
 
@@ -924,7 +917,7 @@ mod tests {
             indices,
         };
 
-        let preprocessed_values = AluAir::<Val, 1>::trace_to_preprocessed(&trace);
+        let preprocessed_values = trace_to_preprocessed::<Val, _, 1>(&trace);
         let air = AluAir::<Val, 1>::new_with_preprocessed(n, 1, preprocessed_values);
         let matrix: RowMajorMatrix<Val> = air.trace_to_matrix(&trace);
 
@@ -960,7 +953,7 @@ mod tests {
             indices,
         };
 
-        let preprocessed_values = AluAir::<Val, 1>::trace_to_preprocessed(&trace);
+        let preprocessed_values = trace_to_preprocessed::<Val, _, 1>(&trace);
         let air = AluAir::<Val, 1>::new_with_preprocessed(n, 1, preprocessed_values);
         let matrix: RowMajorMatrix<Val> = air.trace_to_matrix(&trace);
 
@@ -1003,7 +996,7 @@ mod tests {
             indices,
         };
 
-        let preprocessed_values = AluAir::<Val, 1>::trace_to_preprocessed(&trace);
+        let preprocessed_values = trace_to_preprocessed::<Val, _, 1>(&trace);
         let air = AluAir::<Val, 1>::new_with_preprocessed(2, 1, preprocessed_values);
         let matrix: RowMajorMatrix<Val> = air.trace_to_matrix(&trace);
 
@@ -1049,7 +1042,7 @@ mod tests {
             indices,
         };
 
-        let preprocessed_values = AluAir::<Val, 1>::trace_to_preprocessed(&trace);
+        let preprocessed_values = trace_to_preprocessed::<Val, _, 1>(&trace);
         let air = AluAir::<Val, 1>::new_with_preprocessed(n, 1, preprocessed_values);
         let matrix: RowMajorMatrix<Val> = air.trace_to_matrix(&trace);
 
@@ -1092,7 +1085,7 @@ mod tests {
             indices: vec![[WitnessId(1), WitnessId(2), WitnessId(0), WitnessId(3)]; n],
         };
 
-        let preprocessed_values = AluAir::<Val, 4>::trace_to_preprocessed(&trace);
+        let preprocessed_values = trace_to_preprocessed::<Val, _, 4>(&trace);
 
         let config = build_test_config();
         let pis: Vec<Val> = vec![];
@@ -1138,7 +1131,7 @@ mod tests {
             indices,
         };
 
-        let preprocessed_values = AluAir::<Val, 4>::trace_to_preprocessed(&trace);
+        let preprocessed_values = trace_to_preprocessed::<Val, _, 4>(&trace);
         let air = AluAir::<Val, 4>::new_binomial_with_preprocessed(n, 1, w, preprocessed_values);
         let matrix: RowMajorMatrix<Val> = air.trace_to_matrix(&trace);
 
@@ -1178,7 +1171,7 @@ mod tests {
             indices,
         };
 
-        let preprocessed_values = AluAir::<Val, 4>::trace_to_preprocessed(&trace);
+        let preprocessed_values = trace_to_preprocessed::<Val, _, 4>(&trace);
         let air = AluAir::<Val, 4>::new_binomial_with_preprocessed(n, 1, w, preprocessed_values);
         let matrix: RowMajorMatrix<Val> = air.trace_to_matrix(&trace);
 

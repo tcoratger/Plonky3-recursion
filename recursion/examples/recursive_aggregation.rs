@@ -101,6 +101,13 @@ struct Args {
     )]
     pub alu_lanes: usize,
 
+    #[arg(
+        long,
+        default_value_t = 1,
+        help = "Number of recompose lanes for the table packing in recursive layers"
+    )]
+    pub recompose_lanes: usize,
+
     // TODO: Update once https://github.com/Plonky3/Plonky3/pull/1329 lands
     #[arg(
         long,
@@ -134,6 +141,7 @@ impl Args {
 
     pub fn table_packing(&self) -> TablePacking {
         TablePacking::new(self.public_lanes, self.alu_lanes)
+            .with_npo_lanes(NpoTypeId::recompose(), self.recompose_lanes)
     }
 }
 
@@ -156,6 +164,7 @@ fn main() {
             args.num_recursive_layers,
             &fri_params,
             &table_packing,
+            args.recompose_lanes,
             args.security_level,
             args.zk,
             args.disable_recompose_npo,
@@ -164,6 +173,7 @@ fn main() {
             args.num_recursive_layers,
             &fri_params,
             &table_packing,
+            args.recompose_lanes,
             args.security_level,
             args.zk,
             args.disable_recompose_npo,
@@ -172,6 +182,7 @@ fn main() {
             args.num_recursive_layers,
             &fri_params,
             &table_packing,
+            args.recompose_lanes,
             args.security_level,
             args.zk,
             args.disable_recompose_npo,
@@ -192,11 +203,7 @@ macro_rules! define_field_module {
         $rate:expr,
         $digest_elems:expr,
         $enable_poseidon2_fn:ident,
-        $register_poseidon2_fn:ident,
-        $register_recompose_fn:ident,
         $default_perm_circuit:path,
-        $poseidon2_air_builders_fn:ident,
-        $backend_ctor:ident,
         $backend_width:expr,
         $backend_rate:expr
     ) => {
@@ -216,10 +223,7 @@ macro_rules! define_field_module {
                 $rate,
                 $digest_elems,
                 $enable_poseidon2_fn,
-                $register_poseidon2_fn,
                 $default_perm_circuit,
-                $poseidon2_air_builders_fn,
-                $backend_ctor,
                 $backend_width,
                 $backend_rate,
                 enable_recompose
@@ -229,7 +233,7 @@ macro_rules! define_field_module {
             fn prove_dummy_circuit(
                 constant_value: u32,
                 config: &ConfigWithFriParams,
-                table_packing: TablePacking,
+                table_packing: &TablePacking,
             ) -> RecursionOutput<ConfigWithFriParams> {
                 let mut builder = CircuitBuilder::new();
                 let c = builder.alloc_const(F::from_u32(constant_value), "dummy_const");
@@ -239,7 +243,7 @@ macro_rules! define_field_module {
                 let (airs_degrees, preprocessed_columns) =
                     get_airs_and_degrees_with_prep::<ConfigWithFriParams, F, 1>(
                         &circuit,
-                        table_packing,
+                        &table_packing,
                         &[],
                         &[],
                         ConstraintProfile::Standard,
@@ -257,7 +261,7 @@ macro_rules! define_field_module {
                     ProverData::from_airs_and_degrees(config, &mut airs, &ext_degrees);
                 let circuit_prover_data = CircuitProverData::new(prover_data, preprocessed_columns);
                 let prover =
-                    BatchStarkProver::new(config.clone()).with_table_packing(table_packing);
+                    BatchStarkProver::new(config.clone()).with_table_packing(table_packing.clone());
                 let proof = prover
                     .prove_all_tables(&traces, &circuit_prover_data)
                     .expect("Failed to prove dummy circuit");
@@ -272,7 +276,7 @@ macro_rules! define_field_module {
             fn prove_dummy_circuit_zk(
                 constant_value: u32,
                 config: &ConfigWithFriParamsZk,
-                table_packing: TablePacking,
+                table_packing: &TablePacking,
             ) -> RecursionOutput<ConfigWithFriParamsZk> {
                 let mut builder = CircuitBuilder::new();
                 let c = builder.alloc_const(F::from_u32(constant_value), "dummy_const");
@@ -282,7 +286,7 @@ macro_rules! define_field_module {
                 let (airs_degrees, preprocessed_columns) =
                     get_airs_and_degrees_with_prep::<ConfigWithFriParamsZk, F, 1>(
                         &circuit,
-                        table_packing,
+                        &table_packing,
                         &[],
                         &[],
                         ConstraintProfile::Standard,
@@ -300,7 +304,7 @@ macro_rules! define_field_module {
                     ProverData::from_airs_and_degrees(config, &mut airs, &ext_degrees);
                 let circuit_prover_data = CircuitProverData::new(prover_data, preprocessed_columns);
                 let prover =
-                    BatchStarkProver::new(config.clone()).with_table_packing(table_packing);
+                    BatchStarkProver::new(config.clone()).with_table_packing(table_packing.clone());
                 let proof = prover
                     .prove_all_tables(&traces, &circuit_prover_data)
                     .expect("Failed to prove dummy circuit (ZK)");
@@ -315,15 +319,17 @@ macro_rules! define_field_module {
                 num_recursive_layers: usize,
                 fri_params: &FriParams,
                 table_packing: &TablePacking,
+                recompose_lanes: usize,
                 security_level: usize,
                 zk: bool,
                 disable_recompose_npo: bool,
             ) {
                 let base_table_packing = TablePacking::new(1, 1)
                     .with_fri_params(fri_params.log_final_poly_len, fri_params.log_blowup);
-                let backend = FriRecursionBackend::<$backend_width, $backend_rate>::$backend_ctor(
+                let backend = FriRecursionBackend::<$backend_width, $backend_rate>::new(
                     $poseidon2_config,
-                );
+                )
+                .for_extension_degree::<$d>();
 
                 let tree_depth = num_recursive_layers;
                 let num_leaves = 1usize << tree_depth;
@@ -336,10 +342,11 @@ macro_rules! define_field_module {
                             .map(|i| {
                                 let val = (i + 1) as u32;
                                 info!("Base proof {i} (const = {val})");
-                                $prove_base_fn(val, &config, base_table_packing)
+                                $prove_base_fn(val, &config, &base_table_packing)
                             })
                             .collect();
 
+                        let mut prep_cache: Option<AggregationPrepCache<$cfg_type>> = None;
                         let mut level = 0u32;
                         while proofs.len() > 1 {
                             level += 1;
@@ -352,6 +359,7 @@ macro_rules! define_field_module {
                             let agg_params = ProveNextLayerParams {
                                 table_packing: if level == 1 {
                                     TablePacking::new(2, 2)
+                                        .with_npo_lanes(NpoTypeId::recompose(), recompose_lanes)
                                 } else {
                                     table_packing.clone()
                                 }
@@ -364,7 +372,6 @@ macro_rules! define_field_module {
                             let agg_config: $cfg_type = $cfg_fn(level as u64);
 
                             let mut next_level = Vec::with_capacity(pairs);
-                            let mut prep_cache: Option<AggregationPrepCache<$cfg_type>> = None;
                             for pair_idx in 0..pairs {
                                 let li = pair_idx * 2;
                                 let left = proofs[li].into_recursion_input::<BatchOnly>();
@@ -380,10 +387,10 @@ macro_rules! define_field_module {
 
                                 report_proof_size(&out.0);
                                 let mut verifier = BatchStarkProver::new(agg_config.clone())
-                                    .with_table_packing(agg_params.table_packing);
-                                verifier.$register_poseidon2_fn($poseidon2_config);
+                                    .with_table_packing(agg_params.table_packing.clone());
+                                verifier.register_poseidon2_table::<$d>($poseidon2_config);
                                 if !disable_recompose_npo {
-                                    verifier.$register_recompose_fn();
+                                    verifier.register_recompose_table::<$d>();
                                 }
                                 verifier
                                     .verify_all_tables(&out.0, out.1.common_data())
@@ -429,11 +436,7 @@ define_field_module!(
     8,
     8,
     enable_poseidon2_perm,
-    register_poseidon2_table,
-    register_recompose_table,
     p3_koala_bear::default_koalabear_poseidon2_16,
-    poseidon2_air_builders_d4,
-    new_d4,
     16,
     8
 );
@@ -450,11 +453,7 @@ define_field_module!(
     8,
     8,
     enable_poseidon2_perm,
-    register_poseidon2_table,
-    register_recompose_table,
     p3_baby_bear::default_babybear_poseidon2_16,
-    poseidon2_air_builders_d4,
-    new_d4,
     16,
     8
 );
@@ -471,11 +470,7 @@ define_field_module!(
     4,
     4,
     enable_poseidon2_perm_width_8,
-    register_poseidon2_table_d2,
-    register_recompose_table_d2,
     default_goldilocks_poseidon2_8,
-    poseidon2_air_builders_d2,
-    new_d2,
     8,
     4
 );

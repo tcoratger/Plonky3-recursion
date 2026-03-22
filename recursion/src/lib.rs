@@ -19,7 +19,7 @@ pub mod verifier;
 /// Implement for your StarkConfig (or a wrapper holding FRI verifier params) to use [`FriRecursionBackend`].
 pub use backend::fri::FriRecursionConfig;
 /// FRI PCS backend for the unified recursion API. Use with [`prove_next_layer`] and a config implementing [`FriRecursionConfig`].
-pub use backend::{FriRecursionBackend, FriRecursionBackendD2, FriRecursionBackendD4};
+pub use backend::{FriRecursionBackend, FriRecursionBackendForExt};
 pub use challenger::CircuitChallenger;
 pub use challenger_perm::ChallengerPermConfig;
 pub use generation::{GenerationError, PcsGeneration, generate_batch_challenges};
@@ -32,10 +32,10 @@ pub use public_inputs::{
 };
 /// Unified recursion API: single entry point for proving the next layer over a uni-stark or batch-stark proof.
 pub use recursion::{
-    AggregationPrepCache, BatchOnly, NextLayerPrepCache, PcsRecursionBackend, ProveNextLayerParams,
-    RecursionInput, RecursionOutput, VerifierCircuitResult, build_and_prove_aggregation_layer,
-    build_and_prove_next_layer, build_next_layer_circuit, build_next_layer_prep,
-    prove_aggregation_layer, prove_next_layer,
+    AggregationCircuitFingerprint, AggregationPrepCache, BatchOnly, NextLayerPrepCache,
+    PcsRecursionBackend, ProveNextLayerParams, RecursionInput, RecursionOutput,
+    VerifierCircuitResult, build_and_prove_aggregation_layer, build_and_prove_next_layer,
+    build_next_layer_circuit, build_next_layer_prep, prove_aggregation_layer, prove_next_layer,
 };
 pub use traits::{
     Recursive, RecursiveAir, RecursiveChallenger, RecursiveExtensionMmcs, RecursiveMmcs,
