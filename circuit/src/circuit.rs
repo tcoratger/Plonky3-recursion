@@ -684,7 +684,6 @@ mod tests {
                     ],
                 ],
                 non_primitive: HashMap::new(),
-
                 // ext_reads: 0(a)=1, 1(b)=1, 2(c)=1
                 ext_reads: vec![1, 1, 1],
                 dup_npo_outputs: HashMap::new(),
