@@ -96,6 +96,13 @@ where
 /// Type alias for a vector of circuit table AIRs paired with their respective degrees (log of their trace height).
 type CircuitAirsWithDegrees<SC, const D: usize> = Vec<(CircuitTableAir<SC, D>, usize)>;
 
+/// Output of [`get_airs_and_degrees_with_prep`]: AIRs with degrees, primitive columns, and non-primitive columns.
+type PrepOutput<SC, const D: usize> = (
+    CircuitAirsWithDegrees<SC, D>,
+    Vec<Vec<Val<SC>>>,
+    NonPrimitivePreprocessedMap<Val<SC>>,
+);
+
 pub fn get_airs_and_degrees_with_prep<
     SC: StarkGenericConfig + 'static + Send + Sync,
     ExtF: Field + ExtensionField<Val<SC>> + ExtractBinomialW<Val<SC>>,
@@ -106,14 +113,7 @@ pub fn get_airs_and_degrees_with_prep<
     non_primitive_preprocessors: &[Box<dyn NpoPreprocessor<Val<SC>>>],
     non_primitive_air_builders: &[Box<dyn NpoAirBuilder<SC, D>>],
     constraint_profile: ConstraintProfile,
-) -> Result<
-    (
-        CircuitAirsWithDegrees<SC, D>,
-        Vec<Vec<Val<SC>>>,
-        NonPrimitivePreprocessedMap<Val<SC>>,
-    ),
-    CircuitError,
->
+) -> Result<PrepOutput<SC, D>, CircuitError>
 where
     SymbolicExpressionExt<Val<SC>, SC::Challenge>: Algebra<SymbolicExpression<Val<SC>>>,
     Val<SC>: StarkField,
