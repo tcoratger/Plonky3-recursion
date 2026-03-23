@@ -69,10 +69,14 @@ impl<F: Field, const D: usize> PreprocessedColumns<F, D> {
 }
 
 impl<F: Field, const D: usize> PreprocessedWriter<F> for PreprocessedColumns<F, D> {
+    /// Returns the D-scaled base-field index for a given witness ID as a field element.
+    ///
+    /// `WitnessId(n)` maps to base-field index `n * D`.
     fn witness_index_as_field(&self, wid: WitnessId) -> F {
         F::from_u32(wid.0 * D as u32)
     }
 
+    /// Increments the ext-field read count for each of the given witness indices.
     fn increment_ext_reads(&mut self, wids: &[WitnessId]) {
         for wid in wids {
             let idx = wid.0 as usize;
@@ -83,12 +87,22 @@ impl<F: Field, const D: usize> PreprocessedWriter<F> for PreprocessedColumns<F, 
         }
     }
 
+    /// Extends the preprocessed data of `op_type`'s non-primitive operation
+    /// with `wids`'s witness indices (D-scaled). Does NOT increment ext-field read counts.
+    ///
+    /// Use this for non-primitive OUTPUTS: the table creates these witnesses on the
+    /// `WitnessChecks` bus, so they are not readers. The `out_ctl` multiplicity is
+    /// set separately by `get_airs_and_degrees_with_prep` based on `ext_reads`.
     fn register_non_primitive_output_index(&mut self, op_type: &NpoTypeId, wids: &[WitnessId]) {
         let entry = self.non_primitive.entry(op_type.clone()).or_default();
         let wids_field = wids.iter().map(|wid| F::from_u32(wid.0 * D as u32));
         entry.extend(wids_field);
     }
 
+    /// Extends the preprocessed data of `op_type`'s non-primitive operation
+    /// with `wids`'s witness indices (D-scaled), and increments their ext-field read counts.
+    ///
+    /// Use this for non-primitive inputs that the table reads from the `WitnessChecks` bus.
     fn register_non_primitive_witness_reads(
         &mut self,
         op_type: &NpoTypeId,
@@ -101,6 +115,8 @@ impl<F: Field, const D: usize> PreprocessedWriter<F> for PreprocessedColumns<F, 
         Ok(())
     }
 
+    /// Extends the preprocessed data of `op_type`'s non-primitive operation with `values`.
+    /// Does not update read counts.
     fn register_non_primitive_preprocessed_no_read(&mut self, op_type: &NpoTypeId, values: &[F]) {
         let entry = self.non_primitive.entry(op_type.clone()).or_default();
         entry.extend(values);
