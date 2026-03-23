@@ -69,11 +69,8 @@ impl<F: Field, const D: usize> PreprocessedColumns<F, D> {
 }
 
 impl<F: Field, const D: usize> PreprocessedWriter<F> for PreprocessedColumns<F, D> {
-    /// Returns the D-scaled base-field index for a given witness ID as a field element.
-    ///
-    /// `WitnessId(n)` maps to base-field index `n * D`.
     fn witness_index_as_field(&self, wid: WitnessId) -> F {
-        F::from_u32(wid.0 * D as u32)
+        wid.base_field_index::<F, D>()
     }
 
     /// Increments the ext-field read count for each of the given witness indices.
@@ -95,7 +92,7 @@ impl<F: Field, const D: usize> PreprocessedWriter<F> for PreprocessedColumns<F, 
     /// set separately by `get_airs_and_degrees_with_prep` based on `ext_reads`.
     fn register_non_primitive_output_index(&mut self, op_type: &NpoTypeId, wids: &[WitnessId]) {
         let entry = self.non_primitive.entry(op_type.clone()).or_default();
-        let wids_field = wids.iter().map(|wid| F::from_u32(wid.0 * D as u32));
+        let wids_field = wids.iter().map(|wid| wid.base_field_index::<F, D>());
         entry.extend(wids_field);
     }
 
@@ -109,7 +106,7 @@ impl<F: Field, const D: usize> PreprocessedWriter<F> for PreprocessedColumns<F, 
         wids: &[WitnessId],
     ) -> Result<(), CircuitError> {
         let entry = self.non_primitive.entry(op_type.clone()).or_default();
-        let wids_field = wids.iter().map(|wid| F::from_u32(wid.0 * D as u32));
+        let wids_field = wids.iter().map(|wid| wid.base_field_index::<F, D>());
         entry.extend(wids_field);
         self.increment_ext_reads(wids);
         Ok(())
@@ -244,7 +241,7 @@ impl<F: Field> Circuit<F> {
                 // Const: creates the output witness value. Store D-scaled out index.
                 // No ext_reads increment: Const is a creator, not a reader.
                 Op::Const { out, .. } => {
-                    let idx = preprocessed.witness_index_as_field(*out);
+                    let idx = out.base_field_index::<F, D>();
                     preprocessed.primitive[PrimitiveOpType::Const as usize].push(idx);
                     let out_idx = out.0 as usize;
                     if out_idx >= defined.len() {
@@ -255,7 +252,7 @@ impl<F: Field> Circuit<F> {
                 // Public: creates the output witness value. Store D-scaled out index.
                 // No ext_reads increment: Public is a creator, not a reader.
                 Op::Public { out, .. } => {
-                    let idx = preprocessed.witness_index_as_field(*out);
+                    let idx = out.base_field_index::<F, D>();
                     preprocessed.primitive[PrimitiveOpType::Public as usize].push(idx);
                     let out_idx = out.0 as usize;
                     if out_idx >= defined.len() {
