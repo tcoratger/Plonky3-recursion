@@ -125,7 +125,9 @@ impl<F> ExpressionGraph<F> {
             // Sort each operation's outputs by index for deterministic ordering.
             outputs.sort_unstable_by_key(|&(idx, _)| idx);
 
-            // Find the first index that breaks the contiguous 0..N rule
+            // After sorting, a contiguous 0..N range means output_idx[pos] == pos for all pos.
+            //
+            // This single check catches both gaps and duplicates.
             if let Some((pos, &(bad_idx, _))) = outputs
                 .iter()
                 .enumerate()
