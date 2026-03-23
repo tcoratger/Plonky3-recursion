@@ -249,7 +249,7 @@ macro_rules! define_field_module {
                 let expected = builder.alloc_public_input("expected");
                 builder.connect(c, expected);
                 let circuit = builder.build().unwrap();
-                let (airs_degrees, preprocessed_columns) =
+                let (airs_degrees, primitive_columns, non_primitive_columns) =
                     get_airs_and_degrees_with_prep::<ConfigWithFriParams, F, 1>(
                         &circuit,
                         &table_packing,
@@ -268,7 +268,7 @@ macro_rules! define_field_module {
                     degrees.iter().map(|&d| d + config.is_zk()).collect();
                 let prover_data =
                     ProverData::from_airs_and_degrees(config, &mut airs, &ext_degrees);
-                let circuit_prover_data = CircuitProverData::new(prover_data, preprocessed_columns);
+                let circuit_prover_data = CircuitProverData::new(prover_data, primitive_columns, non_primitive_columns);
                 let prover =
                     BatchStarkProver::new(config.clone()).with_table_packing(table_packing.clone());
                 let proof = prover
@@ -292,7 +292,7 @@ macro_rules! define_field_module {
                 let expected = builder.alloc_public_input("expected");
                 builder.connect(c, expected);
                 let circuit = builder.build().unwrap();
-                let (airs_degrees, preprocessed_columns) =
+                let (airs_degrees, primitive_columns, non_primitive_columns) =
                     get_airs_and_degrees_with_prep::<ConfigWithFriParamsZk, F, 1>(
                         &circuit,
                         &table_packing,
@@ -311,7 +311,7 @@ macro_rules! define_field_module {
                     degrees.iter().map(|&d| d + config.is_zk()).collect();
                 let prover_data =
                     ProverData::from_airs_and_degrees(config, &mut airs, &ext_degrees);
-                let circuit_prover_data = CircuitProverData::new(prover_data, preprocessed_columns);
+                let circuit_prover_data = CircuitProverData::new(prover_data, primitive_columns, non_primitive_columns);
                 let prover =
                     BatchStarkProver::new(config.clone()).with_table_packing(table_packing.clone());
                 let proof = prover
