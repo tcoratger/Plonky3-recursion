@@ -258,6 +258,33 @@ pub type KoalaBearConfig =
 pub type GoldilocksConfig =
     Config<Goldilocks, Poseidon2Goldilocks<8>, Poseidon2Goldilocks<8>, 8, 8, 4, 4, 4, 2>;
 
+/// Generic config builder: creates a STARK configuration from any Poseidon2
+/// permutation, parameterized by field, width, rate, output size, and
+/// challenge degree.
+///
+/// Use the convenience functions ([`baby_bear`], [`koala_bear`], [`goldilocks`])
+/// for the standard presets, or call this directly for custom configurations.
+///
+/// # Example: BabyBear with D=5
+///
+/// ```ignore
+/// let perm = default_babybear_poseidon2_16();
+/// let config = stark_config::<BabyBear, _, 16, 8, 8, 5>(perm).build();
+/// ```
+#[inline]
+pub fn stark_config<
+    F: Field,
+    Perm: Clone + CryptographicPermutation<[F; W]>,
+    const W: usize,
+    const RATE: usize,
+    const OUT: usize,
+    const CHALLENGE_DEGREE: usize,
+>(
+    perm: Perm,
+) -> ConfigBuilder<F, Perm, Perm, W, W, RATE, OUT, OUT, CHALLENGE_DEGREE> {
+    ConfigBuilder::new(perm.clone(), perm)
+}
+
 /// Trait bounds for STARK-compatible fields.
 pub trait StarkField: Field + PrimeCharacteristicRing + TwoAdicField + PrimeField64 {}
 

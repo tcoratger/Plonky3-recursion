@@ -28,7 +28,7 @@ pub mod state;
 pub mod trace;
 
 pub use call::{Poseidon2PermCall, Poseidon2PermCallBase};
-pub use config::Poseidon2Config;
+pub use config::{Poseidon2Config, Poseidon2FieldId};
 pub(crate) use config::Poseidon2PermExec;
 pub(crate) use plugin::Poseidon2CircuitPlugin;
 pub use state::Poseidon2PermPrivateData;

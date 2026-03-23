@@ -577,7 +577,7 @@ fn test_goldilocks_poseidon2_circuit_build_and_run() {
         perm,
     );
     builder.enable_recompose::<Goldilocks>(generate_recompose_trace::<Goldilocks, Ext2>);
-    let poseidon2_config = Poseidon2Config::GoldilocksD2Width8;
+    let poseidon2_config = Poseidon2Config::GOLDILOCKS_D2_W8;
     let inputs = [builder.public_input(), builder.public_input()];
     let hash_outputs = builder
         .add_hash_slice(&poseidon2_config, &inputs, true)
