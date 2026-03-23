@@ -529,21 +529,13 @@ impl Poseidon2PermExecutor {
                 preprocessed.register_non_primitive_preprocessed_no_read(&self.op_type, &[F::ONE]);
             }
             let normal_chain_sel =
-                if !self.new_start && !self.merkle_path && inputs[limb_idx].is_empty() {
-                    F::ONE
-                } else {
-                    F::ZERO
-                };
+                F::from_bool(!self.new_start && !self.merkle_path && inputs[limb_idx].is_empty());
 
             preprocessed
                 .register_non_primitive_preprocessed_no_read(&self.op_type, &[normal_chain_sel]);
 
             let merkle_chain_sel =
-                if !self.new_start && self.merkle_path && inputs[limb_idx].is_empty() {
-                    F::ONE
-                } else {
-                    F::ZERO
-                };
+                F::from_bool(!self.new_start && self.merkle_path && inputs[limb_idx].is_empty());
             preprocessed
                 .register_non_primitive_preprocessed_no_read(&self.op_type, &[merkle_chain_sel]);
         }
@@ -593,16 +585,12 @@ impl Poseidon2PermExecutor {
         }
 
         let mmcs_ctl_enabled = !inputs[width_ext].is_empty();
-        let mmcs_merkle_flag = if mmcs_ctl_enabled && self.merkle_path {
-            F::ONE
-        } else {
-            F::ZERO
-        };
+        let mmcs_merkle_flag = F::from_bool(mmcs_ctl_enabled && self.merkle_path);
         preprocessed
             .register_non_primitive_preprocessed_no_read(&self.op_type, &[mmcs_merkle_flag]);
 
-        let new_start_val = if self.new_start { F::ONE } else { F::ZERO };
-        let merkle_path_val = if self.merkle_path { F::ONE } else { F::ZERO };
+        let new_start_val = F::from_bool(self.new_start);
+        let merkle_path_val = F::from_bool(self.merkle_path);
         preprocessed.register_non_primitive_preprocessed_no_read(
             &self.op_type,
             &[new_start_val, merkle_path_val],
