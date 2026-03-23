@@ -1469,7 +1469,8 @@ pub(crate) fn poseidon2_config_for_air_builder<const D: usize>(
 ) -> Option<Poseidon2Config> {
     matches!(
         (D, config.field_id),
-        (2, Poseidon2FieldId::Goldilocks) | (4, Poseidon2FieldId::BabyBear | Poseidon2FieldId::KoalaBear)
+        (2, Poseidon2FieldId::Goldilocks)
+            | (4, Poseidon2FieldId::BabyBear | Poseidon2FieldId::KoalaBear)
     )
     .then_some(config)
 }
