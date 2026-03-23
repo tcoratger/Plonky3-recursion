@@ -1467,15 +1467,11 @@ impl NpoPreprocessor<Goldilocks> for Poseidon2Preprocessor {
 pub(crate) fn poseidon2_config_for_air_builder<const D: usize>(
     config: Poseidon2Config,
 ) -> Option<Poseidon2Config> {
-    let matches = match (D, config.field_id) {
-        (2, Poseidon2FieldId::Goldilocks) => true,
-        (4, Poseidon2FieldId::BabyBear | Poseidon2FieldId::KoalaBear) => true,
-        _ => false,
-    };
-    if matches {
-        return Some(config);
-    }
-    None
+    matches!(
+        (D, config.field_id),
+        (2, Poseidon2FieldId::Goldilocks) | (4, Poseidon2FieldId::BabyBear | Poseidon2FieldId::KoalaBear)
+    )
+    .then_some(config)
 }
 
 pub(crate) fn poseidon2_air_try_build<SC, const D: usize>(
