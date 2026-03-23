@@ -1067,7 +1067,7 @@ mod test {
         {
             use p3_circuit_prover::*;
 
-            let config = p3_circuit_prover::config::koala_bear().build();
+            let config = p3_circuit_prover::config::koala_bear();
             let table_packing = TablePacking::default();
 
             let (airs_degrees, primitive_columns, non_primitive_columns) =

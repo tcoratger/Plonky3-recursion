@@ -129,7 +129,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let circuit = builder.build()?;
     let expr_to_widx = circuit.expr_to_widx.clone();
 
-    let stark_config = config::koala_bear().build();
+    let stark_config = config::koala_bear();
     let table_packing = TablePacking::new(2, 2);
     let poseidon2_config = Poseidon2Config::KOALA_BEAR_D4_W16;
     let npo_prep: Vec<Box<dyn NpoPreprocessor<Base>>> = vec![

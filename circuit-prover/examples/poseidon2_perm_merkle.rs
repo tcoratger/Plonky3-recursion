@@ -221,7 +221,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let circuit = builder.build()?;
     let table_packing = TablePacking::new(4, 4);
     let poseidon2_config = Poseidon2Config::KOALA_BEAR_D4_W16;
-    let stark_config = config::koala_bear().build();
+    let stark_config = config::koala_bear();
     let npo_prep: Vec<Box<dyn NpoPreprocessor<Base>>> = vec![
         Box::new(Poseidon2Preprocessor),
         Box::new(RecomposePreprocessor),
