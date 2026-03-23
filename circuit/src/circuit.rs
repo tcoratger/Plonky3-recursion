@@ -495,7 +495,6 @@ mod tests {
             PreprocessedColumns {
                 primitive: vec![vec![]; PrimitiveOpType::COUNT],
                 non_primitive: HashMap::new(),
-
                 ext_reads: vec![0],
                 dup_npo_outputs: HashMap::new(),
             }
