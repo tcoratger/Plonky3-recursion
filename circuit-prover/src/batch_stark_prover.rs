@@ -99,6 +99,14 @@ where
 ///
 /// This struct bundles the upstream [`ProverData`] with circuit-specific preprocessed data,
 /// providing a cleaner API for `prove_all_tables`.
+///
+/// Preprocessed columns are stored as flat base-field vectors rather than a
+/// [`PreprocessedColumns<F, D>`](p3_circuit::PreprocessedColumns) because `D` is only
+/// determined at proving time (via `EF::DIMENSION`) while this struct is constructed
+/// and stored beforehand. The `ext_reads` and `dup_npo_outputs` fields from
+/// `PreprocessedColumns` are fully consumed during AIR construction in
+/// [`get_airs_and_degrees_with_prep`](crate::common::get_airs_and_degrees_with_prep)
+/// and are not needed here.
 pub struct CircuitProverData<SC: StarkGenericConfig> {
     /// STARK prover data from p3_batch_stark.
     pub prover_data: ProverData<SC>,
