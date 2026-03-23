@@ -801,19 +801,15 @@ impl Poseidon2Prover {
 
     pub(crate) fn air_wrapper_for_config(config: Poseidon2Config) -> Poseidon2AirWrapperInner {
         match (config.field_id, config.width) {
-            (Poseidon2FieldId::BabyBear, 16) => {
-                Poseidon2AirWrapperInner::BabyBearD4Width16(Box::new(
-                    BabyBearD4Width16::default_air(),
-                ))
-            }
+            (Poseidon2FieldId::BabyBear, 16) => Poseidon2AirWrapperInner::BabyBearD4Width16(
+                Box::new(BabyBearD4Width16::default_air()),
+            ),
             (Poseidon2FieldId::BabyBear, 24) => Poseidon2AirWrapperInner::BabyBearD4Width24(
                 Box::new(BabyBearD4Width24::default_air()),
             ),
-            (Poseidon2FieldId::KoalaBear, 16) => {
-                Poseidon2AirWrapperInner::KoalaBearD4Width16(Box::new(
-                    KoalaBearD4Width16::default_air(),
-                ))
-            }
+            (Poseidon2FieldId::KoalaBear, 16) => Poseidon2AirWrapperInner::KoalaBearD4Width16(
+                Box::new(KoalaBearD4Width16::default_air()),
+            ),
             (Poseidon2FieldId::KoalaBear, 24) => Poseidon2AirWrapperInner::KoalaBearD4Width24(
                 Box::new(KoalaBearD4Width24::default_air()),
             ),
@@ -866,14 +862,12 @@ impl Poseidon2Prover {
                     ),
                 ))
             }
-            (Poseidon2FieldId::Goldilocks, 8) => {
-                Poseidon2AirWrapperInner::GoldilocksD2Width8(Box::new(
-                    goldilocks_d2_width8_default_air_with_preprocessed(
-                        unsafe { transmute::<Vec<F>, Vec<Goldilocks>>(preprocessed) },
-                        min_height,
-                    ),
-                ))
-            }
+            (Poseidon2FieldId::Goldilocks, 8) => Poseidon2AirWrapperInner::GoldilocksD2Width8(
+                Box::new(goldilocks_d2_width8_default_air_with_preprocessed(
+                    unsafe { transmute::<Vec<F>, Vec<Goldilocks>>(preprocessed) },
+                    min_height,
+                )),
+            ),
             _ => panic!("unsupported Poseidon2 config: {:?}", config),
         }
     }
