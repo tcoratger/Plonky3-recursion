@@ -583,7 +583,6 @@ mod tests {
                     ],
                 ],
                 non_primitive: HashMap::new(),
-
                 // ext_reads: wid0=4 (a+c in op1, c in op2, c in op3),
                 //            wid1=1, wid2=2 (b in op2+op3), wid3=1, wid4=1
                 ext_reads: vec![4, 1, 2, 1, 1],
