@@ -31,7 +31,7 @@
 //!
 //! ## Preprocessed trace layout
 //!
-//! Each lane occupies 13 columns (see [`PREP_*`][PREP_MULT_A] constants):
+//! Each lane occupies 13 columns (see [`AluPrepLaneCols`](super::alu_columns::AluPrepLaneCols)):
 //!
 //! | Offset | Name              | Purpose                                        |
 //! |--------|-------------------|------------------------------------------------|
@@ -51,7 +51,8 @@
 //!
 //! After all lanes, there are `1 + 4 * (K - 1)` **global** extra preprocessed
 //! columns for packed HornerAcc: column 0 is `sel_horner_packed`; for each step
-//! `t = 1..K-1`, four columns `a_t_idx`, `c_t_idx`, `a_t_reader`, `c_t_reader`.
+//! `t = 1..K-1`, four columns `a_t_idx`, `c_t_idx`, `a_t_reader`, `c_t_reader`
+//! (see [`AluPackedHornerStepPrepCols`](super::alu_columns::AluPackedHornerStepPrepCols)).
 //!
 //! Total preprocessed width = `lanes * 13 + 1 + 4 * (K - 1)`.
 //!
@@ -78,6 +79,7 @@
 use alloc::string::ToString;
 use alloc::vec;
 use alloc::vec::Vec;
+use core::borrow::{Borrow, BorrowMut};
 use core::marker::PhantomData;
 
 use p3_air::{Air, AirBuilder, BaseAir, WindowAccess};
@@ -88,40 +90,12 @@ use p3_lookup::lookup_traits::{Direction, Kind, Lookup};
 use p3_matrix::dense::RowMajorMatrix;
 use p3_uni_stark::SymbolicExpression;
 
+use super::alu_columns::{
+    AluMainLaneCols, AluPackedHornerStepPrepCols, AluPrepLaneCols, EXTRA_PREP_SEL_PACKED,
+    PACKED_HORNER_STEP_PREP_WIDTH, PREP_LANE_WIDTH, alu_main_lane_width, extra_prep_a_idx_for_step,
+    horner_extra_prep_width,
+};
 use crate::air::utils::{create_symbolic_variables, get_alu_index_lookups};
-
-// ── Preprocessed column offsets within each lane (13 columns) ────────────────
-pub(crate) const PREP_MULT_A: usize = 0;
-pub(crate) const PREP_SEL_ADD: usize = 1;
-pub(crate) const PREP_SEL_BOOL: usize = 2;
-pub(crate) const PREP_SEL_MULADD: usize = 3;
-pub(crate) const PREP_SEL_HORNER: usize = 4;
-pub(crate) const PREP_A_IDX: usize = 5;
-pub(crate) const PREP_B_IDX: usize = 6;
-pub(crate) const PREP_C_IDX: usize = 7;
-pub(crate) const PREP_OUT_IDX: usize = 8;
-pub(crate) const PREP_MULT_B: usize = 9;
-pub(crate) const PREP_MULT_OUT: usize = 10;
-pub(crate) const PREP_A_IS_READER: usize = 11;
-pub(crate) const PREP_C_IS_READER: usize = 12;
-
-/// Number of preprocessed columns per lane.
-pub(crate) const PREP_LANE_WIDTH: usize = 13;
-
-// ── Global extra preprocessed: column 0 = packed Horner selector ──────────────
-pub(crate) const EXTRA_PREP_SEL_PACKED: usize = 0;
-
-/// Preprocessed offset for step `t`'s `a_idx` (`t` in `1..K-1`).
-#[inline]
-pub(crate) const fn extra_prep_a_idx_for_step(t: usize) -> usize {
-    1 + 4 * (t - 1)
-}
-
-/// Number of global extra preprocessed columns for K-step packed Horner (`K >= 2`).
-#[inline]
-pub(crate) const fn horner_extra_prep_width(k: usize) -> usize {
-    1 + 4 * (k - 1)
-}
 
 /// Entry in the HornerAcc lane schedule.
 #[derive(Debug, Clone, Copy)]
@@ -270,7 +244,7 @@ impl<F: Field + PrimeCharacteristicRing, const D: usize> AluAir<F, D> {
 
     /// Number of main columns per lane: a[D], b[D], c[D], out[D]
     pub const fn lane_width() -> usize {
-        4 * D
+        alu_main_lane_width::<D>()
     }
 
     /// Total main trace width for this AIR instance.
@@ -279,7 +253,7 @@ impl<F: Field + PrimeCharacteristicRing, const D: usize> AluAir<F, D> {
         self.lanes * Self::lane_width() + extra
     }
 
-    /// Number of preprocessed columns per lane (see `PREP_*` constants).
+    /// Number of preprocessed columns per lane (see [`AluPrepLaneCols`](super::alu_columns::AluPrepLaneCols)).
     pub const fn preprocessed_lane_width() -> usize {
         PREP_LANE_WIDTH
     }
@@ -312,7 +286,10 @@ impl<F: Field + PrimeCharacteristicRing, const D: usize> AluAir<F, D> {
         }
 
         let is_horner: Vec<bool> = (0..num_ops)
-            .map(|i| preprocessed[i * plw + PREP_SEL_HORNER] == F::ONE)
+            .map(|i| {
+                let prep: &AluPrepLaneCols<F> = preprocessed[i * plw..(i + 1) * plw].borrow();
+                prep.sel_horner == F::ONE
+            })
             .collect();
 
         if !is_horner.iter().any(|&h| h) {
@@ -415,10 +392,13 @@ impl<F: Field + PrimeCharacteristicRing, const D: usize> AluAir<F, D> {
         if op_indices.is_empty() {
             return true;
         }
-        let b0 = preprocessed[op_indices[0] * plw + PREP_B_IDX];
-        op_indices
-            .iter()
-            .all(|&idx| preprocessed[idx * plw + PREP_B_IDX] == b0)
+        let prep0: &AluPrepLaneCols<F> =
+            preprocessed[op_indices[0] * plw..(op_indices[0] + 1) * plw].borrow();
+        let b0 = prep0.b_idx;
+        op_indices.iter().all(|&idx| {
+            let p: &AluPrepLaneCols<F> = preprocessed[idx * plw..(idx + 1) * plw].borrow();
+            p.b_idx == b0
+        })
     }
 
     /// Write the 4 operands `[a, b, c, out]` of operation `op_idx` into `dst`
@@ -543,26 +523,32 @@ impl<F: Field + PrimeCharacteristicRing, const D: usize> AluAir<F, D> {
 
                         values[base..base + plw].copy_from_slice(src0);
 
-                        values[base + PREP_OUT_IDX] = src_last[PREP_OUT_IDX];
-                        values[base + PREP_MULT_OUT] = src_last[PREP_MULT_OUT];
+                        let lane_prep: &mut AluPrepLaneCols<F> =
+                            values[base..base + plw].borrow_mut();
+                        let src_last_prep: &AluPrepLaneCols<F> = src_last.borrow();
+                        lane_prep.out_idx = src_last_prep.out_idx;
+                        lane_prep.mult_out = src_last_prep.mult_out;
 
-                        let mult_b0 = values[base + PREP_MULT_B];
+                        let mult_b0 = lane_prep.mult_b;
                         let mut mult_b_scaled = F::ZERO;
                         for _ in 0..k {
                             mult_b_scaled += mult_b0;
                         }
-                        values[base + PREP_MULT_B] = mult_b_scaled;
+                        lane_prep.mult_b = mult_b_scaled;
 
                         let extra_base = row * row_width + self.lanes * plw;
                         values[extra_base + EXTRA_PREP_SEL_PACKED] = F::ONE;
                         for t in 1..k {
-                            let src_t = &self.preprocessed
-                                [(*first_idx + t) * plw..(*first_idx + t + 1) * plw];
+                            let src_t: &AluPrepLaneCols<F> = self.preprocessed
+                                [(*first_idx + t) * plw..(*first_idx + t + 1) * plw]
+                                .borrow();
                             let p = extra_base + extra_prep_a_idx_for_step(t);
-                            values[p] = src_t[PREP_A_IDX];
-                            values[p + 1] = src_t[PREP_C_IDX];
-                            values[p + 2] = src_t[PREP_A_IS_READER];
-                            values[p + 3] = src_t[PREP_C_IS_READER];
+                            let step: &mut AluPackedHornerStepPrepCols<F> =
+                                values[p..p + PACKED_HORNER_STEP_PREP_WIDTH].borrow_mut();
+                            step.a_idx = src_t.a_idx;
+                            step.c_idx = src_t.c_idx;
+                            step.a_reader = src_t.a_is_reader;
+                            step.c_reader = src_t.c_is_reader;
                         }
                     }
                 }
@@ -653,16 +639,22 @@ where
             let m = lane * lane_width;
             let p = lane * PREP_LANE_WIDTH;
 
-            let a = &local[m..m + D];
-            let b = &local[m + D..m + 2 * D];
-            let c = &local[m + 2 * D..m + 3 * D];
-            let out = &local[m + 3 * D..m + 4 * D];
+            let lane_local: &AluMainLaneCols<_, D> = local[m..m + lane_width].borrow();
+            let lane_next: &AluMainLaneCols<_, D> = next[m..m + lane_width].borrow();
 
-            let mult_a = prep_local[p + PREP_MULT_A];
-            let sel_add = prep_local[p + PREP_SEL_ADD];
-            let sel_bool = prep_local[p + PREP_SEL_BOOL];
-            let sel_muladd = prep_local[p + PREP_SEL_MULADD];
-            let sel_horner = prep_local[p + PREP_SEL_HORNER];
+            let prep_cur: &AluPrepLaneCols<_> = prep_local[p..p + PREP_LANE_WIDTH].borrow();
+            let prep_n: &AluPrepLaneCols<_> = prep_next[p..p + PREP_LANE_WIDTH].borrow();
+
+            let a = &lane_local.a;
+            let b = &lane_local.b;
+            let c = &lane_local.c;
+            let out = &lane_local.out;
+
+            let mult_a = prep_cur.mult_a;
+            let sel_add = prep_cur.sel_add;
+            let sel_bool = prep_cur.sel_bool;
+            let sel_muladd = prep_cur.sel_muladd;
+            let sel_horner = prep_cur.sel_horner;
 
             let active = AB::Expr::ZERO - mult_a;
             let sel_mul = active - sel_bool - sel_muladd - sel_horner - sel_add;
@@ -691,12 +683,12 @@ where
             }
 
             // ── HORNER_ACC ───────────────────────────────────────────────
-            let next_sel_horner = prep_next[p + PREP_SEL_HORNER];
+            let next_sel_horner = prep_n.sel_horner;
 
-            let next_a = &next[m..m + D];
-            let next_b = &next[m + D..m + 2 * D];
-            let next_c = &next[m + 2 * D..m + 3 * D];
-            let next_out = &next[m + 3 * D..m + 4 * D];
+            let next_a = &lane_next.a;
+            let next_b = &lane_next.b;
+            let next_c = &lane_next.c;
+            let next_out = &lane_next.out;
 
             let out_next_b = ext_mul::<AB, D>(out, next_b, &w);
 
@@ -815,16 +807,19 @@ impl<F: Field, const D: usize> LookupAir<F> for AluAir<F, D> {
         let num_int = k - 1;
         let ac_base = extra_main + num_int * D;
 
-        let mult_a_lane0 = SymbolicExpression::from(preprocessed_local[PREP_MULT_A]);
+        let prep_lane0: &AluPrepLaneCols<_> = preprocessed_local[..PREP_LANE_WIDTH].borrow();
+        let mult_a_lane0 = SymbolicExpression::from(prep_lane0.mult_a);
 
         for t in 1..k {
             let p = extra_prep + extra_prep_a_idx_for_step(t);
-            let a_reader = SymbolicExpression::from(preprocessed_local[p + 2]);
-            let c_reader = SymbolicExpression::from(preprocessed_local[p + 3]);
+            let step: &AluPackedHornerStepPrepCols<_> =
+                preprocessed_local[p..p + PACKED_HORNER_STEP_PREP_WIDTH].borrow();
+            let a_reader = SymbolicExpression::from(step.a_reader);
+            let c_reader = SymbolicExpression::from(step.c_reader);
             let eff_mult_a = mult_a_lane0.dup() * a_reader.dup();
             let eff_mult_c = mult_a_lane0.dup() * c_reader;
 
-            let a_idx = SymbolicExpression::from(preprocessed_local[p]);
+            let a_idx = SymbolicExpression::from(step.a_idx);
             let main_off = ac_base + 2 * (t - 1) * D;
             let mut a_inps = vec![a_idx];
             for j in 0..D {
@@ -836,7 +831,7 @@ impl<F: Field, const D: usize> LookupAir<F> for AluAir<F, D> {
                 &[(a_inps, eff_mult_a, Direction::Receive)],
             ));
 
-            let c_idx = SymbolicExpression::from(preprocessed_local[p + 1]);
+            let c_idx = SymbolicExpression::from(step.c_idx);
             let mut c_inps = vec![c_idx];
             for j in 0..D {
                 c_inps.push(SymbolicExpression::from(
